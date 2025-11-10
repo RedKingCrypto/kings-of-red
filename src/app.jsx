@@ -43,19 +43,20 @@ export default function App() {
     loadGameData();
   }, []);
 
-  const loadGameData = async () => {
+  const loadGameData = () => {
+    // For Vercel deployment, we'll use localStorage instead of window.storage
     try {
-      const heraldsData = await window.storage.get('heralds-state');
-      const balanceData = await window.storage.get('food-balance');
+      const heraldsData = localStorage.getItem('heralds-state');
+      const balanceData = localStorage.getItem('food-balance');
       
       if (heraldsData) {
-        setHeralds(JSON.parse(heraldsData.value));
+        setHeralds(JSON.parse(heraldsData));
       } else {
         setHeralds(MOCK_HERALDS);
       }
       
       if (balanceData) {
-        setFoodBalance(parseFloat(balanceData.value));
+        setFoodBalance(parseFloat(balanceData));
       }
     } catch (error) {
       setHeralds(MOCK_HERALDS);
@@ -63,10 +64,10 @@ export default function App() {
     }
   };
 
-  const saveGameData = async (newHeralds, newBalance) => {
+  const saveGameData = (newHeralds, newBalance) => {
     try {
-      await window.storage.set('heralds-state', JSON.stringify(newHeralds));
-      await window.storage.set('food-balance', newBalance.toString());
+      localStorage.setItem('heralds-state', JSON.stringify(newHeralds));
+      localStorage.setItem('food-balance', newBalance.toString());
     } catch (error) {
       console.error('Failed to save game data:', error);
     }
@@ -335,3 +336,112 @@ export default function App() {
                             HERALD_CONFIG.BRONZE_FOOD_PER_DAY} FOOD
                         </div>
                       )}
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-2">
+                    {!herald.staked ? (
+                      <button
+                        onClick={() => stakeHerald(herald.id)}
+                        className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg font-semibold transition"
+                      >
+                        Stake Herald
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => claimRewards(herald)}
+                          disabled={!claimable}
+                          className={`flex-1 py-2 rounded-lg font-semibold transition ${
+                            claimable
+                              ? 'bg-green-600 hover:bg-green-700'
+                              : 'bg-gray-700 cursor-not-allowed opacity-50'
+                          }`}
+                        >
+                          Claim Rewards
+                        </button>
+                        <button
+                          onClick={() => unstakeHerald(herald.id)}
+                          className="flex-1 bg-red-600 hover:bg-red-700 py-2 rounded-lg font-semibold transition"
+                        >
+                          Unstake
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {(selectedTab === 'unstaked' ? unstakedHeralds : stakedHeralds).length === 0 && (
+          <div className="text-center py-12 bg-gray-800/30 rounded-lg">
+            <p className="text-gray-400">
+              {selectedTab === 'unstaked' 
+                ? 'No unstaked Heralds. Stake your Heralds to start earning!' 
+                : 'No staked Heralds yet. Visit the Unstaked tab to stake your Heralds.'}
+            </p>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
+      <div className="border-b border-red-800/50 bg-black/40 backdrop-blur">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Crown className="w-8 h-8 text-red-500" />
+              <button 
+                onClick={() => setCurrentPage('home')}
+                className="hover:opacity-80 transition text-left"
+              >
+                <h1 className="text-2xl font-bold">KINGS OF RED</h1>
+                <p className="text-sm text-gray-400">Herald Platform - Phase 1</p>
+              </button>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 bg-green-900/30 px-4 py-2 rounded-lg border border-green-500/30">
+                <Coins className="w-5 h-5 text-green-400" />
+                <span className="font-bold">{foodBalance.toFixed(2)}</span>
+                <span className="text-sm text-gray-400">$KINGSFOOD</span>
+              </div>
+              
+              {!connected ? (
+                <button
+                  onClick={connectWallet}
+                  className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-semibold transition"
+                >
+                  Connect Wallet
+                </button>
+              ) : (
+                <div className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
+                  <span className="text-sm text-gray-400">Connected:</span>
+                  <span className="ml-2 font-mono text-sm">
+                    {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8">
+        {currentPage === 'home' ? renderHomePage() : renderGamePage()}
+      </div>
+
+      <div className="border-t border-red-800/50 bg-black/40 backdrop-blur mt-12">
+        <div className="container mx-auto px-4 py-6">
+          <div className="text-center text-sm text-gray-500">
+            <p>Kings of Red © 2024 • Built on Base Network</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
