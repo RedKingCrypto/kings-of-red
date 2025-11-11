@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, Coins, Clock, Flame, Shield, Swords } from 'lucide-react';
+import MintPage from './mint.jsx';
 
 // PLACEHOLDER VALUES - Customize these
 const HERALD_CONFIG = {
@@ -13,7 +14,7 @@ const HERALD_CONFIG = {
 
 const CLANS = [
   { id: 1, name: 'Smizfume', color: 'from-red-600 to-orange-500', icon: Flame },
-  { id: 2, name: 'Genin', color: 'from-gray-600 to-slate-400', icon: Shield },
+  { id: 2, name: 'Coalheart', color: 'from-gray-600 to-slate-400', icon: Shield },
   { id: 3, name: 'Warmdice', color: 'from-purple-600 to-indigo-500', icon: Crown },
   { id: 4, name: 'Bervation', color: 'from-blue-600 to-cyan-500', icon: Swords },
   { id: 5, name: 'Konfisof', color: 'from-green-600 to-emerald-500', icon: Shield },
@@ -31,7 +32,7 @@ const MOCK_HERALDS = [
   { id: 7, clan: 7, rarity: 'Silver', tokenId: '1007', staked: false }
 ];
 
-export default function Application() {
+export default function App() {
   const [connected, setConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
   const [heralds, setHeralds] = useState([]);
@@ -41,10 +42,15 @@ export default function Application() {
 
   useEffect(() => {
     loadGameData();
+    
+    // Check URL for page routing
+    const path = window.location.pathname;
+    if (path.includes('/mint')) {
+      setCurrentPage('mint');
+    }
   }, []);
 
   const loadGameData = () => {
-    // For Vercel deployment, we'll use localStorage instead of window.storage
     try {
       const heraldsData = localStorage.getItem('heralds-state');
       const balanceData = localStorage.getItem('food-balance');
@@ -78,6 +84,16 @@ export default function Application() {
     setWalletAddress(mockAddress);
     setConnected(true);
   };
+
+  const navigateTo = (page) => {
+    setCurrentPage(page);
+    window.history.pushState({}, '', page === 'home' ? '/' : `/${page}`);
+  };
+
+  // If on mint page, show mint page component
+  if (currentPage === 'mint') {
+    return <MintPage onNavigate={navigateTo} />;
+  }
 
   const stakeHerald = (heraldId) => {
     const updatedHeralds = heralds.map(h => {
@@ -208,21 +224,30 @@ export default function Application() {
         </div>
       </div>
 
-      {!connected ? (
+      <div className="flex gap-4 justify-center mb-8">
         <button
-          onClick={connectWallet}
-          className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-semibold transition text-lg"
+          onClick={() => navigateTo('mint')}
+          className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 px-10 py-4 rounded-lg font-bold text-lg transition shadow-lg"
         >
-          Connect Wallet to Start
+          🔥 Mint Herald NFT
         </button>
-      ) : (
-        <button
-          onClick={() => setCurrentPage('game')}
-          className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-semibold transition text-lg"
-        >
-          Enter Herald Platform
-        </button>
-      )}
+        
+        {!connected ? (
+          <button
+            onClick={connectWallet}
+            className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-semibold transition text-lg"
+          >
+            Connect Wallet
+          </button>
+        ) : (
+          <button
+            onClick={() => navigateTo('game')}
+            className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-semibold transition text-lg"
+          >
+            Enter Herald Platform
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -396,7 +421,7 @@ export default function Application() {
             <div className="flex items-center gap-3">
               <Crown className="w-8 h-8 text-red-500" />
               <button 
-                onClick={() => setCurrentPage('home')}
+                onClick={() => navigateTo('home')}
                 className="hover:opacity-80 transition text-left"
               >
                 <h1 className="text-2xl font-bold">KINGS OF RED</h1>
@@ -405,6 +430,15 @@ export default function Application() {
             </div>
             
             <div className="flex items-center gap-4">
+              {currentPage !== 'mint' && (
+                <button
+                  onClick={() => navigateTo('mint')}
+                  className="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg font-semibold transition text-sm"
+                >
+                  Mint NFT
+                </button>
+              )}
+              
               <div className="flex items-center gap-2 bg-green-900/30 px-4 py-2 rounded-lg border border-green-500/30">
                 <Coins className="w-5 h-5 text-green-400" />
                 <span className="font-bold">{foodBalance.toFixed(2)}</span>
