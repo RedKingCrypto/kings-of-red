@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Crown, Coins, Clock, Flame, Shield, Swords } from 'lucide-react';
 import MintPage from './mint.jsx';
 import AboutPage from './About.jsx';
+import StakingPage from './Staking.jsx';
 
 // PLACEHOLDER VALUES - Customize these
 const HERALD_CONFIG = {
@@ -50,7 +51,9 @@ export default function App() {
       setCurrentPage('mint');
     } else if (path.includes('/about')) {
       setCurrentPage('about');
-    }
+    } else if (path.includes('/staking')) {
+  setCurrentPage('staking');
+}
   }, []);
 
   const loadGameData = () => {
@@ -101,6 +104,10 @@ export default function App() {
   if (currentPage === 'about') {
     return <AboutPage onNavigate={navigateTo} />;
   }
+
+  if (currentPage === 'staking') {
+  return <StakingPage onNavigate={navigateTo} />;
+}
 
   const stakeHerald = (heraldId) => {
     const updatedHeralds = heralds.map(h => {
@@ -248,11 +255,11 @@ export default function App() {
           </button>
         ) : (
           <button
-            onClick={() => navigateTo('game')}
-            className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-semibold transition text-lg"
-          >
-            Enter Herald Platform
-          </button>
+  onClick={() => navigateTo('staking')}
+  className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-semibold transition text-lg"
+>
+  Stake Heralds
+</button>
         )}
 
         <button
