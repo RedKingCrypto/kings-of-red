@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, Coins, Clock, Flame, Shield, Swords } from 'lucide-react';
 import MintPage from './mint.jsx';
+import AboutPage from './About.jsx';
 
 // PLACEHOLDER VALUES - Customize these
 const HERALD_CONFIG = {
-  BRONZE_FOOD_PER_DAY: 50,
-  SILVER_FOOD_PER_DAY: 100,
-  GOLD_FOOD_PER_DAY: 200,
+  BRONZE_FOOD_PER_DAY: 20,
+  SILVER_FOOD_PER_DAY: 65,
+  GOLD_FOOD_PER_DAY: 100,
   CLAIM_COOLDOWN_HOURS: 24,
   CLAIMING_FEE_ENABLED: false,
   CLAIMING_FEE_AMOUNT: 0
@@ -47,6 +48,8 @@ export default function App() {
     const path = window.location.pathname;
     if (path.includes('/mint')) {
       setCurrentPage('mint');
+    } else if (path.includes('/about')) {
+      setCurrentPage('about');
     }
   }, []);
 
@@ -90,9 +93,13 @@ export default function App() {
     window.history.pushState({}, '', page === 'home' ? '/' : `/${page}`);
   };
 
-  // If on mint page, show mint page component
+  // If on mint or about page, show those components
   if (currentPage === 'mint') {
     return <MintPage onNavigate={navigateTo} />;
+  }
+
+  if (currentPage === 'about') {
+    return <AboutPage onNavigate={navigateTo} />;
   }
 
   const stakeHerald = (heraldId) => {
@@ -224,7 +231,7 @@ export default function App() {
         </div>
       </div>
 
-      <div className="flex gap-4 justify-center mb-8">
+      <div className="flex gap-4 justify-center mb-8 flex-wrap">
         <button
           onClick={() => navigateTo('mint')}
           className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 px-10 py-4 rounded-lg font-bold text-lg transition shadow-lg"
@@ -247,6 +254,13 @@ export default function App() {
             Enter Herald Platform
           </button>
         )}
+
+        <button
+          onClick={() => navigateTo('about')}
+          className="bg-gray-700 hover:bg-gray-600 px-8 py-4 rounded-lg font-semibold transition text-lg"
+        >
+          About
+        </button>
       </div>
     </div>
   );
@@ -466,13 +480,14 @@ export default function App() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {currentPage === 'home' ? renderHomePage() : renderGamePage()}
+        {currentPage === 'home' && renderHomePage()}
+        {currentPage === 'game' && renderGamePage()}
       </div>
 
       <div className="border-t border-red-800/50 bg-black/40 backdrop-blur mt-12">
         <div className="container mx-auto px-4 py-6">
           <div className="text-center text-sm text-gray-500">
-            <p>Kings of Red © 2024 • Built on Base Network</p>
+            <p>Kings of Red © 2025 • Built on Base Network</p>
           </div>
         </div>
       </div>

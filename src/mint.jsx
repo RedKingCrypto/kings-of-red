@@ -38,44 +38,58 @@ export default function HeraldMintingPage({ onNavigate }) {
   }, [connected]);
 
   const loadContractData = async () => {
-    try {
-      setLoading(true);
-      const provider = new ethers.JsonRpcProvider(BASE_MAINNET_CONFIG.rpcUrls[0]);
-      const contract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, provider);
-      
-      // Load supply data
-      const [bronzeMinted, silverMinted, goldMinted, bronzePrice, silverPrice, goldPrice] = await Promise.all([
-        contract.bronzeMinted(),
-        contract.silverMinted(),
-        contract.goldMinted(),
-        contract.bronzePrice(),
-        contract.silverPrice(),
-        contract.goldPrice()
-      ]);
-      
-      setSupply({
-        bronze: { 
-          total: 100, 
-          minted: Number(bronzeMinted), 
-          price: ethers.formatEther(bronzePrice) 
-        },
-        silver: { 
-          total: 77, 
-          minted: Number(silverMinted), 
-          price: ethers.formatEther(silverPrice) 
-        },
-        gold: { 
-          total: 43, 
-          minted: Number(goldMinted), 
-          price: ethers.formatEther(goldPrice) 
-        }
-      });
-    } catch (error) {
-      console.error('Error loading contract data:', error);
-    } finally {
-      setLoading(false);
+  try {
+    setLoading(true);
+    
+    // Use connected wallet provider if available, otherwise use public RPC
+    let provider;
+    if (window.ethereum && connected) {
+      provider = new ethers.BrowserProvider(window.ethereum);
+    } else {
+      provider = new ethers.JsonRpcProvider(BASE_MAINNET_CONFIG.rpcUrls[0]);
     }
-  };
+    
+    const contract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, provider);
+    
+    // Load supply data - force fresh read
+    const [bronzeMinted, silverMinted, goldMinted, bronzePrice, silverPrice, goldPrice] = await Promise.all([
+      contract.bronzeMinted(),
+      contract.silverMinted(),
+      contract.goldMinted(),
+      contract.bronzePrice(),
+      contract.silverPrice(),
+      contract.goldPrice()
+    ]);
+    
+    console.log('Contract data loaded:', {
+      bronze: Number(bronzeMinted),
+      silver: Number(silverMinted),
+      gold: Number(goldMinted)
+    });
+    
+    setSupply({
+      bronze: { 
+        total: 100, 
+        minted: Number(bronzeMinted), 
+        price: ethers.formatEther(bronzePrice) 
+      },
+      silver: { 
+        total: 77, 
+        minted: Number(silverMinted), 
+        price: ethers.formatEther(silverPrice) 
+      },
+      gold: { 
+        total: 43, 
+        minted: Number(goldMinted), 
+        price: ethers.formatEther(goldPrice) 
+      }
+    });
+  } catch (error) {
+    console.error('Error loading contract data:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const checkGenesisStatus = async () => {
     try {
@@ -319,21 +333,13 @@ export default function HeraldMintingPage({ onNavigate }) {
           <ul className="space-y-2">
             <li className="flex items-start gap-2">
               <Trophy className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
-              <span className="text-gray-300">Lifetime 10% affiliate commission on ALL future sales</span>
+              <span className="text-gray-300">Guaranteed lowest Price for First Generation Herald NFTs</span>
             </li>
             <li className="flex items-start gap-2">
               <Trophy className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
               <span className="text-gray-300">Exclusive Genesis Badge NFT</span>
             </li>
-            <li className="flex items-start gap-2">
-              <Trophy className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
-              <span className="text-gray-300">Priority whitelist for Alpha drop</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <Trophy className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
-              <span className="text-gray-300">Early access to all future features</span>
-            </li>
-          </ul>
+           </ul>
         </div>
 
         {/* Minting Cards */}
@@ -445,7 +451,10 @@ export default function HeraldMintingPage({ onNavigate }) {
                 </a>
 
                 <button
-                  onClick={() => setMintSuccess(null)}
+                  onClick={() => {
+  setMintSuccess(null);
+  loadContractData(); // Refresh supply counts
+}}
                   className="w-full bg-red-600 hover:bg-red-700 py-3 rounded-lg font-semibold transition"
                 >
                   Close
@@ -508,7 +517,7 @@ export default function HeraldMintingPage({ onNavigate }) {
           <div className="bg-gray-800/50 rounded-lg p-6">
             <h4 className="font-bold mb-2">What happens after minting?</h4>
             <p className="text-gray-300 text-sm">
-              Your Herald NFT will appear in your wallet immediately. Staking will open soon where you can stake your Herald and start earning $KINGSFOOD tokens every 24 hours!
+              Your Herald NFT will appear in your wallet immediately. Once staking opens you can stake your Herald and start earning $KINGSFOOD tokens every 24 hours!
             </p>
           </div>
           <div className="bg-gray-800/50 rounded-lg p-6">
@@ -520,7 +529,7 @@ export default function HeraldMintingPage({ onNavigate }) {
           <div className="bg-gray-800/50 rounded-lg p-6">
             <h4 className="font-bold mb-2">What's the difference between rarities?</h4>
             <p className="text-gray-300 text-sm">
-              Bronze Heralds produce 20 FOOD/day, Silver produce 65 FOOD/day, and Gold produce 100 FOOD/day. Gold Heralds also provide larger battle boosts in future updates.
+              Bronze Heralds produce 20 FOOD/day, Silver produce 65 FOOD/day, and Gold produce 100 FOOD/day. 
             </p>
           </div>
         </div>
