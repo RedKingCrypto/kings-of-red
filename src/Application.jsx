@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, Coins, Clock, Flame, Shield, Swords } from 'lucide-react';
 import MintPage from './mint.jsx';
-import AboutPage from './About.jsx';
 import StakingPage from './Staking.jsx';
+import ExchangePage from './Exchange.jsx';
+import AboutPage from './About.jsx';
 
 // PLACEHOLDER VALUES - Customize these
 const HERALD_CONFIG = {
   BRONZE_FOOD_PER_DAY: 20,
   SILVER_FOOD_PER_DAY: 65,
   GOLD_FOOD_PER_DAY: 100,
-  CLAIM_COOLDOWN_HOURS: 24,
-  CLAIMING_FEE_ENABLED: false,
-  CLAIMING_FEE_AMOUNT: 0
+  CLAIM_COOLDOWN_HOURS: 24
 };
 
 const CLANS = [
@@ -24,173 +23,42 @@ const CLANS = [
   { id: 7, name: 'Bowkin', color: 'from-rose-600 to-red-700', icon: Flame }
 ];
 
-const MOCK_HERALDS = [
-  { id: 1, clan: 1, rarity: 'Gold', tokenId: '1001', staked: false },
-  { id: 2, clan: 2, rarity: 'Silver', tokenId: '1002', staked: false },
-  { id: 3, clan: 3, rarity: 'Bronze', tokenId: '1003', staked: false },
-  { id: 4, clan: 4, rarity: 'Silver', tokenId: '1004', staked: false },
-  { id: 5, clan: 5, rarity: 'Bronze', tokenId: '1005', staked: false },
-  { id: 6, clan: 6, rarity: 'Gold', tokenId: '1006', staked: false },
-  { id: 7, clan: 7, rarity: 'Silver', tokenId: '1007', staked: false }
-];
-
-export default function App() {
+export default function Application() {
+  // Game state
   const [connected, setConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
-  const [heralds, setHeralds] = useState([]);
   const [foodBalance, setFoodBalance] = useState(0);
-  const [selectedTab, setSelectedTab] = useState('unstaked');
+  
+  // Navigation state
   const [currentPage, setCurrentPage] = useState('home');
+  
+  const navigateTo = (page) => {
+    setCurrentPage(page);
+    window.history.pushState({}, '', `/${page === 'home' ? '' : page}`);
+  };
 
+  // Handle browser back/forward
   useEffect(() => {
-    loadGameData();
+    const handlePopState = () => {
+      const path = window.location.pathname.slice(1) || 'home';
+      setCurrentPage(path);
+    };
     
-    // Check URL for page routing
-    const path = window.location.pathname;
-    if (path.includes('/mint')) {
-      setCurrentPage('mint');
-    } else if (path.includes('/about')) {
-      setCurrentPage('about');
-    } else if (path.includes('/staking')) {
-  setCurrentPage('staking');
-}
+    window.addEventListener('popstate', handlePopState);
+    
+    // Check initial path
+    const initialPath = window.location.pathname.slice(1) || 'home';
+    setCurrentPage(initialPath);
+    
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const loadGameData = () => {
-    try {
-      const heraldsData = localStorage.getItem('heralds-state');
-      const balanceData = localStorage.getItem('food-balance');
-      
-      if (heraldsData) {
-        setHeralds(JSON.parse(heraldsData));
-      } else {
-        setHeralds(MOCK_HERALDS);
-      }
-      
-      if (balanceData) {
-        setFoodBalance(parseFloat(balanceData));
-      }
-    } catch (error) {
-      setHeralds(MOCK_HERALDS);
-      setFoodBalance(0);
-    }
-  };
-
-  const saveGameData = (newHeralds, newBalance) => {
-    try {
-      localStorage.setItem('heralds-state', JSON.stringify(newHeralds));
-      localStorage.setItem('food-balance', newBalance.toString());
-    } catch (error) {
-      console.error('Failed to save game data:', error);
-    }
-  };
-
   const connectWallet = () => {
+    // Mock wallet connection - replace with real Web3 later
     const mockAddress = '0x' + Math.random().toString(16).substr(2, 40);
     setWalletAddress(mockAddress);
     setConnected(true);
   };
-
-  const navigateTo = (page) => {
-    setCurrentPage(page);
-    window.history.pushState({}, '', page === 'home' ? '/' : `/${page}`);
-  };
-
-  // If on mint or about page, show those components
-  if (currentPage === 'mint') {
-    return <MintPage onNavigate={navigateTo} />;
-  }
-
-  if (currentPage === 'about') {
-    return <AboutPage onNavigate={navigateTo} />;
-  }
-
-  if (currentPage === 'staking') {
-  return <StakingPage onNavigate={navigateTo} />;
-}
-
-  const stakeHerald = (heraldId) => {
-    const updatedHeralds = heralds.map(h => {
-      if (h.id === heraldId) {
-        return {
-          ...h,
-          staked: true,
-          stakedAt: Date.now(),
-          lastClaim: Date.now()
-        };
-      }
-      return h;
-    });
-    setHeralds(updatedHeralds);
-    saveGameData(updatedHeralds, foodBalance);
-  };
-
-  const unstakeHerald = (heraldId) => {
-    const updatedHeralds = heralds.map(h => {
-      if (h.id === heraldId) {
-        const { stakedAt, lastClaim, ...rest } = h;
-        return { ...rest, staked: false };
-      }
-      return h;
-    });
-    setHeralds(updatedHeralds);
-    saveGameData(updatedHeralds, foodBalance);
-  };
-
-  const canClaim = (herald) => {
-    if (!herald.staked || !herald.lastClaim) return false;
-    const timeSinceLastClaim = Date.now() - herald.lastClaim;
-    const cooldownMs = HERALD_CONFIG.CLAIM_COOLDOWN_HOURS * 60 * 60 * 1000;
-    return timeSinceLastClaim >= cooldownMs;
-  };
-
-  const getTimeUntilClaim = (herald) => {
-    if (!herald.staked || !herald.lastClaim) return null;
-    const cooldownMs = HERALD_CONFIG.CLAIM_COOLDOWN_HOURS * 60 * 60 * 1000;
-    const timeSinceLastClaim = Date.now() - herald.lastClaim;
-    const timeRemaining = cooldownMs - timeSinceLastClaim;
-    
-    if (timeRemaining <= 0) return 'Ready to claim!';
-    
-    const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
-    const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
-  };
-
-  const claimRewards = (herald) => {
-    if (!canClaim(herald)) return;
-    
-    const foodAmount = 
-      herald.rarity === 'Gold' ? HERALD_CONFIG.GOLD_FOOD_PER_DAY :
-      herald.rarity === 'Silver' ? HERALD_CONFIG.SILVER_FOOD_PER_DAY :
-      HERALD_CONFIG.BRONZE_FOOD_PER_DAY;
-    
-    const updatedHeralds = heralds.map(h => {
-      if (h.id === herald.id) {
-        return { ...h, lastClaim: Date.now() };
-      }
-      return h;
-    });
-    
-    const newBalance = foodBalance + foodAmount;
-    setHeralds(updatedHeralds);
-    setFoodBalance(newBalance);
-    saveGameData(updatedHeralds, newBalance);
-  };
-
-  const getClan = (clanId) => CLANS.find(c => c.id === clanId);
-
-  const getRarityColor = (rarity) => {
-    switch(rarity) {
-      case 'Gold': return 'text-yellow-400 border-yellow-400';
-      case 'Silver': return 'text-gray-300 border-gray-300';
-      case 'Bronze': return 'text-orange-400 border-orange-400';
-      default: return 'text-gray-400 border-gray-400';
-    }
-  };
-
-  const stakedHeralds = heralds.filter(h => h.staked);
-  const unstakedHeralds = heralds.filter(h => !h.staked);
 
   const renderHomePage = () => (
     <div className="text-center py-12">
@@ -199,7 +67,7 @@ export default function App() {
       <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
         A collectible trading card game featuring token mining, epic battles, and seven legendary clans.
       </p>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-6xl mx-auto mb-12">
         {CLANS.map(clan => {
           const ClanIcon = clan.icon;
@@ -238,232 +106,101 @@ export default function App() {
         </div>
       </div>
 
-      <div className="flex gap-4 justify-center mb-8 flex-wrap">
+      <div className="flex gap-4 justify-center">
         <button
           onClick={() => navigateTo('mint')}
-          className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 px-10 py-4 rounded-lg font-bold text-lg transition shadow-lg"
+          className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-semibold transition text-lg"
         >
-          🔥 Mint Herald NFT
+          Mint Herald NFTs
         </button>
-        
-        {!connected ? (
-          <button
-            onClick={connectWallet}
-            className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-semibold transition text-lg"
-          >
-            Connect Wallet
-          </button>
-        ) : (
-          <button
-  onClick={() => navigateTo('staking')}
-  className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-semibold transition text-lg"
->
-  Stake Heralds
-</button>
-        )}
-
         <button
           onClick={() => navigateTo('about')}
           className="bg-gray-700 hover:bg-gray-600 px-8 py-4 rounded-lg font-semibold transition text-lg"
         >
-          About
+          Learn More
         </button>
       </div>
     </div>
   );
 
-  const renderGamePage = () => {
-    if (!connected) {
-      return (
-        <div className="text-center py-20">
-          <Crown className="w-16 h-16 mx-auto mb-4 text-red-500" />
-          <h2 className="text-2xl font-bold mb-2">Welcome to Kings of Red</h2>
-          <p className="text-gray-400 mb-6">Connect your wallet to start playing</p>
-          <button
-            onClick={connectWallet}
-            className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-semibold transition text-lg"
-          >
-            Connect Wallet
-          </button>
-        </div>
-      );
-    }
-
-    return (
-      <>
-        <div className="bg-gradient-to-r from-red-900/30 to-orange-900/30 border border-red-500/30 rounded-lg p-6 mb-8">
-          <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
-            <Crown className="w-6 h-6" />
-            Herald Mining
-          </h3>
-          <p className="text-gray-300 mb-4">
-            Stake your Herald NFTs to produce $KINGSFOOD every 24 hours. Herald rewards vary by rarity:
-          </p>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-black/30 p-4 rounded border border-orange-400/30">
-              <div className="text-orange-400 font-bold mb-1">Bronze Herald</div>
-              <div className="text-2xl font-bold">{HERALD_CONFIG.BRONZE_FOOD_PER_DAY}</div>
-              <div className="text-sm text-gray-400">FOOD/day</div>
-            </div>
-            <div className="bg-black/30 p-4 rounded border border-gray-300/30">
-              <div className="text-gray-300 font-bold mb-1">Silver Herald</div>
-              <div className="text-2xl font-bold">{HERALD_CONFIG.SILVER_FOOD_PER_DAY}</div>
-              <div className="text-sm text-gray-400">FOOD/day</div>
-            </div>
-            <div className="bg-black/30 p-4 rounded border border-yellow-400/30">
-              <div className="text-yellow-400 font-bold mb-1">Gold Herald</div>
-              <div className="text-2xl font-bold">{HERALD_CONFIG.GOLD_FOOD_PER_DAY}</div>
-              <div className="text-sm text-gray-400">FOOD/day</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setSelectedTab('unstaked')}
-            className={`px-6 py-3 rounded-lg font-semibold transition ${
-              selectedTab === 'unstaked'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            Unstaked Heralds ({unstakedHeralds.length})
-          </button>
-          <button
-            onClick={() => setSelectedTab('staked')}
-            className={`px-6 py-3 rounded-lg font-semibold transition ${
-              selectedTab === 'staked'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            Staked Heralds ({stakedHeralds.length})
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {(selectedTab === 'unstaked' ? unstakedHeralds : stakedHeralds).map(herald => {
-            const clan = getClan(herald.clan);
-            const ClanIcon = clan.icon;
-            const claimable = canClaim(herald);
-            const timeUntilClaim = getTimeUntilClaim(herald);
-            
-            return (
-              <div
-                key={herald.id}
-                className={`bg-gradient-to-br ${clan.color} p-0.5 rounded-xl`}
-              >
-                <div className="bg-gray-900 rounded-xl p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-bold">{clan.name}</h3>
-                      <p className="text-sm text-gray-400">Token #{herald.tokenId}</p>
-                    </div>
-                    <ClanIcon className="w-8 h-8 opacity-50" />
-                  </div>
-                  
-                  <div className={`inline-block px-3 py-1 rounded border ${getRarityColor(herald.rarity)} mb-4`}>
-                    <span className="font-bold text-sm">{herald.rarity}</span>
-                  </div>
-                  
-                  {herald.staked && (
-                    <div className="bg-black/50 rounded-lg p-4 mb-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
-                        <Clock className="w-4 h-4" />
-                        <span>Next claim:</span>
-                      </div>
-                      <div className={`text-lg font-bold ${claimable ? 'text-green-400' : 'text-yellow-400'}`}>
-                        {timeUntilClaim}
-                      </div>
-                      {claimable && (
-                        <div className="text-sm text-gray-400 mt-1">
-                          +{herald.rarity === 'Gold' ? HERALD_CONFIG.GOLD_FOOD_PER_DAY :
-                            herald.rarity === 'Silver' ? HERALD_CONFIG.SILVER_FOOD_PER_DAY :
-                            HERALD_CONFIG.BRONZE_FOOD_PER_DAY} FOOD
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className="flex gap-2">
-                    {!herald.staked ? (
-                      <button
-                        onClick={() => stakeHerald(herald.id)}
-                        className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg font-semibold transition"
-                      >
-                        Stake Herald
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => claimRewards(herald)}
-                          disabled={!claimable}
-                          className={`flex-1 py-2 rounded-lg font-semibold transition ${
-                            claimable
-                              ? 'bg-green-600 hover:bg-green-700'
-                              : 'bg-gray-700 cursor-not-allowed opacity-50'
-                          }`}
-                        >
-                          Claim Rewards
-                        </button>
-                        <button
-                          onClick={() => unstakeHerald(herald.id)}
-                          className="flex-1 bg-red-600 hover:bg-red-700 py-2 rounded-lg font-semibold transition"
-                        >
-                          Unstake
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {(selectedTab === 'unstaked' ? unstakedHeralds : stakedHeralds).length === 0 && (
-          <div className="text-center py-12 bg-gray-800/30 rounded-lg">
-            <p className="text-gray-400">
-              {selectedTab === 'unstaked' 
-                ? 'No unstaked Heralds. Stake your Heralds to start earning!' 
-                : 'No staked Heralds yet. Visit the Unstaked tab to stake your Heralds.'}
-            </p>
-          </div>
-        )}
-      </>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
-      <div className="border-b border-red-800/50 bg-black/40 backdrop-blur">
+      {/* Navigation Header */}
+      <div className="border-b border-red-800/50 bg-black/40 backdrop-blur sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            {/* Logo/Title */}
+            <button
+              onClick={() => navigateTo('home')}
+              className="flex items-center gap-3 hover:opacity-80 transition"
+            >
               <Crown className="w-8 h-8 text-red-500" />
-              <button 
-                onClick={() => navigateTo('home')}
-                className="hover:opacity-80 transition text-left"
-              >
+              <div className="text-left">
                 <h1 className="text-2xl font-bold">KINGS OF RED</h1>
-                <p className="text-sm text-gray-400">Herald Platform - Phase 1</p>
+                <p className="text-sm text-gray-400">NFT Trading Card Game</p>
+              </div>
+            </button>
+
+            {/* Navigation Links */}
+            <div className="hidden md:flex items-center gap-6">
+              <button
+                onClick={() => navigateTo('home')}
+                className={`transition px-3 py-2 rounded ${
+                  currentPage === 'home' 
+                    ? 'text-red-500 font-semibold' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                Home
+              </button>
+              <button
+                onClick={() => navigateTo('mint')}
+                className={`transition px-3 py-2 rounded ${
+                  currentPage === 'mint' 
+                    ? 'text-red-500 font-semibold' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                Mint NFTs
+              </button>
+              <button
+                onClick={() => navigateTo('staking')}
+                className={`transition px-3 py-2 rounded ${
+                  currentPage === 'staking' 
+                    ? 'text-red-500 font-semibold' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                Staking
+              </button>
+              <button
+                onClick={() => navigateTo('exchange')}
+                className={`transition px-3 py-2 rounded ${
+                  currentPage === 'exchange' 
+                    ? 'text-red-500 font-semibold' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                Exchange
+              </button>
+              <button
+                onClick={() => navigateTo('about')}
+                className={`transition px-3 py-2 rounded ${
+                  currentPage === 'about' 
+                    ? 'text-red-500 font-semibold' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                About
               </button>
             </div>
-            
+
+            {/* Wallet Connection & FOOD Balance */}
             <div className="flex items-center gap-4">
-              {currentPage !== 'mint' && (
-                <button
-                  onClick={() => navigateTo('mint')}
-                  className="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg font-semibold transition text-sm"
-                >
-                  Mint NFT
-                </button>
-              )}
-              
-              <div className="flex items-center gap-2 bg-green-900/30 px-4 py-2 rounded-lg border border-green-500/30">
+              <div className="hidden sm:flex items-center gap-2 bg-green-900/30 px-4 py-2 rounded-lg border border-green-500/30">
                 <Coins className="w-5 h-5 text-green-400" />
-                <span className="font-bold">{foodBalance.toFixed(2)}</span>
-                <span className="text-sm text-gray-400">$KINGSFOOD</span>
+                <span className="font-bold">{foodBalance.toFixed(0)}</span>
+                <span className="text-sm text-gray-400">FOOD</span>
               </div>
               
               {!connected ? (
@@ -475,26 +212,98 @@ export default function App() {
                 </button>
               ) : (
                 <div className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
-                  <span className="text-sm text-gray-400">Connected:</span>
-                  <span className="ml-2 font-mono text-sm">
+                  <span className="text-sm text-gray-400">Connected</span>
+                  <div className="font-mono text-sm">
                     {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-                  </span>
+                  </div>
                 </div>
               )}
             </div>
           </div>
+
+          {/* Mobile Menu */}
+          <div className="md:hidden mt-4 flex gap-2 overflow-x-auto pb-2">
+            <button
+              onClick={() => navigateTo('home')}
+              className={`whitespace-nowrap px-4 py-2 rounded-lg transition ${
+                currentPage === 'home' 
+                  ? 'bg-red-600 text-white' 
+                  : 'bg-gray-800 text-gray-300'
+              }`}
+            >
+              Home
+            </button>
+            <button
+              onClick={() => navigateTo('mint')}
+              className={`whitespace-nowrap px-4 py-2 rounded-lg transition ${
+                currentPage === 'mint' 
+                  ? 'bg-red-600 text-white' 
+                  : 'bg-gray-800 text-gray-300'
+              }`}
+            >
+              Mint
+            </button>
+            <button
+              onClick={() => navigateTo('staking')}
+              className={`whitespace-nowrap px-4 py-2 rounded-lg transition ${
+                currentPage === 'staking' 
+                  ? 'bg-red-600 text-white' 
+                  : 'bg-gray-800 text-gray-300'
+              }`}
+            >
+              Staking
+            </button>
+            <button
+              onClick={() => navigateTo('exchange')}
+              className={`whitespace-nowrap px-4 py-2 rounded-lg transition ${
+                currentPage === 'exchange' 
+                  ? 'bg-red-600 text-white' 
+                  : 'bg-gray-800 text-gray-300'
+              }`}
+            >
+              Exchange
+            </button>
+            <button
+              onClick={() => navigateTo('about')}
+              className={`whitespace-nowrap px-4 py-2 rounded-lg transition ${
+                currentPage === 'about' 
+                  ? 'bg-red-600 text-white' 
+                  : 'bg-gray-800 text-gray-300'
+              }`}
+            >
+              About
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* Page Content */}
       <div className="container mx-auto px-4 py-8">
         {currentPage === 'home' && renderHomePage()}
-        {currentPage === 'game' && renderGamePage()}
+        {currentPage === 'mint' && <MintPage onNavigate={navigateTo} />}
+        {currentPage === 'staking' && <StakingPage onNavigate={navigateTo} />}
+        {currentPage === 'exchange' && <ExchangePage onNavigate={navigateTo} />}
+        {currentPage === 'about' && <AboutPage onNavigate={navigateTo} />}
       </div>
 
+      {/* Footer */}
       <div className="border-t border-red-800/50 bg-black/40 backdrop-blur mt-12">
         <div className="container mx-auto px-4 py-6">
           <div className="text-center text-sm text-gray-500">
             <p>Kings of Red © 2025 • Built on Base Network</p>
+            <p className="mt-2">
+              <button onClick={() => navigateTo('about')} className="hover:text-gray-300 transition">
+                About
+              </button>
+              {' • '}
+              <a href="https://discord.gg/kingsofred" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition">
+                Discord
+              </a>
+              {' • '}
+              <a href="https://twitter.com/kingsofred" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition">
+                Twitter
+              </a>
+            </p>
           </div>
         </div>
       </div>
