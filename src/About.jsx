@@ -171,16 +171,16 @@ export default function AboutPage({ onNavigate }) {
               Stay updated on game development, connect with other players, and get support:
             </p>
             <div className="space-y-2 text-gray-300">
-              <p>• Website: kingsofred.com (coming soon)</p>
-              <p>• Discord: [Your Discord Link]</p>
-              <p>• Twitter/X: [Your Twitter]</p>
+              <p>• Website: kingsofred.com </p>
+              <p>• Telegram: https://t.me/kingsofred</p>
+              <p>• Twitter/X: @RedKingDefi</p>
               <p>• Contract: <a 
-                href="https://basescan.org/address/0x42f11a62beef5d04ab69fff95f3ffa5032909356" 
+                href="https://basescan.org/address/0xb282DC4c005C88A3E81D513D09a78f48CA404311" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:text-blue-300 font-mono break-all"
               >
-                0x42f11a62beef5d04ab69fff95f3ffa5032909356
+                0xb282DC4c005C88A3E81D513D09a78f48CA404311
               </a></p>
             </div>
           </div>
