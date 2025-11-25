@@ -1,7 +1,10 @@
-import React from 'react';
-import { Crown, Swords, Coins, Shield, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Crown, Coins, Sword, Shield, Flame, AlertTriangle, BookOpen, FileText, X } from 'lucide-react';
 
 export default function AboutPage({ onNavigate }) {
+  const [showWhitepaper, setShowWhitepaper] = useState(false);
+  
+  // Rest of your component code...
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
       {/* Header */}
@@ -32,7 +35,7 @@ export default function AboutPage({ onNavigate }) {
               Kings of Red is a collectible trading card game built on the Base blockchain network. Players collect NFT cards representing Heralds, Alphas, Fighters, Pets, Ladies, Weapons, and Badges across seven legendary clans.
             </p>
             <p className="text-gray-300 leading-relaxed">
-              Each card type serves a unique gameplay purpose, from resource generation to battle enhancements. The game features strategic elements including staking, token mining, PvP battles, and NFT crafting systems.
+              Each card type serves a unique gameplay purpose, from resource generation to battle enhancements. The game features strategic elements including staking, token mining, PvE battles, and NFT crafting systems. 
             </p>
           </div>
         </section>

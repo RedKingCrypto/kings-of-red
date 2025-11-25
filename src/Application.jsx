@@ -161,27 +161,7 @@ export default function Application() {
                     : 'text-gray-300 hover:text-white'
                 }`}
               >
-                Mint NFTs
-              </button>
-              <button
-                onClick={() => navigateTo('staking')}
-                className={`transition px-3 py-2 rounded ${
-                  currentPage === 'staking' 
-                    ? 'text-red-500 font-semibold' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
-              >
-                Staking
-              </button>
-              <button
-                onClick={() => navigateTo('exchange')}
-                className={`transition px-3 py-2 rounded ${
-                  currentPage === 'exchange' 
-                    ? 'text-red-500 font-semibold' 
-                    : 'text-gray-300 hover:text-white'
-                }`}
-              >
-                Exchange
+                Mint
               </button>
               <button
                 onClick={() => navigateTo('about')}
@@ -193,6 +173,24 @@ export default function Application() {
               >
                 About
               </button>
+              <button
+                onClick={() => navigateTo('faq')}
+                className={`transition px-3 py-2 rounded ${
+                  currentPage === 'faq' 
+                    ? 'text-red-500 font-semibold' 
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                FAQ
+              </button>
+              <a
+                href="https://medium.com/@Red-King"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-300 hover:text-white transition px-3 py-2 rounded"
+              >
+                Medium
+              </a>
             </div>
 
             {/* Wallet Connection & FOOD Balance */}
@@ -244,26 +242,6 @@ export default function Application() {
               Mint
             </button>
             <button
-              onClick={() => navigateTo('staking')}
-              className={`whitespace-nowrap px-4 py-2 rounded-lg transition ${
-                currentPage === 'staking' 
-                  ? 'bg-red-600 text-white' 
-                  : 'bg-gray-800 text-gray-300'
-              }`}
-            >
-              Staking
-            </button>
-            <button
-              onClick={() => navigateTo('exchange')}
-              className={`whitespace-nowrap px-4 py-2 rounded-lg transition ${
-                currentPage === 'exchange' 
-                  ? 'bg-red-600 text-white' 
-                  : 'bg-gray-800 text-gray-300'
-              }`}
-            >
-              Exchange
-            </button>
-            <button
               onClick={() => navigateTo('about')}
               className={`whitespace-nowrap px-4 py-2 rounded-lg transition ${
                 currentPage === 'about' 
@@ -273,6 +251,14 @@ export default function Application() {
             >
               About
             </button>
+            <a
+              href="https://medium.com/@Red-King"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="whitespace-nowrap px-4 py-2 rounded-lg transition bg-gray-800 text-gray-300"
+            >
+              Medium
+            </a>
           </div>
         </div>
       </div>

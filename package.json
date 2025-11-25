@@ -8,15 +8,29 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "@openzeppelin/contracts": "^5.4.0",
     "ethers": "^6.9.0",
-    "lucide-react": "^0.263.1"
+    "lucide-react": "^0.263.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
     "vite": "^5.0.8"
-  }
+  },
+  "description": "",
+  "main": "vite.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RedKingCrypto/kings-of-red.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/RedKingCrypto/kings-of-red/issues"
+  },
+  "homepage": "https://github.com/RedKingCrypto/kings-of-red#readme"
 }
