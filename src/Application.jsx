@@ -53,12 +53,7 @@ export default function Application() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const connectWallet = () => {
-    // Mock wallet connection - replace with real Web3 later
-    const mockAddress = '0x' + Math.random().toString(16).substr(2, 40);
-    setWalletAddress(mockAddress);
-    setConnected(true);
-  };
+  
 
   const renderHomePage = () => (
     <div className="text-center py-12">

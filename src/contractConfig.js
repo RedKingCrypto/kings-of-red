@@ -1,5 +1,5 @@
 // Contract configuration for Herald NFT on Base Mainnet
-export const HERALD_CONTRACT_ADDRESS = "0x42f11a62beef5d04ab69fff95f3ffa5032909356";
+export const HERALD_CONTRACT_ADDRESS = "0xb282DC4c005C88A3E81D513D09a78f48CA404311";
 
 export const BASE_MAINNET_CONFIG = {
   chainId: '0x2105', // 8453 in hex
