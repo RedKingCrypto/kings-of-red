@@ -383,26 +383,26 @@ export default function HeraldMintingPage({ onNavigate }) {
                   </div>
 
                   <button
-                    onClick={() => mintHerald(rarity)}
-                    disabled={minting || remaining === 0 || !connected}
-                    className={`w-full py-3 rounded-lg font-bold transition ${
-                      remaining === 0
-                        ? 'bg-gray-700 cursor-not-allowed text-gray-500'
-                        : minting
-                        ? 'bg-gray-700 cursor-wait text-gray-300'
-                        : !connected
-                        ? 'bg-gray-700 cursor-not-allowed text-gray-400'
-                        : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700'
-                    }`}
-                  >
-                    {!connected
-                      ? 'Connect Wallet'
-                      : remaining === 0
-                      ? 'SOLD OUT'
-                      : minting
-                      ? 'Minting...'
-                      : `Mint ${rarity.charAt(0).toUpperCase() + rarity.slice(1)} Herald`}
-                  </button>
+  onClick={() => mintHerald(rarity)}
+  disabled={minting || remaining === 0 || !connected}
+  className={`w-full py-3 rounded-lg font-bold transition ${
+    remaining === 0
+      ? 'bg-gray-700 cursor-not-allowed text-gray-500'
+      : minting
+      ? 'bg-gray-700 cursor-wait text-gray-300'
+      : !connected
+      ? 'bg-gray-700 cursor-not-allowed text-gray-400'
+      : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700'
+  }`}
+>
+  {!connected
+    ? 'Connect Wallet'  // ❌ THIS IS THE PROBLEM LINE
+    : remaining === 0
+    ? 'SOLD OUT'
+    : minting
+    ? 'Minting...'
+    : `Mint ${rarity.charAt(0).toUpperCase() + rarity.slice(1)} Herald`}
+</button>
                 </div>
               </div>
             );
