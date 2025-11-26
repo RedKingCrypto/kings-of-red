@@ -382,6 +382,7 @@ export default function HeraldMintingPage({ onNavigate }) {
                     </div>
                   </div>
 
+                  
                   <button
   onClick={() => mintHerald(rarity)}
   disabled={minting || remaining === 0 || !connected}
@@ -395,14 +396,13 @@ export default function HeraldMintingPage({ onNavigate }) {
       : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700'
   }`}
 >
-  {!connected
-    ? 'Connect Wallet'  // ❌ THIS IS THE PROBLEM LINE
-    : remaining === 0
+  {remaining === 0
     ? 'SOLD OUT'
     : minting
     ? 'Minting...'
     : `Mint ${rarity.charAt(0).toUpperCase() + rarity.slice(1)} Herald`}
 </button>
+
                 </div>
               </div>
             );
