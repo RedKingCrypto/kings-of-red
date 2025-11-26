@@ -274,38 +274,7 @@ export default function HeraldMintingPage({ onNavigate }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
       {/* Header */}
-      <div className="border-b border-red-800/50 bg-black/40 backdrop-blur">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <Crown className="w-8 h-8 text-red-500" />
-              <button 
-                onClick={() => onNavigate && onNavigate('home')}
-                className="hover:opacity-80 transition text-left"
-              >
-                <h1 className="text-2xl font-bold">KINGS OF RED</h1>
-                <p className="text-sm text-gray-400">Herald Minting - Genesis Sale</p>
-              </button>
-            </div>
-            
-            {!connected ? (
-              <button
-                onClick={connectWallet}
-                className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-semibold transition"
-              >
-                Connect Wallet
-              </button>
-            ) : (
-              <div className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
-                <span className="text-sm text-gray-400">Connected:</span>
-                <span className="ml-2 font-mono text-sm">
-                  {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      
 
       <div className="container mx-auto px-4 py-8">
         {/* Hero Section */}
@@ -536,23 +505,6 @@ export default function HeraldMintingPage({ onNavigate }) {
       </div>
 
       {/* Footer */}
-      <div className="border-t border-red-800/50 bg-black/40 backdrop-blur mt-12">
-        <div className="container mx-auto px-4 py-6">
-          <div className="text-center text-sm text-gray-500">
-            <p>Kings of Red © 2025 • Built on Base Network</p>
-            <p className="mt-2">
-              Contract: <a 
-                href={`https://basescan.org/address/${HERALD_CONTRACT_ADDRESS}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300 font-mono"
-              >
-                {HERALD_CONTRACT_ADDRESS.slice(0, 6)}...{HERALD_CONTRACT_ADDRESS.slice(-4)}
-              </a>
-            </p>
           </div>
-        </div>
-      </div>
-    </div>
   );
 }
