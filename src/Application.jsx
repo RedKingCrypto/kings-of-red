@@ -4,6 +4,7 @@ import MintPage from './mint.jsx';
 import StakingPage from './Staking.jsx';
 import ExchangePage from './Exchange.jsx';
 import AboutPage from './About.jsx';
+import FAQPage from './faq.jsx'; 
 
 // PLACEHOLDER VALUES - Customize these
 const HERALD_CONFIG = {
@@ -264,6 +265,7 @@ export default function Application() {
         {currentPage === 'staking' && <StakingPage />}
         {currentPage === 'exchange' && <ExchangePage />}
         {currentPage === 'about' && <AboutPage />}
+        {currentPage === 'faq' && <FAQPage />} 
       </div>
 
       {/* Footer */}
