@@ -201,7 +201,7 @@ export default function AboutPage({ onNavigate }) {
       <div className="border-t border-red-800/50 bg-black/40 backdrop-blur mt-12">
         <div className="container mx-auto px-4 py-6">
           <div className="text-center text-sm text-gray-500">
-            <p>Kings of Red © 2025 • Built on Base Network</p>
+            <p>Kings of Red © 2025 • Built by Red King Crypto on Base Network</p>
             <p className="mt-2">For entertainment purposes only • Play responsibly</p>
           </div>
         </div>

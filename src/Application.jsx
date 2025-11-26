@@ -28,10 +28,10 @@ export default function Application() {
   const [connected, setConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
   const [foodBalance, setFoodBalance] = useState(0);
-  
+
   // Navigation state
   const [currentPage, setCurrentPage] = useState('home');
-  
+
   const navigateTo = (page) => {
     setCurrentPage(page);
     window.history.pushState({}, '', `/${page === 'home' ? '' : page}`);
@@ -43,17 +43,31 @@ export default function Application() {
       const path = window.location.pathname.slice(1) || 'home';
       setCurrentPage(path);
     };
-    
+
     window.addEventListener('popstate', handlePopState);
-    
+
     // Check initial path
     const initialPath = window.location.pathname.slice(1) || 'home';
     setCurrentPage(initialPath);
-    
+
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  
+  // Real wallet connection - replace with actual Web3 later
+  const connectWallet = async () => {
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        setWalletAddress(accounts[0]);
+        setConnected(true);
+      } catch (error) {
+        console.error('Failed to connect wallet:', error);
+        alert('Failed to connect wallet. Please try again.');
+      }
+    } else {
+      alert('Please install MetaMask to use this application!');
+    }
+  };
 
   const renderHomePage = () => (
     <div className="text-center py-12">
@@ -121,9 +135,9 @@ export default function Application() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
       {/* Navigation Header */}
-      <div className="border-b border-red-800/50 bg-black/40 backdrop-blur sticky top-0 z-50">
+      <div className="border-b border-red-800/50 bg-black/40 backdrop-blur">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             {/* Logo/Title */}
             <button
               onClick={() => navigateTo('home')}
@@ -141,9 +155,7 @@ export default function Application() {
               <button
                 onClick={() => navigateTo('home')}
                 className={`transition px-3 py-2 rounded ${
-                  currentPage === 'home' 
-                    ? 'text-red-500 font-semibold' 
-                    : 'text-gray-300 hover:text-white'
+                  currentPage === 'home' ? 'text-red-500 font-semibold' : 'text-gray-300 hover:text-white'
                 }`}
               >
                 Home
@@ -151,9 +163,7 @@ export default function Application() {
               <button
                 onClick={() => navigateTo('mint')}
                 className={`transition px-3 py-2 rounded ${
-                  currentPage === 'mint' 
-                    ? 'text-red-500 font-semibold' 
-                    : 'text-gray-300 hover:text-white'
+                  currentPage === 'mint' ? 'text-red-500 font-semibold' : 'text-gray-300 hover:text-white'
                 }`}
               >
                 Mint
@@ -161,9 +171,7 @@ export default function Application() {
               <button
                 onClick={() => navigateTo('about')}
                 className={`transition px-3 py-2 rounded ${
-                  currentPage === 'about' 
-                    ? 'text-red-500 font-semibold' 
-                    : 'text-gray-300 hover:text-white'
+                  currentPage === 'about' ? 'text-red-500 font-semibold' : 'text-gray-300 hover:text-white'
                 }`}
               >
                 About
@@ -171,9 +179,7 @@ export default function Application() {
               <button
                 onClick={() => navigateTo('faq')}
                 className={`transition px-3 py-2 rounded ${
-                  currentPage === 'faq' 
-                    ? 'text-red-500 font-semibold' 
-                    : 'text-gray-300 hover:text-white'
+                  currentPage === 'faq' ? 'text-red-500 font-semibold' : 'text-gray-300 hover:text-white'
                 }`}
               >
                 FAQ
@@ -182,7 +188,7 @@ export default function Application() {
                 href="https://medium.com/@Red-King"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-300 hover:text-white transition px-3 py-2 rounded"
+                className="text-gray-300 hover:text-white transition px-3 py-2"
               >
                 Medium
               </a>
@@ -190,12 +196,11 @@ export default function Application() {
 
             {/* Wallet Connection & FOOD Balance */}
             <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-2 bg-green-900/30 px-4 py-2 rounded-lg border border-green-500/30">
+              <div className="flex items-center gap-2 bg-green-900/30 px-4 py-2 rounded-lg border border-green-500/30">
                 <Coins className="w-5 h-5 text-green-400" />
-                <span className="font-bold">{foodBalance.toFixed(0)}</span>
-                <span className="text-sm text-gray-400">FOOD</span>
+                <span className="font-bold">{foodBalance.toFixed(0)} FOOD</span>
               </div>
-              
+
               {!connected ? (
                 <button
                   onClick={connectWallet}
@@ -219,9 +224,7 @@ export default function Application() {
             <button
               onClick={() => navigateTo('home')}
               className={`whitespace-nowrap px-4 py-2 rounded-lg transition ${
-                currentPage === 'home' 
-                  ? 'bg-red-600 text-white' 
-                  : 'bg-gray-800 text-gray-300'
+                currentPage === 'home' ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-300'
               }`}
             >
               Home
@@ -229,9 +232,7 @@ export default function Application() {
             <button
               onClick={() => navigateTo('mint')}
               className={`whitespace-nowrap px-4 py-2 rounded-lg transition ${
-                currentPage === 'mint' 
-                  ? 'bg-red-600 text-white' 
-                  : 'bg-gray-800 text-gray-300'
+                currentPage === 'mint' ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-300'
               }`}
             >
               Mint
@@ -239,9 +240,7 @@ export default function Application() {
             <button
               onClick={() => navigateTo('about')}
               className={`whitespace-nowrap px-4 py-2 rounded-lg transition ${
-                currentPage === 'about' 
-                  ? 'bg-red-600 text-white' 
-                  : 'bg-gray-800 text-gray-300'
+                currentPage === 'about' ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-300'
               }`}
             >
               About
@@ -250,7 +249,7 @@ export default function Application() {
               href="https://medium.com/@Red-King"
               target="_blank"
               rel="noopener noreferrer"
-              className="whitespace-nowrap px-4 py-2 rounded-lg transition bg-gray-800 text-gray-300"
+              className="whitespace-nowrap px-4 py-2 rounded-lg bg-gray-800 text-gray-300"
             >
               Medium
             </a>
@@ -261,10 +260,10 @@ export default function Application() {
       {/* Page Content */}
       <div className="container mx-auto px-4 py-8">
         {currentPage === 'home' && renderHomePage()}
-        {currentPage === 'mint' && <MintPage onNavigate={navigateTo} />}
-        {currentPage === 'staking' && <StakingPage onNavigate={navigateTo} />}
-        {currentPage === 'exchange' && <ExchangePage onNavigate={navigateTo} />}
-        {currentPage === 'about' && <AboutPage onNavigate={navigateTo} />}
+        {currentPage === 'mint' && <MintPage />}
+        {currentPage === 'staking' && <StakingPage />}
+        {currentPage === 'exchange' && <ExchangePage />}
+        {currentPage === 'about' && <AboutPage />}
       </div>
 
       {/* Footer */}
@@ -272,19 +271,18 @@ export default function Application() {
         <div className="container mx-auto px-4 py-6">
           <div className="text-center text-sm text-gray-500">
             <p>Kings of Red © 2025 • Built on Base Network</p>
-            <p className="mt-2">
-              <button onClick={() => navigateTo('about')} className="hover:text-gray-300 transition">
+            <div className="mt-2">
+              <button
+                onClick={() => navigateTo('about')}
+                className="hover:text-gray-300 transition"
+              >
                 About
               </button>
               {' • '}
-              <a href="https://discord.gg/kingsofred" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition">
-                Discord
-              </a>
+              <a href="#" className="hover:text-gray-300 transition">Discord</a>
               {' • '}
-              <a href="https://twitter.com/kingsofred" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition">
-                Twitter
-              </a>
-            </p>
+              <a href="#" className="hover:text-gray-300 transition">Twitter</a>
+            </div>
           </div>
         </div>
       </div>
