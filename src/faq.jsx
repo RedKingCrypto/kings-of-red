@@ -8,6 +8,15 @@ export default function FAQPage({ onNavigate }) {
     setOpenQuestion(openQuestion === index ? null : index);
   };
 
+  // Safe navigation handler
+  const handleNavigate = (page) => {
+    if (onNavigate && typeof onNavigate === 'function') {
+      onNavigate(page);
+    } else {
+      console.warn('onNavigate function not provided to FAQPage');
+    }
+  };
+
   const faqs = [
     {
       category: "Getting Started",
@@ -318,7 +327,7 @@ export default function FAQPage({ onNavigate }) {
               Follow on Twitter
             </a>
             <button
-              onClick={() => onNavigate('about')}
+              onClick={() => handleNavigate('about')}
               className="bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded-lg font-semibold transition"
             >
               Read Whitepaper
@@ -346,7 +355,7 @@ export default function FAQPage({ onNavigate }) {
         {/* Back Button */}
         <div className="mt-8 text-center">
           <button
-            onClick={() => onNavigate('home')}
+            onClick={() => handleNavigate('home')}
             className="text-gray-400 hover:text-white transition"
           >
             ← Back to Home
