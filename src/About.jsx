@@ -1,28 +1,11 @@
 import React, { useState } from 'react';
-import { Crown, Coins, Sword, Shield, Flame, AlertTriangle, BookOpen, FileText, X } from 'lucide-react';
+import { Crown, Coins, Swords, Shield, Flame, AlertTriangle, BookOpen, FileText, X } from 'lucide-react';
 
-export default function AboutPage({ onNavigate }) {
+export default function AboutPage() {
   const [showWhitepaper, setShowWhitepaper] = useState(false);
   
-  // Rest of your component code...
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
-      {/* Header */}
-      <div className="border-b border-red-800/50 bg-black/40 backdrop-blur">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-3">
-            <Crown className="w-8 h-8 text-red-500" />
-            <button 
-              onClick={() => onNavigate && onNavigate('home')}
-              className="hover:opacity-80 transition text-left"
-            >
-              <h1 className="text-2xl font-bold">KINGS OF RED</h1>
-              <p className="text-sm text-gray-400">About the Game</p>
-            </button>
-          </div>
-        </div>
-      </div>
-
+    <div className="min-h-screen">
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         {/* Game Overview */}
         <section className="mb-12">
@@ -112,6 +95,24 @@ export default function AboutPage({ onNavigate }) {
           </div>
         </section>
 
+        {/* Whitepaper Button */}
+        <section className="mb-12">
+          <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30 rounded-lg p-6 text-center">
+            <BookOpen className="w-16 h-16 mx-auto mb-4 text-blue-400" />
+            <h2 className="text-2xl font-bold mb-4">Read the Full Whitepaper</h2>
+            <p className="text-gray-300 mb-6">
+              Get detailed information about game mechanics, tokenomics, roadmap, and more in our comprehensive whitepaper.
+            </p>
+            <button
+              onClick={() => setShowWhitepaper(true)}
+              className="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-lg font-semibold transition text-lg inline-flex items-center gap-2"
+            >
+              <FileText className="w-5 h-5" />
+              Read Whitepaper
+            </button>
+          </div>
+        </section>
+
         {/* Important Disclaimer */}
         <section className="mb-12">
           <div className="bg-yellow-900/30 border-2 border-yellow-500/50 rounded-lg p-6">
@@ -171,7 +172,7 @@ export default function AboutPage({ onNavigate }) {
               Stay updated on game development, connect with other players, and get support:
             </p>
             <div className="space-y-2 text-gray-300">
-              <p>• Website: kingsofred.com </p>
+              <p>• Website: kingsofred.com</p>
               <p>• Telegram: https://t.me/kingsofred</p>
               <p>• Twitter/X: @RedKingDefi</p>
               <p>• Contract: <a 
@@ -185,27 +186,94 @@ export default function AboutPage({ onNavigate }) {
             </div>
           </div>
         </section>
-
-        {/* Back Button */}
-        <div className="text-center">
-          <button
-            onClick={() => onNavigate && onNavigate('home')}
-            className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-semibold transition text-lg"
-          >
-            Back to Home
-          </button>
-        </div>
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-red-800/50 bg-black/40 backdrop-blur mt-12">
-        <div className="container mx-auto px-4 py-6">
-          <div className="text-center text-sm text-gray-500">
-            <p>Kings of Red © 2025 • Built by Red King Crypto on Base Network</p>
-            <p className="mt-2">For entertainment purposes only • Play responsibly</p>
+      {/* Whitepaper Modal */}
+      {showWhitepaper && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-red-500 rounded-lg max-w-4xl max-h-[90vh] overflow-y-auto p-8 relative">
+            <button
+              onClick={() => setShowWhitepaper(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white transition"
+            >
+              <X className="w-8 h-8" />
+            </button>
+
+            <div className="prose prose-invert max-w-none">
+              <h1 className="text-4xl font-bold mb-6 text-red-500">Kings of Red Whitepaper</h1>
+              
+              <h2 className="text-2xl font-bold mt-8 mb-4">Introduction</h2>
+              <p>Kings of Red is a blockchain-based NFT trading card game built on Base Network, featuring token mining, strategic battles, and progressive gameplay across seven legendary clans.</p>
+
+              <h2 className="text-2xl font-bold mt-8 mb-4">Game Overview</h2>
+              <p>Players collect NFT cards, stake them to generate tokens, engage in PvE battles, and craft higher-tier NFTs through merging mechanics. The game economy is designed for long-term sustainability with deflationary mechanisms.</p>
+
+              <h2 className="text-2xl font-bold mt-8 mb-4">NFT Card Types</h2>
+              <ul>
+                <li><strong>Heralds (Phase 1):</strong> Entry-level miners producing $KINGSFOOD tokens daily</li>
+                <li><strong>Alphas (Phase 2):</strong> Enhanced miners producing $KINGSGOLD tokens</li>
+                <li><strong>Fighters (Phase 3):</strong> Battle-focused cards for PvE combat</li>
+                <li><strong>Pets (Phase 4):</strong> Breeding and companion mechanics</li>
+                <li><strong>Ladies (Phase 5):</strong> Generate battle boosts and bonuses</li>
+                <li><strong>Weapons & Badges:</strong> Equipment and achievement systems</li>
+              </ul>
+
+              <h2 className="text-2xl font-bold mt-8 mb-4">Token Economics</h2>
+              <h3 className="text-xl font-bold mt-6 mb-3">$KINGSFOOD</h3>
+              <p>Primary resource token produced by Herald NFTs. Used for pet feeding, basic crafting, and in-game purchases. Daily production varies by rarity: Bronze (20), Silver (65), Gold (100).</p>
+
+              <h3 className="text-xl font-bold mt-6 mb-3">$KINGSGOLD</h3>
+              <p>Premium resource token produced by Alpha NFTs. Required for claiming Herald rewards (5 GOLD/claim), battle entries, and advanced features. More scarce and valuable than FOOD.</p>
+
+              <h2 className="text-2xl font-bold mt-8 mb-4">Withdrawal Tax System</h2>
+              <p>All token withdrawals are subject to a 7% tax split as follows:</p>
+              <ul>
+                <li>40% burned (reduces supply, supports token value)</li>
+                <li>40% to treasury (funds development and operations)</li>
+                <li>20% to rewards pool (incentivizes player engagement)</li>
+              </ul>
+
+              <h2 className="text-2xl font-bold mt-8 mb-4">NFT Forging System</h2>
+              <p>Players can merge NFTs to upgrade rarity tiers:</p>
+              <ul>
+                <li>4 Bronze → 1 Silver (costs 200 FOOD + 100 GOLD)</li>
+                <li>2 Silver → 1 Gold (costs 500 FOOD + 300 GOLD)</li>
+              </ul>
+              <p>Forging burns input NFTs and tokens, creating deflationary pressure on both supply metrics.</p>
+
+              <h2 className="text-2xl font-bold mt-8 mb-4">The Seven Clans</h2>
+              <p>Every NFT belongs to one of seven clans: Smizfume, Coalheart, Warmdice, Bervation, Konfisof, Witkastle, and Bowkin. Clans are randomly assigned during minting. Future updates will introduce clan-specific bonuses and competitive elements.</p>
+
+              <h2 className="text-2xl font-bold mt-8 mb-4">Development Roadmap</h2>
+              <ul>
+                <li><strong>Phase 1 (Current):</strong> Herald Genesis Sale and initial NFT distribution</li>
+                <li><strong>Phase 2:</strong> Staking system activation and token production</li>
+                <li><strong>Phase 3:</strong> Token withdrawals, exchange functionality</li>
+                <li><strong>Phase 4:</strong> Alpha NFT sales and enhanced mining</li>
+                <li><strong>Phase 5:</strong> Battle system and Fighter NFTs</li>
+                <li><strong>Phase 6+:</strong> Pet breeding, Lady NFTs, advanced features</li>
+              </ul>
+
+              <h2 className="text-2xl font-bold mt-8 mb-4">Important Disclaimers</h2>
+              <p><strong>Subject to Change:</strong> All game mechanics, token production rates, fees, and features are subject to change at any time to ensure long-term game balance and sustainability.</p>
+              <p><strong>Not Financial Advice:</strong> This is entertainment software. NFTs and tokens are collectibles, not investments. No guarantees of value or returns are made.</p>
+              <p><strong>Risk Warning:</strong> Cryptocurrency and NFT values are volatile. Only participate with funds you can afford to lose.</p>
+
+              <div className="mt-12 pt-8 border-t border-gray-700 text-center">
+                <p className="text-gray-400">Kings of Red © 2025 • Built on Base Network</p>
+                <p className="text-gray-500 text-sm mt-2">For detailed technical documentation, visit our GitHub repository</p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowWhitepaper(false)}
+              className="w-full bg-red-600 hover:bg-red-700 py-3 rounded-lg font-semibold transition mt-8"
+            >
+              Close
+            </button>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
