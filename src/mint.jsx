@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, Coins, Clock, Flame, Shield, Swords, Sparkles, Users, Trophy, Gift } from 'lucide-react';
+import { Crown, Coins, Clock, Flame, Shield, Swords, Sparkles, Users, Trophy, Gift, Plus, Minus } from 'lucide-react';
 import { ethers } from 'ethers';
 import { HERALD_CONTRACT_ADDRESS, HERALD_ABI, BASE_MAINNET_CONFIG } from './contractConfig';
 
@@ -13,13 +13,16 @@ const CLANS = [
   { id: 6, name: 'Bowkin', color: 'from-rose-600 to-red-700', icon: Flame }
 ];
 
-export default function HeraldMintingPage({ onNavigate }) {
-  const [connected, setConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState('');
+export default function HeraldMintingPage({ onNavigate, connected, walletAddress, connectWallet }) {
   const [minting, setMinting] = useState(false);
   const [mintSuccess, setMintSuccess] = useState(null);
   const [affiliateCode, setAffiliateCode] = useState('');
   const [userAffiliateCode, setUserAffiliateCode] = useState('');
+  const [quantities, setQuantities] = useState({
+    bronze: 1,
+    silver: 1,
+    gold: 1
+  });
   
   // Contract data
   const [supply, setSupply] = useState({
@@ -29,67 +32,76 @@ export default function HeraldMintingPage({ onNavigate }) {
   });
   const [loading, setLoading] = useState(false);
 
+  // Check URL for affiliate code on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref');
+    if (refCode) {
+      setAffiliateCode(refCode);
+    }
+  }, []);
+
   // Load contract data on mount and when connected
   useEffect(() => {
     loadContractData();
-    if (connected) {
+    if (connected && walletAddress) {
       checkGenesisStatus();
     }
-  }, [connected]);
+  }, [connected, walletAddress]);
 
   const loadContractData = async () => {
-  try {
-    setLoading(true);
-    
-    // Use connected wallet provider if available, otherwise use public RPC
-    let provider;
-    if (window.ethereum && connected) {
-      provider = new ethers.BrowserProvider(window.ethereum);
-    } else {
-      provider = new ethers.JsonRpcProvider(BASE_MAINNET_CONFIG.rpcUrls[0]);
-    }
-    
-    const contract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, provider);
-    
-    // Load supply data - force fresh read
-    const [bronzeMinted, silverMinted, goldMinted, bronzePrice, silverPrice, goldPrice] = await Promise.all([
-      contract.bronzeMinted(),
-      contract.silverMinted(),
-      contract.goldMinted(),
-      contract.bronzePrice(),
-      contract.silverPrice(),
-      contract.goldPrice()
-    ]);
-    
-    console.log('Contract data loaded:', {
-      bronze: Number(bronzeMinted),
-      silver: Number(silverMinted),
-      gold: Number(goldMinted)
-    });
-    
-    setSupply({
-      bronze: { 
-        total: 100, 
-        minted: Number(bronzeMinted), 
-        price: ethers.formatEther(bronzePrice) 
-      },
-      silver: { 
-        total: 77, 
-        minted: Number(silverMinted), 
-        price: ethers.formatEther(silverPrice) 
-      },
-      gold: { 
-        total: 43, 
-        minted: Number(goldMinted), 
-        price: ethers.formatEther(goldPrice) 
+    try {
+      setLoading(true);
+      
+      // Use connected wallet provider if available, otherwise use public RPC
+      let provider;
+      if (window.ethereum && connected) {
+        provider = new ethers.BrowserProvider(window.ethereum);
+      } else {
+        provider = new ethers.JsonRpcProvider(BASE_MAINNET_CONFIG.rpcUrls[0]);
       }
-    });
-  } catch (error) {
-    console.error('Error loading contract data:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+      
+      const contract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, provider);
+      
+      // Load supply data - force fresh read
+      const [bronzeMinted, silverMinted, goldMinted, bronzePrice, silverPrice, goldPrice] = await Promise.all([
+        contract.bronzeMinted(),
+        contract.silverMinted(),
+        contract.goldMinted(),
+        contract.bronzePrice(),
+        contract.silverPrice(),
+        contract.goldPrice()
+      ]);
+      
+      console.log('Contract data loaded:', {
+        bronze: Number(bronzeMinted),
+        silver: Number(silverMinted),
+        gold: Number(goldMinted)
+      });
+      
+      setSupply({
+        bronze: { 
+          total: 100, 
+          minted: Number(bronzeMinted), 
+          price: ethers.formatEther(bronzePrice) 
+        },
+        silver: { 
+          total: 77, 
+          minted: Number(silverMinted), 
+          price: ethers.formatEther(silverPrice) 
+        },
+        gold: { 
+          total: 43, 
+          minted: Number(goldMinted), 
+          price: ethers.formatEther(goldPrice) 
+        }
+      });
+    } catch (error) {
+      console.error('Error loading contract data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const checkGenesisStatus = async () => {
     try {
@@ -107,48 +119,16 @@ export default function HeraldMintingPage({ onNavigate }) {
     }
   };
 
-  const connectWallet = async () => {
-    if (!window.ethereum) {
-      alert('Please install MetaMask to mint Heralds!\n\nMetaMask is a crypto wallet browser extension.\nDownload at: https://metamask.io');
-      return;
-    }
-
-    try {
-      // Request account access
-      const accounts = await window.ethereum.request({ 
-        method: 'eth_requestAccounts' 
-      });
-      
-      // Check if on Base network
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      
-      if (chainId !== BASE_MAINNET_CONFIG.chainId) {
-        // Try to switch to Base
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: BASE_MAINNET_CONFIG.chainId }],
-          });
-        } catch (switchError) {
-          // If Base not added, add it
-          if (switchError.code === 4902) {
-            await window.ethereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [BASE_MAINNET_CONFIG],
-            });
-          } else {
-            throw switchError;
-          }
-        }
-      }
-      
-      setWalletAddress(accounts[0]);
-      setConnected(true);
-      
-    } catch (error) {
-      console.error('Error connecting wallet:', error);
-      alert('Failed to connect wallet. Please try again.');
-    }
+  const updateQuantity = (rarity, change) => {
+    setQuantities(prev => {
+      const newQty = prev[rarity] + change;
+      const remaining = supply[rarity].total - supply[rarity].minted;
+      // Clamp between 1 and min(7, remaining)
+      return {
+        ...prev,
+        [rarity]: Math.max(1, Math.min(7, Math.min(newQty, remaining)))
+      };
+    });
   };
 
   const mintHerald = async (rarity) => {
@@ -164,24 +144,28 @@ export default function HeraldMintingPage({ onNavigate }) {
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, signer);
       
-      // Get price for this rarity
-      let price;
+      // Get price and quantity for this rarity
+      let pricePerNFT;
       let rarityNum;
       let rarityName;
+      const quantity = quantities[rarity];
       
       if (rarity === 'bronze') {
-        price = await contract.bronzePrice();
+        pricePerNFT = await contract.bronzePrice();
         rarityNum = 0;
         rarityName = 'Bronze';
       } else if (rarity === 'silver') {
-        price = await contract.silverPrice();
+        pricePerNFT = await contract.silverPrice();
         rarityNum = 1;
         rarityName = 'Silver';
       } else {
-        price = await contract.goldPrice();
+        pricePerNFT = await contract.goldPrice();
         rarityNum = 2;
         rarityName = 'Gold';
       }
+      
+      // Calculate total price
+      const totalPrice = pricePerNFT * BigInt(quantity);
       
       // Check if sold out
       const remaining = supply[rarity].total - supply[rarity].minted;
@@ -191,42 +175,61 @@ export default function HeraldMintingPage({ onNavigate }) {
         return;
       }
       
-      // Send mint transaction
-      const tx = await contract.mintHerald(rarityNum, { value: price });
+      if (quantity > remaining) {
+        alert(`Only ${remaining} ${rarityName} Herald${remaining > 1 ? 's' : ''} remaining!`);
+        setMinting(false);
+        return;
+      }
       
-      alert('Transaction sent! Waiting for confirmation...\n\nThis may take 10-30 seconds.');
+      // Send mint transaction with affiliate code
+      const refCode = affiliateCode || '';
+      const tx = await contract.mintHerald(rarityNum, quantity, refCode, { value: totalPrice });
+      
+      alert(`Transaction sent! Minting ${quantity} Herald${quantity > 1 ? 's' : ''}...\n\nThis may take 10-30 seconds.`);
       
       // Wait for transaction to be mined
       const receipt = await tx.wait();
       
-      // Parse the HeraldMinted event to get clan and tokenId
-      let clanId = Math.floor(Math.random() * 7);
-      let tokenId = '???';
+      // Parse the HeraldMinted events to get clan and tokenIds
+      let mintedNFTs = [];
       
       try {
-        const event = receipt.logs.find(log => {
+        receipt.logs.forEach(log => {
           try {
             const parsed = contract.interface.parseLog(log);
-            return parsed && parsed.name === 'HeraldMinted';
+            if (parsed && parsed.name === 'HeraldMinted') {
+              mintedNFTs.push({
+                tokenId: parsed.args.tokenId.toString(),
+                clan: Number(parsed.args.clan)
+              });
+            }
           } catch {
-            return false;
+            // Skip logs that aren't HeraldMinted events
           }
         });
-        
-        if (event) {
-          const parsed = contract.interface.parseLog(event);
-          tokenId = parsed.args.tokenId.toString();
-          clanId = Number(parsed.args.clan);
-        }
       } catch (error) {
-        console.error('Error parsing event:', error);
+        console.error('Error parsing events:', error);
+      }
+      
+      // If we couldn't parse events, create placeholder data
+      if (mintedNFTs.length === 0) {
+        for (let i = 0; i < quantity; i++) {
+          mintedNFTs.push({
+            tokenId: '???',
+            clan: Math.floor(Math.random() * 7)
+          });
+        }
       }
       
       setMintSuccess({
         rarity: rarityName,
-        clan: CLANS[clanId],
-        tokenId: tokenId,
-        price: ethers.formatEther(price),
+        nfts: mintedNFTs.map(nft => ({
+          ...nft,
+          clanData: CLANS[nft.clan]
+        })),
+        quantity: quantity,
+        totalPrice: ethers.formatEther(totalPrice),
+        pricePerNFT: ethers.formatEther(pricePerNFT),
         txHash: receipt.hash
       });
       
@@ -234,7 +237,7 @@ export default function HeraldMintingPage({ onNavigate }) {
       await loadContractData();
       
       // Check if this was their first mint (Genesis badge)
-      if (connected) {
+      if (connected && walletAddress) {
         await checkGenesisStatus();
       }
       
@@ -256,7 +259,7 @@ export default function HeraldMintingPage({ onNavigate }) {
   };
 
   const copyAffiliateLink = () => {
-    const link = `https://kings-of-red-e2b2.vercel.app/mint?ref=${userAffiliateCode}`;
+    const link = `https://kingsofred.com/mint?ref=${userAffiliateCode}`;
     navigator.clipboard.writeText(link);
     alert('Affiliate link copied to clipboard!');
   };
@@ -273,9 +276,6 @@ export default function HeraldMintingPage({ onNavigate }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
-      {/* Header */}
-      
-
       <div className="container mx-auto px-4 py-8">
         {/* Hero Section */}
         <div className="text-center mb-12">
@@ -302,13 +302,17 @@ export default function HeraldMintingPage({ onNavigate }) {
           <ul className="space-y-2">
             <li className="flex items-start gap-2">
               <Trophy className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
-              <span className="text-gray-300">Guaranteed lowest Price for First Generation Herald NFTs</span>
+              <span className="text-gray-300">Guaranteed lowest price for First Generation Herald NFTs</span>
             </li>
             <li className="flex items-start gap-2">
               <Trophy className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
-              <span className="text-gray-300">Exclusive Genesis Badge NFT</span>
+              <span className="text-gray-300">Exclusive Genesis Badge NFT + 7% affiliate commission</span>
             </li>
-           </ul>
+            <li className="flex items-start gap-2">
+              <Trophy className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+              <span className="text-gray-300">Mint up to 7 NFTs at once to save on gas fees</span>
+            </li>
+          </ul>
         </div>
 
         {/* Minting Cards */}
@@ -317,7 +321,10 @@ export default function HeraldMintingPage({ onNavigate }) {
             const rarityData = supply[rarity];
             const remaining = rarityData.total - rarityData.minted;
             const percentMinted = (rarityData.minted / rarityData.total) * 100;
-            const priceUSD = (parseFloat(rarityData.price) * 3160).toFixed(2); // ETH price ~$3160
+            const quantity = quantities[rarity];
+            const pricePerNFT = parseFloat(rarityData.price);
+            const totalPrice = (pricePerNFT * quantity).toFixed(5);
+            const totalPriceUSD = (pricePerNFT * quantity * 3160).toFixed(2);
 
             return (
               <div
@@ -327,8 +334,8 @@ export default function HeraldMintingPage({ onNavigate }) {
                 <div className="bg-gray-900 rounded-xl p-6">
                   <div className="text-center mb-4">
                     <h3 className="text-2xl font-bold capitalize mb-1">{rarity} Herald</h3>
-                    <p className="text-3xl font-bold">{rarityData.price} ETH</p>
-                    <p className="text-sm text-gray-400">(≈ ${priceUSD})</p>
+                    <p className="text-2xl font-bold">{rarityData.price} ETH</p>
+                    <p className="text-sm text-gray-400">per NFT</p>
                   </div>
 
                   <div className="mb-4">
@@ -351,27 +358,58 @@ export default function HeraldMintingPage({ onNavigate }) {
                     </div>
                   </div>
 
-                  
-                  <button
-  onClick={() => mintHerald(rarity)}
-  disabled={minting || remaining === 0 || !connected}
-  className={`w-full py-3 rounded-lg font-bold transition ${
-    remaining === 0
-      ? 'bg-gray-700 cursor-not-allowed text-gray-500'
-      : minting
-      ? 'bg-gray-700 cursor-wait text-gray-300'
-      : !connected
-      ? 'bg-gray-700 cursor-not-allowed text-gray-400'
-      : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700'
-  }`}
->
-  {remaining === 0
-    ? 'SOLD OUT'
-    : minting
-    ? 'Minting...'
-    : `Mint ${rarity.charAt(0).toUpperCase() + rarity.slice(1)} Herald`}
-</button>
+                  {/* Quantity Selector */}
+                  {remaining > 0 && connected && (
+                    <div className="bg-black/30 rounded-lg p-4 mb-4">
+                      <div className="text-sm text-gray-400 mb-2 text-center">Quantity</div>
+                      <div className="flex items-center justify-center gap-4">
+                        <button
+                          onClick={() => updateQuantity(rarity, -1)}
+                          disabled={quantity <= 1}
+                          className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed p-2 rounded-lg transition"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <span className="text-2xl font-bold w-8 text-center">{quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(rarity, 1)}
+                          disabled={quantity >= 7 || quantity >= remaining}
+                          className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed p-2 rounded-lg transition"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {quantity > 1 && (
+                        <div className="mt-3 text-center">
+                          <div className="text-sm text-gray-400">Total Cost</div>
+                          <div className="text-xl font-bold">{totalPrice} ETH</div>
+                          <div className="text-xs text-gray-400">≈ ${totalPriceUSD}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
+                  <button
+                    onClick={() => mintHerald(rarity)}
+                    disabled={minting || remaining === 0 || !connected}
+                    className={`w-full py-3 rounded-lg font-bold transition ${
+                      remaining === 0
+                        ? 'bg-gray-700 cursor-not-allowed text-gray-500'
+                        : minting
+                        ? 'bg-gray-700 cursor-wait text-gray-300'
+                        : !connected
+                        ? 'bg-gray-700 cursor-not-allowed text-gray-400'
+                        : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700'
+                    }`}
+                  >
+                    {remaining === 0
+                      ? 'SOLD OUT'
+                      : minting
+                      ? 'Minting...'
+                      : !connected
+                      ? 'Connect Wallet to Mint'
+                      : `Mint ${quantity} Herald${quantity > 1 ? 's' : ''}`}
+                  </button>
                 </div>
               </div>
             );
@@ -381,31 +419,48 @@ export default function HeraldMintingPage({ onNavigate }) {
         {/* Mint Success Modal */}
         {mintSuccess && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900 rounded-xl p-8 max-w-md w-full border border-green-500/50">
+            <div className="bg-gray-900 rounded-xl p-8 max-w-2xl w-full border border-green-500/50 max-h-[90vh] overflow-y-auto">
               <div className="text-center">
                 <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Sparkles className="w-8 h-8 text-green-400" />
                 </div>
-                <h3 className="text-2xl font-bold mb-2">Herald Minted!</h3>
-                <p className="text-gray-400 mb-6">Congratulations on your new Herald NFT</p>
+                <h3 className="text-2xl font-bold mb-2">
+                  {mintSuccess.quantity} Herald{mintSuccess.quantity > 1 ? 's' : ''} Minted!
+                </h3>
+                <p className="text-gray-400 mb-6">
+                  Congratulations on your new {mintSuccess.rarity} Herald{mintSuccess.quantity > 1 ? 's' : ''}
+                </p>
                 
-                <div className={`bg-gradient-to-br ${mintSuccess.clan.color} p-0.5 rounded-xl mb-6`}>
-                  <div className="bg-gray-800 rounded-xl p-6">
-                    <div className="text-yellow-400 font-bold text-lg mb-2">{mintSuccess.rarity}</div>
-                    <div className="text-2xl font-bold mb-1">{mintSuccess.clan.name}</div>
-                    <div className="text-sm text-gray-400">Token #{mintSuccess.tokenId}</div>
-                  </div>
+                {/* Display all minted NFTs */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {mintSuccess.nfts.map((nft, idx) => (
+                    <div key={idx} className={`bg-gradient-to-br ${nft.clanData.color} p-0.5 rounded-xl`}>
+                      <div className="bg-gray-800 rounded-xl p-4">
+                        <div className="text-yellow-400 font-bold text-sm mb-1">{mintSuccess.rarity}</div>
+                        <div className="text-xl font-bold mb-1">{nft.clanData.name}</div>
+                        <div className="text-xs text-gray-400">Token #{nft.tokenId}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
-                <div className="space-y-2 mb-6">
+                <div className="space-y-2 mb-6 bg-black/30 rounded-lg p-4">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Price Paid:</span>
-                    <span className="font-bold">{mintSuccess.price} ETH</span>
+                    <span className="text-gray-400">Quantity:</span>
+                    <span className="font-bold">{mintSuccess.quantity} NFT{mintSuccess.quantity > 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Price Per NFT:</span>
+                    <span className="font-bold">{mintSuccess.pricePerNFT} ETH</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Total Paid:</span>
+                    <span className="font-bold">{mintSuccess.totalPrice} ETH</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Daily Rewards:</span>
                     <span className="font-bold">
-                      {mintSuccess.rarity === 'Gold' ? '100' : mintSuccess.rarity === 'Silver' ? '65' : '20'} FOOD
+                      {(mintSuccess.rarity === 'Gold' ? 100 : mintSuccess.rarity === 'Silver' ? 65 : 20) * mintSuccess.quantity} FOOD/day
                     </span>
                   </div>
                 </div>
@@ -421,9 +476,9 @@ export default function HeraldMintingPage({ onNavigate }) {
 
                 <button
                   onClick={() => {
-  setMintSuccess(null);
-  loadContractData(); // Refresh supply counts
-}}
+                    setMintSuccess(null);
+                    loadContractData();
+                  }}
                   className="w-full bg-red-600 hover:bg-red-700 py-3 rounded-lg font-semibold transition"
                 >
                   Close
@@ -441,12 +496,12 @@ export default function HeraldMintingPage({ onNavigate }) {
               Your Genesis Affiliate Code
             </h3>
             <p className="text-gray-300 mb-4">
-              Share your unique link and earn 10% commission on every Herald minted through your referral!
+              Share your unique link and earn 7% commission (paid instantly in ETH) on every Herald minted through your referral!
             </p>
             <div className="flex gap-2">
               <input
                 type="text"
-                value={`https://kings-of-red-e2b2.vercel.app/mint?ref=${userAffiliateCode}`}
+                value={`https://kingsofred.com/mint?ref=${userAffiliateCode}`}
                 readOnly
                 className="flex-1 bg-black/50 border border-green-500/30 rounded-lg px-4 py-2 font-mono text-sm"
               />
@@ -496,15 +551,13 @@ export default function HeraldMintingPage({ onNavigate }) {
             </p>
           </div>
           <div className="bg-gray-800/50 rounded-lg p-6">
-            <h4 className="font-bold mb-2">What's the difference between rarities?</h4>
+            <h4 className="font-bold mb-2">Why mint multiple at once?</h4>
             <p className="text-gray-300 text-sm">
-              Bronze Heralds produce 20 FOOD/day, Silver produce 65 FOOD/day, and Gold produce 100 FOOD/day. 
+              Minting up to 7 NFTs in one transaction saves you gas fees! Instead of paying $3 per mint (7 times = $21), you pay only $3 once for all 7 NFTs.
             </p>
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-          </div>
+    </div>
   );
 }

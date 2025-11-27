@@ -259,20 +259,27 @@ export default function Application() {
       </div>
 
       {/* Page Content */}
-      <div className="container mx-auto px-4 py-8">
-        {currentPage === 'home' && renderHomePage()}
-        {currentPage === 'mint' && <MintPage />}
-        {currentPage === 'staking' && <StakingPage />}
-        {currentPage === 'exchange' && <ExchangePage />}
-        {currentPage === 'about' && <AboutPage />}
-        {currentPage === 'faq' && <FAQPage />} 
-      </div>
+<div className="container mx-auto px-4 py-8">
+  {currentPage === 'home' && renderHomePage()}
+  {currentPage === 'mint' && (
+    <MintPage 
+      onNavigate={setCurrentPage}
+      connected={connected}
+      walletAddress={walletAddress}
+      connectWallet={connectWallet}
+    />
+  )}
+  {currentPage === 'staking' && <StakingPage />}
+  {currentPage === 'exchange' && <ExchangePage />}
+  {currentPage === 'about' && <AboutPage />}
+  {currentPage === 'faq' && <FAQPage onNavigate={setCurrentPage} />}
+</div>
 
       {/* Footer */}
       <div className="border-t border-red-800/50 bg-black/40 backdrop-blur mt-12">
         <div className="container mx-auto px-4 py-6">
           <div className="text-center text-sm text-gray-500">
-            <p>Kings of Red © 2025 • Built on Base Network</p>
+            <p>Kings of Red © <a href= "https://redkingcrypto.com">Red King Crypto</a> 2025 • Built on Base Network</p>
             <div className="mt-2">
               <button
                 onClick={() => navigateTo('about')}
