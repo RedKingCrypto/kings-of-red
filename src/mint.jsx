@@ -104,20 +104,26 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
   };
 
   const checkGenesisStatus = async () => {
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const contract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, provider);
-      
-      const hasGenesis = await contract.hasGenesisBadge(walletAddress);
-      if (hasGenesis) {
-        // Generate affiliate code based on wallet address
-        const code = 'KOR-' + walletAddress.slice(2, 8).toUpperCase();
-        setUserAffiliateCode(code);
-      }
-    } catch (error) {
-      console.error('Error checking Genesis status:', error);
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const contract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, provider);
+    
+    // Check if user has Genesis badge
+    const hasGenesis = await contract.hasGenesisBadge(walletAddress);
+    
+    // Get the actual affiliate code from the contract
+    const code = await contract.affiliateCode(walletAddress);
+    
+    if (code && code !== '') {
+      setUserAffiliateCode(code);
+      console.log('Affiliate code loaded:', code);
+    } else {
+      console.log('No affiliate code yet for this wallet');
     }
-  };
+  } catch (error) {
+    console.error('Error checking Genesis status:', error);
+  }
+};
 
   const updateQuantity = (rarity, change) => {
     setQuantities(prev => {
