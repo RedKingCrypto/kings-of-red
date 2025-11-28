@@ -77,7 +77,7 @@ export default function FAQPage({ onNavigate }) {
         },
         {
           q: "When does staking open?",
-          a: "Staking will open approximately 2-3 weeks after the Genesis Herald sale. We'll announce the exact date on Discord and Twitter. This delay allows us to ensure everything works perfectly."
+          a: "As per our roadmap Staking is set to open in February/March 2026. We'll announce the exact date on Telegram and Twitter. This delay allows us to ensure everything works perfectly."
         },
         {
           q: "How do I claim my daily rewards?",

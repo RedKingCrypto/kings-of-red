@@ -559,7 +559,7 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
           <div className="bg-gray-800/50 rounded-lg p-6">
             <h4 className="font-bold mb-2">Why mint multiple at once?</h4>
             <p className="text-gray-300 text-sm">
-              Minting up to 7 NFTs in one transaction saves you gas fees! Instead of paying $3 per mint (7 times = $21), you pay only $3 once for all 7 NFTs.
+              Minting up to 7 NFTs in one transaction saves you gas fees! 
             </p>
           </div>
         </div>
