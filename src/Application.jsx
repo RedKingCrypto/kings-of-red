@@ -95,6 +95,78 @@ export default function Application() {
         })}
       </div>
 
+      {/* Herald NFT Showcase Section */}
+<div className="my-16 max-w-6xl mx-auto">
+  <div className="text-center mb-8">
+    <h2 className="text-3xl font-bold mb-2">Collect Legendary Heralds</h2>
+    <p className="text-gray-400">Each Herald belongs to one of seven clans and comes in Bronze, Silver, or Gold rarity</p>
+  </div>
+  
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+    {/* Herald 1 */}
+    <div className="group">
+      <div className="relative overflow-hidden rounded-xl border-2 border-gray-700 hover:border-red-500 transition-all duration-300">
+        <img 
+          src="/heralds/herald1.jpg" 
+          alt="Herald NFT Example 1"
+          className="w-full h-auto object-cover transform group-hover:scale-110 transition-transform duration-300"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <p className="text-white font-bold text-lg">Bronze Herald</p>
+            <p className="text-gray-300 text-sm">20 FOOD/day</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Herald 2 */}
+    <div className="group">
+      <div className="relative overflow-hidden rounded-xl border-2 border-gray-700 hover:border-red-500 transition-all duration-300">
+        <img 
+          src="/heralds/herald2.jpg" 
+          alt="Herald NFT Example 2"
+          className="w-full h-auto object-cover transform group-hover:scale-110 transition-transform duration-300"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <p className="text-white font-bold text-lg">Silver Herald</p>
+            <p className="text-gray-300 text-sm">65 FOOD/day</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Herald 3 */}
+    <div className="group">
+      <div className="relative overflow-hidden rounded-xl border-2 border-gray-700 hover:border-red-500 transition-all duration-300">
+        <img 
+          src="/heralds/herald3.jpg" 
+          alt="Herald NFT Example 3"
+          className="w-full h-auto object-cover transform group-hover:scale-110 transition-transform duration-300"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <p className="text-white font-bold text-lg">Gold Herald</p>
+            <p className="text-gray-300 text-sm">100 FOOD/day</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {/* Call to Action */}
+  <div className="text-center mt-8">
+    <button
+      onClick={() => onNavigate && onNavigate('mint')}
+      className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 px-8 py-4 rounded-lg font-bold text-lg transition-all transform hover:scale-105"
+    >
+      Start Minting →
+    </button>
+    <p className="text-gray-400 text-sm mt-3">Genesis Sale • Limited Supply • Random Clan Assignment</p>
+  </div>
+</div>
+
       <div className="bg-gradient-to-r from-red-900/30 to-orange-900/30 border border-red-500/30 rounded-lg p-8 max-w-3xl mx-auto mb-8">
         <h3 className="text-2xl font-bold mb-4">Phase 1: Herald Launch</h3>
         <p className="text-gray-300 mb-4">
