@@ -33,7 +33,7 @@ export default function FAQPage({ onNavigate }) {
         },
         {
           q: "What blockchain is this built on?",
-          a: "Kings of Red is built on Base, which is Coinbase's Layer 2 network. It offers low gas fees ($1-3 per transaction), fast confirmations (2-5 seconds), and the security of Ethereum."
+          a: "Kings of Red is built on Base, which is Coinbase's Layer 2 network. It offers low gas fees (just a few cents per transaction), fast confirmations (2-5 seconds), and the security of Ethereum."
         }
       ]
     },
@@ -189,7 +189,7 @@ export default function FAQPage({ onNavigate }) {
         },
         {
           q: "How much does minting cost in gas fees?",
-          a: "On Base network, gas fees are typically $1-3 per transaction. This is much cheaper than Ethereum mainnet which can cost $20-100+ in gas fees."
+          a: "On Base network, gas fees are typically a few cents per transaction. This is much cheaper than Ethereum mainnet which can cost $20-100+ in gas fees."
         },
         {
           q: "Can I sell my Herald NFT?",

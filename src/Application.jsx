@@ -360,9 +360,9 @@ export default function Application() {
                 About
               </button>
               {' • '}
-              <a href="#" className="hover:text-gray-300 transition">Discord</a>
+              <a href="https://t.me/kingsofred" className="hover:text-gray-300 transition">Telegram</a>
               {' • '}
-              <a href="#" className="hover:text-gray-300 transition">Twitter</a>
+              <a href="https://x.com/RedKingDefi" className="hover:text-gray-300 transition">Twitter</a>
             </div>
           </div>
         </div>
