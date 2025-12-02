@@ -156,13 +156,8 @@ export default function Application() {
   </div>
 
   {/* Call to Action */}
-  <div className="text-center mt-8">
-    <button
-      onClick={() => onNavigate && onNavigate('mint')}
-      className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 px-8 py-4 rounded-lg font-bold text-lg transition-all transform hover:scale-105"
-    >
-      Start Minting →
-    </button>
+   <div className="text-center mt-8">
+   
     <p className="text-gray-400 text-sm mt-3">Genesis Sale • Limited Supply • Random Clan Assignment</p>
   </div>
 </div>
