@@ -1,6 +1,12 @@
-// Contract configuration for Herald NFT on Base Mainnet
-export const HERALD_CONTRACT_ADDRESS = "0xb282DC4c005C88A3E81D513D09a78f48CA404311";
+// Contract configuration for Kings of Red on Base Mainnet
 
+// ============ CONTRACT ADDRESSES ============
+export const HERALD_CONTRACT_ADDRESS = "0xb282DC4c005C88A3E81D513D09a78f48CA404311";
+export const FOOD_TOKEN_ADDRESS = "0x61921e291b88045ee2bc006c5d0a3baddd8a2d22";
+export const GOLD_TOKEN_ADDRESS = "0xb7a2c42655074736988864f4851d8cf831629f22";
+export const GAME_BALANCE_ADDRESS = "0x11022f5cccea6262ce91e3bc75f9f912ae848b8e";
+
+// ============ NETWORK CONFIG ============
 export const BASE_MAINNET_CONFIG = {
   chainId: '0x2105', // 8453 in hex
   chainName: 'Base',
@@ -13,10 +19,47 @@ export const BASE_MAINNET_CONFIG = {
   blockExplorerUrls: ['https://basescan.org']
 };
 
-// Import your ABI from the downloaded file
-// You'll need to copy the "abi" array from HeraldNFT.abi.json
+// ============ TOKEN ABIs ============
+export const FOOD_TOKEN_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)"
+];
+
+export const GOLD_TOKEN_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)"
+];
+
+// ============ GAME BALANCE MANAGER ABI ============
+export const GAME_BALANCE_ABI = [
+  "function inGameFood(address) view returns (uint256)",
+  "function inGameGold(address) view returns (uint256)",
+  "function getBalances(address user) view returns (uint256 food, uint256 gold)",
+  "function depositFood(uint256 amount)",
+  "function depositGold(uint256 amount)",
+  "function withdrawFood(uint256 amount)",
+  "function withdrawGold(uint256 amount)",
+  "function canWithdraw(address) view returns (bool)",
+  "function timeUntilWithdrawal(address) view returns (uint256)",
+  "function lastWithdrawal(address) view returns (uint256)",
+  "event Deposited(address indexed user, string tokenType, uint256 amount)",
+  "event Withdrawn(address indexed user, string tokenType, uint256 amount, uint256 tax)"
+];
+
+// ============ HERALD NFT ABI ============
 export const HERALD_ABI = [
-  
   {
     "inputs": [],
     "stateMutability": "nonpayable",
@@ -218,8 +261,7 @@ export const HERALD_ABI = [
     "name": "Transfer",
     "type": "event"
   },
-
-    {
+  {
     "inputs": [],
     "name": "MAX_BRONZE",
     "outputs": [
@@ -724,4 +766,4 @@ export const HERALD_ABI = [
     "stateMutability": "nonpayable",
     "type": "function"
   }
-]
+];
