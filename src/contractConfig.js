@@ -17,7 +17,7 @@ export const RARITY_NAMES = ['Bronze', 'Silver', 'Gold'];
 export const getHeraldImageUrl = (clan, rarity) => {
   const clanName = CLAN_NAMES[clan].toLowerCase();
   const rarityName = RARITY_NAMES[rarity].toLowerCase();
-  return `${IPFS_IMAGE_BASE}/herald_${clanName}_${rarityName}.png`;
+  return `${IPFS_IMAGE_BASE}/${clanName}_${rarityName}.png`;
 };
 
 // ============ NETWORK CONFIG ============
