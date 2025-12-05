@@ -5,6 +5,7 @@ export const HERALD_CONTRACT_ADDRESS = "0xb282DC4c005C88A3E81D513D09a78f48CA4043
 export const FOOD_TOKEN_ADDRESS = "0x61921e291b88045ee2bc006c5d0a3baddd8a2d22";
 export const GOLD_TOKEN_ADDRESS = "0xb7a2c42655074736988864f4851d8cf831629f22";
 export const GAME_BALANCE_ADDRESS = "0x11022f5cccea6262ce91e3bc75f9f912ae848b8e";
+export const HERALD_STAKING_ADDRESS = "0xE8d717084C6a25837C923559760a7a3580FDb571";
 
 // ============ NETWORK CONFIG ============
 export const BASE_MAINNET_CONFIG = {
@@ -56,6 +57,27 @@ export const GAME_BALANCE_ABI = [
   "function lastWithdrawal(address) view returns (uint256)",
   "event Deposited(address indexed user, string tokenType, uint256 amount)",
   "event Withdrawn(address indexed user, string tokenType, uint256 amount, uint256 tax)"
+];
+
+// ============ HERALD STAKING ABI ============
+export const HERALD_STAKING_ABI = [
+  "function stakeHerald(uint256 tokenId)",
+  "function unstakeHerald(uint256 tokenId)",
+  "function claimRewards()",
+  "function getUserStakedHeralds(address user) view returns (uint256[])",
+  "function getPendingRewards(address user) view returns (uint256 totalRewards, uint256 readyCount)",
+  "function getTimeUntilClaim(uint256 tokenId) view returns (uint256)",
+  "function getStakeInfo(uint256 tokenId) view returns (address owner, uint256 stakedAt, uint256 lastClaim, uint8 clan, uint8 rarity, bool canClaim)",
+  "function hasClanStaked(address user, uint8 clan) view returns (bool)",
+  "function totalStaked() view returns (uint256)",
+  "function bronzeProduction() view returns (uint256)",
+  "function silverProduction() view returns (uint256)",
+  "function goldProduction() view returns (uint256)",
+  "function claimCost() view returns (uint256)",
+  "function claimCooldown() view returns (uint256)",
+  "event HeraldStaked(address indexed user, uint256 indexed tokenId, uint8 clan, uint8 rarity)",
+  "event HeraldUnstaked(address indexed user, uint256 indexed tokenId)",
+  "event RewardsClaimed(address indexed user, uint256 amount, uint256 goldBurned)"
 ];
 
 // ============ HERALD NFT ABI ============

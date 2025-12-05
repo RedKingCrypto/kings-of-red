@@ -1,516 +1,395 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, Coins, Clock, Flame, Shield, Swords, Lock, Unlock, AlertCircle } from 'lucide-react';
+import { Crown, Coins, Clock, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { ethers } from 'ethers';
-import { HERALD_CONTRACT_ADDRESS, HERALD_ABI, BASE_MAINNET_CONFIG } from './contractConfig';
+import {
+  HERALD_CONTRACT_ADDRESS,
+  HERALD_STAKING_ADDRESS,
+  HERALD_ABI,
+  HERALD_STAKING_ABI
+} from './contractConfig';
 
-const CLANS = [
-  { id: 0, name: 'Smizfume', color: 'from-red-600 to-orange-500', icon: Flame },
-  { id: 1, name: 'Coalheart', color: 'from-gray-600 to-slate-400', icon: Shield },
-  { id: 2, name: 'Warmdice', color: 'from-purple-600 to-indigo-500', icon: Crown },
-  { id: 3, name: 'Bervation', color: 'from-blue-600 to-cyan-500', icon: Swords },
-  { id: 4, name: 'Konfisof', color: 'from-green-600 to-emerald-500', icon: Shield },
-  { id: 5, name: 'Witkastle', color: 'from-yellow-500 to-amber-400', icon: Crown },
-  { id: 6, name: 'Bowkin', color: 'from-rose-600 to-red-700', icon: Flame }
-];
+const CLAN_NAMES = ['Smizfume', 'Coalheart', 'Warmdice', 'Bervation', 'Konfisof', 'Witkastle', 'Bowkin'];
+const RARITY_NAMES = ['Bronze', 'Silver', 'Gold'];
+const RARITY_COLORS = ['text-orange-400', 'text-gray-300', 'text-yellow-400'];
+const PRODUCTION_RATES = [20, 65, 100]; // FOOD per day
 
-const FOOD_PRODUCTION = {
-  'Bronze': 20,
-  'Silver': 65,
-  'Gold': 100
-};
-
-export default function StakingPage({ onNavigate }) {
-  const [connected, setConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState('');
-  const [loading, setLoading] = useState(false);
+export default function StakingPage({ connected, walletAddress, onNavigate }) {
+  const [loading, setLoading] = useState(true);
   const [ownedHeralds, setOwnedHeralds] = useState([]);
-  const [stakedSlots, setStakedSlots] = useState({
-    0: null, 1: null, 2: null, 3: null, 4: null, 5: null, 6: null
-  });
-  const [foodBalance, setFoodBalance] = useState(0);
-  const [goldBalance, setGoldBalance] = useState(1000); // Placeholder
-  const [selectedHerald, setSelectedHerald] = useState(null);
-  const [showStakeModal, setShowStakeModal] = useState(false);
-  const [targetClan, setTargetClan] = useState(null);
+  const [stakedHeralds, setStakedHeralds] = useState([]);
+  const [pendingRewards, setPendingRewards] = useState({ total: '0', count: 0 });
+  const [claimCost, setClaimCost] = useState('7');
+  const [processing, setProcessing] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
-    checkWalletConnection();
-  }, []);
-
-  useEffect(() => {
-    if (connected) {
-      loadUserHeralds();
-      loadStakedHeralds();
+    if (connected && walletAddress) {
+      loadStakingData();
     }
-  }, [connected]);
+  }, [connected, walletAddress]);
 
-  const checkWalletConnection = async () => {
-    if (window.ethereum) {
-      try {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        if (accounts.length > 0) {
-          setWalletAddress(accounts[0]);
-          setConnected(true);
-        }
-      } catch (error) {
-        console.error('Error checking wallet:', error);
-      }
-    }
-  };
-
-  const connectWallet = async () => {
-    if (!window.ethereum) {
-      alert('Please install MetaMask!');
-      return;
-    }
-
-    try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      if (chainId !== BASE_MAINNET_CONFIG.chainId) {
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: BASE_MAINNET_CONFIG.chainId }],
-          });
-        } catch (switchError) {
-          if (switchError.code === 4902) {
-            await window.ethereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [BASE_MAINNET_CONFIG],
-            });
-          }
-        }
-      }
-      
-      setWalletAddress(accounts[0]);
-      setConnected(true);
-    } catch (error) {
-      console.error('Error connecting wallet:', error);
-    }
-  };
-
-  const loadUserHeralds = async () => {
+  const loadStakingData = async () => {
     try {
       setLoading(true);
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const contract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, provider);
       
-      // Get user's balance
-      const balance = await contract.balanceOf(walletAddress);
-      const totalHeralds = Number(balance);
+      const heraldContract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, provider);
+      const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, provider);
       
-      // Load each Herald's data
-      const heralds = [];
-      for (let i = 0; i < totalHeralds; i++) {
-        try {
-          // This would need tokenOfOwnerByIndex function in contract
-          // For now, we'll use a simpler approach checking token IDs
-          const totalSupply = await contract.totalSupply();
+      // Get user's total Herald balance
+      const balance = await heraldContract.balanceOf(walletAddress);
+      const heraldCount = parseInt(balance.toString());
+      
+      // Get staked Herald IDs
+      const stakedIds = await stakingContract.getUserStakedHeralds(walletAddress);
+      
+      // Get pending rewards
+      const [totalRewards, readyCount] = await stakingContract.getPendingRewards(walletAddress);
+      setPendingRewards({
+        total: parseFloat(ethers.formatEther(totalRewards)).toFixed(2),
+        count: parseInt(readyCount.toString())
+      });
+      
+      // Get claim cost
+      const cost = await stakingContract.claimCost();
+      setClaimCost(ethers.formatEther(cost));
+      
+      // Load staked Heralds details
+      const stakedDetails = await Promise.all(
+        stakedIds.map(async (tokenId) => {
+          const [owner, stakedAt, lastClaim, clan, rarity, canClaim] = await stakingContract.getStakeInfo(tokenId);
+          const timeUntil = await stakingContract.getTimeUntilClaim(tokenId);
           
-          for (let tokenId = 1; tokenId <= Number(totalSupply); tokenId++) {
-            try {
-              const owner = await contract.ownerOf(tokenId);
-              if (owner.toLowerCase() === walletAddress.toLowerCase()) {
-                const heraldData = await contract.getHerald(tokenId);
-                heralds.push({
-                  tokenId: tokenId,
-                  rarity: ['Bronze', 'Silver', 'Gold'][heraldData[0]],
-                  clan: Number(heraldData[1]),
-                  mintedAt: Number(heraldData[2])
-                });
-              }
-            } catch (e) {
-              // Token doesn't exist or error, skip
-            }
-          }
-        } catch (error) {
-          console.error('Error loading herald:', error);
-        }
-      }
+          return {
+            tokenId: tokenId.toString(),
+            clan: parseInt(clan),
+            rarity: parseInt(rarity),
+            canClaim,
+            timeUntilClaim: parseInt(timeUntil.toString()),
+            lastClaim: parseInt(lastClaim.toString())
+          };
+        })
+      );
       
-      setOwnedHeralds(heralds);
-    } catch (error) {
-      console.error('Error loading user Heralds:', error);
-    } finally {
+      setStakedHeralds(stakedDetails);
+      
+      // Calculate owned (unstaked) Heralds
+      // For now, we'll show count only (full NFT loading can be added later)
+      const unstakedCount = heraldCount - stakedIds.length;
+      setOwnedHeralds(Array(unstakedCount).fill({ placeholder: true }));
+      
       setLoading(false);
-    }
-  };
-
-  const loadStakedHeralds = () => {
-    // Load staked data from localStorage or contract
-    // For now, using localStorage
-    try {
-      const saved = localStorage.getItem(`staked-${walletAddress}`);
-      if (saved) {
-        setStakedSlots(JSON.parse(saved));
-      }
     } catch (error) {
-      console.error('Error loading staked Heralds:', error);
+      console.error('Error loading staking data:', error);
+      setLoading(false);
+      showMessage('error', 'Error loading staking data');
     }
   };
 
-  const saveStakedHeralds = (newSlots) => {
+  const showMessage = (type, text) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+  };
+
+  const handleApproveAndStake = async (tokenId) => {
     try {
-      localStorage.setItem(`staked-${walletAddress}`, JSON.stringify(newSlots));
+      setProcessing(true);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      
+      const heraldContract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, signer);
+      
+      // Approve staking contract
+      showMessage('info', 'Approving Herald for staking...');
+      const approveTx = await heraldContract.approve(HERALD_STAKING_ADDRESS, tokenId);
+      await approveTx.wait();
+      
+      // Stake
+      showMessage('info', 'Staking Herald...');
+      const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, signer);
+      const stakeTx = await stakingContract.stakeHerald(tokenId);
+      await stakeTx.wait();
+      
+      showMessage('success', 'Herald staked successfully!');
+      await loadStakingData();
+      setProcessing(false);
     } catch (error) {
-      console.error('Error saving staked Heralds:', error);
+      console.error('Error staking:', error);
+      showMessage('error', error.message || 'Failed to stake Herald');
+      setProcessing(false);
     }
   };
 
-  const openStakeModal = (clanId) => {
-    // Find unstaked Heralds from this clan
-    const availableHeralds = ownedHeralds.filter(h => {
-      const alreadyStaked = Object.values(stakedSlots).some(s => s && s.tokenId === h.tokenId);
-      return h.clan === clanId && !alreadyStaked;
-    });
-    
-    if (availableHeralds.length === 0) {
-      alert(`You don't have any unstaked ${CLANS[clanId].name} Heralds!`);
-      return;
+  const handleUnstake = async (tokenId) => {
+    try {
+      setProcessing(true);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      
+      const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, signer);
+      
+      showMessage('info', 'Unstaking Herald...');
+      const tx = await stakingContract.unstakeHerald(tokenId);
+      await tx.wait();
+      
+      showMessage('success', 'Herald unstaked successfully!');
+      await loadStakingData();
+      setProcessing(false);
+    } catch (error) {
+      console.error('Error unstaking:', error);
+      showMessage('error', error.message || 'Failed to unstake Herald');
+      setProcessing(false);
     }
-    
-    setTargetClan(clanId);
-    setShowStakeModal(true);
   };
 
-  const stakeHerald = (herald) => {
-    const newSlots = { ...stakedSlots };
-    newSlots[herald.clan] = {
-      ...herald,
-      stakedAt: Date.now(),
-      lastClaim: Date.now()
-    };
-    
-    setStakedSlots(newSlots);
-    saveStakedHeralds(newSlots);
-    setShowStakeModal(false);
-    setSelectedHerald(null);
-  };
-
-  const unstakeHerald = (clanId) => {
-    if (!window.confirm('Are you sure you want to unstake this Herald? You will lose any unclaimed rewards!')) {
-      return;
+  const handleClaimRewards = async () => {
+    try {
+      setProcessing(true);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      
+      const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, signer);
+      
+      showMessage('info', 'Claiming rewards...');
+      const tx = await stakingContract.claimRewards();
+      await tx.wait();
+      
+      showMessage('success', `Claimed ${pendingRewards.total} FOOD! Check Dashboard.`);
+      await loadStakingData();
+      setProcessing(false);
+    } catch (error) {
+      console.error('Error claiming:', error);
+      const errorMsg = error.message.includes('Insufficient in-game GOLD')
+        ? 'Not enough GOLD in-game balance! Visit Exchange to deposit GOLD.'
+        : error.message || 'Failed to claim rewards';
+      showMessage('error', errorMsg);
+      setProcessing(false);
     }
-    
-    const newSlots = { ...stakedSlots };
-    newSlots[clanId] = null;
-    
-    setStakedSlots(newSlots);
-    saveStakedHeralds(newSlots);
   };
 
-  const canClaim = (stakedHerald) => {
-    if (!stakedHerald || !stakedHerald.lastClaim) return false;
-    const hoursSinceClaim = (Date.now() - stakedHerald.lastClaim) / (1000 * 60 * 60);
-    return hoursSinceClaim >= 24;
-  };
-
-  const getTimeUntilClaim = (stakedHerald) => {
-    if (!stakedHerald || !stakedHerald.lastClaim) return '--:--';
-    
-    const nextClaimTime = stakedHerald.lastClaim + (24 * 60 * 60 * 1000);
-    const timeRemaining = nextClaimTime - Date.now();
-    
-    if (timeRemaining <= 0) return 'Ready!';
-    
-    const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
-    const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+  const formatTime = (seconds) => {
+    if (seconds === 0) return 'Ready!';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
     return `${hours}h ${minutes}m`;
-  };
-
-  const claimRewards = (clanId) => {
-    const stakedHerald = stakedSlots[clanId];
-    if (!canClaim(stakedHerald)) {
-      alert('Not ready to claim yet!');
-      return;
-    }
-    
-    // Check if user has enough GOLD (5 GOLD to claim)
-    if (goldBalance < 5) {
-      alert('Not enough $KINGSGOLD! You need 5 GOLD to claim rewards.');
-      return;
-    }
-    
-    const foodReward = FOOD_PRODUCTION[stakedHerald.rarity];
-    
-    // Update balances
-    setFoodBalance(prev => prev + foodReward);
-    setGoldBalance(prev => prev - 5);
-    
-    // Update last claim time
-    const newSlots = { ...stakedSlots };
-    newSlots[clanId] = { ...stakedHerald, lastClaim: Date.now() };
-    setStakedSlots(newSlots);
-    saveStakedHeralds(newSlots);
-    
-    alert(`Claimed ${foodReward} $KINGSFOOD! (-5 $KINGSGOLD fee)`);
-  };
-
-  const getTotalDailyProduction = () => {
-    return Object.values(stakedSlots).reduce((total, slot) => {
-      if (slot && slot.rarity) {
-        return total + FOOD_PRODUCTION[slot.rarity];
-      }
-      return total;
-    }, 0);
-  };
-
-  const getRarityColor = (rarity) => {
-    switch(rarity) {
-      case 'Gold': return 'text-yellow-400 border-yellow-400';
-      case 'Silver': return 'text-gray-300 border-gray-300';
-      case 'Bronze': return 'text-orange-400 border-orange-400';
-      default: return 'text-gray-400 border-gray-400';
-    }
   };
 
   if (!connected) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white flex items-center justify-center">
-        <div className="text-center">
-          <Crown className="w-16 h-16 mx-auto mb-4 text-red-500" />
-          <h2 className="text-2xl font-bold mb-2">Connect Wallet to Stake</h2>
-          <p className="text-gray-400 mb-6">Stake your Heralds to earn $KINGSFOOD</p>
-          <button
-            onClick={connectWallet}
-            className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-semibold transition text-lg"
-          >
-            Connect Wallet
-          </button>
-        </div>
+      <div className="max-w-4xl mx-auto text-center py-16">
+        <Crown className="w-16 h-16 text-red-500 mx-auto mb-4" />
+        <h2 className="text-3xl font-bold mb-4">Connect Your Wallet</h2>
+        <p className="text-gray-400 mb-8">
+          Connect your wallet to stake your Heralds and earn FOOD tokens.
+        </p>
+        <button
+          onClick={() => onNavigate('home')}
+          className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-semibold transition"
+        >
+          Go Home
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
+    <div className="max-w-7xl mx-auto">
       {/* Header */}
-      <div className="border-b border-red-800/50 bg-black/40 backdrop-blur">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <Crown className="w-8 h-8 text-red-500" />
-              <button 
-                onClick={() => onNavigate && onNavigate('home')}
-                className="hover:opacity-80 transition text-left"
-              >
-                <h1 className="text-2xl font-bold">KINGS OF RED</h1>
-                <p className="text-sm text-gray-400">Herald Staking</p>
-              </button>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 bg-green-900/30 px-4 py-2 rounded-lg border border-green-500/30">
-                <Coins className="w-5 h-5 text-green-400" />
-                <span className="font-bold">{foodBalance.toFixed(0)}</span>
-                <span className="text-sm text-gray-400">FOOD</span>
-              </div>
-              
-              <div className="flex items-center gap-2 bg-yellow-900/30 px-4 py-2 rounded-lg border border-yellow-500/30">
-                <Coins className="w-5 h-5 text-yellow-400" />
-                <span className="font-bold">{goldBalance.toFixed(0)}</span>
-                <span className="text-sm text-gray-400">GOLD</span>
-              </div>
-              
-              <div className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
-                <span className="text-sm text-gray-400">Connected:</span>
-                <span className="ml-2 font-mono text-sm">
-                  {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold mb-2">Herald Staking</h1>
+        <p className="text-gray-400">
+          Stake your Heralds to earn FOOD tokens. Max 7 Heralds (one per clan).
+        </p>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 border border-blue-500/30 rounded-lg p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <Crown className="w-6 h-6 text-blue-400" />
-              <h3 className="text-lg font-bold">Heralds Owned</h3>
-            </div>
-            <p className="text-3xl font-bold">{ownedHeralds.length}</p>
-          </div>
-          
-          <div className="bg-gradient-to-br from-green-900/30 to-emerald-900/30 border border-green-500/30 rounded-lg p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <Lock className="w-6 h-6 text-green-400" />
-              <h3 className="text-lg font-bold">Currently Staked</h3>
-            </div>
-            <p className="text-3xl font-bold">{Object.values(stakedSlots).filter(s => s !== null).length} / 7</p>
-          </div>
-          
-          <div className="bg-gradient-to-br from-yellow-900/30 to-orange-900/30 border border-yellow-500/30 rounded-lg p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <Coins className="w-6 h-6 text-yellow-400" />
-              <h3 className="text-lg font-bold">Daily Production</h3>
-            </div>
-            <p className="text-3xl font-bold">{getTotalDailyProduction()} FOOD</p>
-          </div>
-        </div>
-
-        {/* Info Banner */}
-        <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-8 flex items-start gap-3">
-          <AlertCircle className="w-6 h-6 text-blue-400 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-gray-300">
-            <p className="font-semibold mb-1">Herald Staking Rules:</p>
-            <ul className="space-y-1 list-disc list-inside">
-              <li>You can stake ONE Herald per clan (max 7 total)</li>
-              <li>Claiming rewards requires 5 $KINGSGOLD per claim</li>
-              <li>Rewards are claimable every 24 hours</li>
-              <li>Unstaking forfeits any unclaimed rewards</li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Staking Slots - 7 Clans */}
-        <h2 className="text-2xl font-bold mb-6">Staking Slots</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {CLANS.map(clan => {
-            const ClanIcon = clan.icon;
-            const stakedHerald = stakedSlots[clan.id];
-            const isStaked = stakedHerald !== null;
-            const claimable = canClaim(stakedHerald);
-            const timeUntilClaim = getTimeUntilClaim(stakedHerald);
-            
-            return (
-              <div
-                key={clan.id}
-                className={`bg-gradient-to-br ${clan.color} p-0.5 rounded-xl`}
-              >
-                <div className="bg-gray-900 rounded-xl p-6 h-full">
-                  {/* Clan Header */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <ClanIcon className="w-6 h-6" />
-                      <h3 className="text-lg font-bold">{clan.name}</h3>
-                    </div>
-                    {isStaked ? (
-                      <Lock className="w-5 h-5 text-green-400" />
-                    ) : (
-                      <Unlock className="w-5 h-5 text-gray-500" />
-                    )}
-                  </div>
-                  
-                  {isStaked ? (
-                    <>
-                      {/* Staked Herald Info */}
-                      <div className="bg-black/30 rounded-lg p-4 mb-4">
-                        <div className={`inline-block px-2 py-1 rounded text-xs font-bold mb-2 ${getRarityColor(stakedHerald.rarity)}`}>
-                          {stakedHerald.rarity}
-                        </div>
-                        <p className="text-sm text-gray-400">Token #{stakedHerald.tokenId}</p>
-                        <p className="text-lg font-bold mt-2">
-                          +{FOOD_PRODUCTION[stakedHerald.rarity]} FOOD/day
-                        </p>
-                      </div>
-                      
-                      {/* Claim Timer */}
-                      <div className="bg-black/30 rounded-lg p-3 mb-4">
-                        <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
-                          <Clock className="w-4 h-4" />
-                          <span>Next claim:</span>
-                        </div>
-                        <p className={`font-bold ${claimable ? 'text-green-400' : 'text-yellow-400'}`}>
-                          {timeUntilClaim}
-                        </p>
-                      </div>
-                      
-                      {/* Actions */}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => claimRewards(clan.id)}
-                          disabled={!claimable}
-                          className={`flex-1 py-2 rounded-lg font-semibold transition text-sm ${
-                            claimable
-                              ? 'bg-green-600 hover:bg-green-700'
-                              : 'bg-gray-700 cursor-not-allowed opacity-50'
-                          }`}
-                        >
-                          Claim
-                        </button>
-                        <button
-                          onClick={() => unstakeHerald(clan.id)}
-                          className="flex-1 bg-red-600 hover:bg-red-700 py-2 rounded-lg font-semibold transition text-sm"
-                        >
-                          Unstake
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* Empty Slot */}
-                      <div className="bg-black/30 rounded-lg p-8 mb-4 flex items-center justify-center border-2 border-dashed border-gray-600">
-                        <p className="text-gray-500 text-center">
-                          No Herald<br />Staked
-                        </p>
-                      </div>
-                      
-                      <button
-                        onClick={() => openStakeModal(clan.id)}
-                        className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 py-2 rounded-lg font-semibold transition"
-                      >
-                        Stake Herald
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Stake Selection Modal */}
-      {showStakeModal && targetClan !== null && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-xl p-6 max-w-2xl w-full border border-green-500/50 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold mb-4">Select {CLANS[targetClan].name} Herald to Stake</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {ownedHeralds
-                .filter(h => h.clan === targetClan && !Object.values(stakedSlots).some(s => s && s.tokenId === h.tokenId))
-                .map(herald => (
-                  <div
-                    key={herald.tokenId}
-                    onClick={() => stakeHerald(herald)}
-                    className={`bg-gradient-to-br ${CLANS[herald.clan].color} p-0.5 rounded-lg cursor-pointer hover:scale-105 transition`}
-                  >
-                    <div className="bg-gray-800 rounded-lg p-4">
-                      <div className={`inline-block px-2 py-1 rounded text-xs font-bold mb-2 ${getRarityColor(herald.rarity)}`}>
-                        {herald.rarity}
-                      </div>
-                      <p className="text-sm text-gray-400">Token #{herald.tokenId}</p>
-                      <p className="text-lg font-bold mt-2">
-                        +{FOOD_PRODUCTION[herald.rarity]} FOOD/day
-                      </p>
-                    </div>
-                  </div>
-                ))}
-            </div>
-            
-            <button
-              onClick={() => {
-                setShowStakeModal(false);
-                setTargetClan(null);
-              }}
-              className="w-full bg-gray-700 hover:bg-gray-600 py-3 rounded-lg font-semibold transition"
-            >
-              Cancel
-            </button>
+      {/* Message Banner */}
+      {message.text && (
+        <div className={`mb-6 p-4 rounded-lg border ${
+          message.type === 'success' ? 'bg-green-900/20 border-green-800 text-green-300' :
+          message.type === 'error' ? 'bg-red-900/20 border-red-800 text-red-300' :
+          'bg-blue-900/20 border-blue-800 text-blue-300'
+        }`}>
+          <div className="flex items-center gap-2">
+            {message.type === 'success' && <CheckCircle className="w-5 h-5" />}
+            {message.type === 'error' && <AlertCircle className="w-5 h-5" />}
+            {message.type === 'info' && <Loader className="w-5 h-5 animate-spin" />}
+            <span>{message.text}</span>
           </div>
         </div>
       )}
 
-      {/* Footer */}
-      <div className="border-t border-red-800/50 bg-black/40 backdrop-blur mt-12">
-        <div className="container mx-auto px-4 py-6">
-          <div className="text-center text-sm text-gray-500">
-            <p>Kings of Red © 2025 • Built on Base Network</p>
+      {/* Rewards Summary */}
+      <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-2">
+            <Crown className="w-6 h-6 text-red-500" />
+            <h3 className="font-bold">Staked Heralds</h3>
+          </div>
+          <p className="text-3xl font-bold">{stakedHeralds.length} / 7</p>
+        </div>
+
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-2">
+            <Coins className="w-6 h-6 text-blue-400" />
+            <h3 className="font-bold">Pending FOOD</h3>
+          </div>
+          <p className="text-3xl font-bold text-blue-400">{pendingRewards.total}</p>
+          <p className="text-xs text-gray-400 mt-1">{pendingRewards.count} Heralds ready</p>
+        </div>
+
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-2">
+            <Coins className="w-6 h-6 text-yellow-400" />
+            <h3 className="font-bold">Claim Cost</h3>
+          </div>
+          <p className="text-3xl font-bold text-yellow-400">{claimCost} GOLD</p>
+          <p className="text-xs text-gray-400 mt-1">per Herald</p>
+        </div>
+      </div>
+
+      {/* Claim Button */}
+      {pendingRewards.count > 0 && (
+        <div className="mb-8">
+          <button
+            onClick={handleClaimRewards}
+            disabled={processing}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-6 py-4 rounded-lg font-bold text-lg transition flex items-center justify-center gap-2"
+          >
+            {processing ? (
+              <>
+                <Loader className="w-5 h-5 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                Claim {pendingRewards.total} FOOD ({pendingRewards.count} Heralds)
+              </>
+            )}
+          </button>
+          <p className="text-center text-sm text-gray-400 mt-2">
+            Cost: {(parseFloat(claimCost) * pendingRewards.count).toFixed(2)} GOLD total
+          </p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-16">
+          <Loader className="w-12 h-12 text-red-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Loading your Heralds...</p>
+        </div>
+      ) : (
+        <>
+          {/* Staked Heralds */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-4">Staked Heralds ({stakedHeralds.length})</h2>
+            
+            {stakedHeralds.length === 0 ? (
+              <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-12 text-center">
+                <Crown className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-400">No Heralds staked yet</p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {stakedHeralds.map((herald) => (
+                  <div key={herald.tokenId} className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-bold">Herald #{herald.tokenId}</h3>
+                        <p className="text-sm text-gray-400">{CLAN_NAMES[herald.clan]}</p>
+                        <p className={`text-sm font-semibold ${RARITY_COLORS[herald.rarity]}`}>
+                          {RARITY_NAMES[herald.rarity]}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-400">Earning</p>
+                        <p className="text-sm font-bold text-blue-400">{PRODUCTION_RATES[herald.rarity]} FOOD/day</p>
+                      </div>
+                    </div>
+
+                    <div className="mb-3 p-2 bg-gray-900/50 rounded">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="w-4 h-4" />
+                        <span className={herald.canClaim ? 'text-green-400' : 'text-gray-400'}>
+                          {formatTime(herald.timeUntilClaim)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleUnstake(herald.tokenId)}
+                      disabled={processing}
+                      className="w-full bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 px-4 py-2 rounded text-sm transition"
+                    >
+                      Unstake
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Unstaked Heralds */}
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Your Heralds (Unstaked)</h2>
+            
+            {ownedHeralds.length === 0 ? (
+              <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-12 text-center">
+                <Crown className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-400 mb-4">
+                  {stakedHeralds.length === 0 
+                    ? "You don't own any Heralds yet"
+                    : "All your Heralds are staked!"}
+                </p>
+                {stakedHeralds.length === 0 && (
+                  <button
+                    onClick={() => onNavigate('mint')}
+                    className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-semibold transition"
+                  >
+                    Mint Herald NFTs
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-blue-300">
+                    <p className="font-semibold mb-2">Full NFT Gallery Coming Soon!</p>
+                    <p className="text-blue-400/80 mb-3">
+                      You have {ownedHeralds.length} unstaked Herald{ownedHeralds.length !== 1 ? 's' : ''} in your wallet. 
+                      To stake them, you'll need the token ID.
+                    </p>
+                    <p className="text-blue-400/80 mb-3">
+                      <strong>How to find Token IDs:</strong>
+                    </p>
+                    <ol className="list-decimal ml-4 space-y-1 text-blue-400/80">
+                      <li>Go to <a href={`https://basescan.org/token/${HERALD_CONTRACT_ADDRESS}?a=${walletAddress}`} target="_blank" rel="noopener noreferrer" className="underline">BaseScan (Your Heralds)</a></li>
+                      <li>Find the Token ID you want to stake</li>
+                      <li>Come back and use the contract directly (for now)</li>
+                    </ol>
+                    <p className="text-blue-400/80 mt-3">
+                      We're building a visual NFT gallery that will show all your Heralds with images and one-click staking!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Info Box */}
+      <div className="mt-8 p-4 bg-yellow-900/20 border border-yellow-800/50 rounded-lg">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-yellow-300">
+            <p className="font-semibold mb-1">Important Notes</p>
+            <ul className="list-disc ml-4 space-y-1 text-yellow-400/80">
+              <li>Claims cost {claimCost} GOLD per Herald (paid from in-game balance)</li>
+              <li>Each Herald has a 24-hour cooldown between claims</li>
+              <li>Staked Heralds cannot be transferred or sold (unstake first)</li>
+              <li>Need GOLD? Visit the <button onClick={() => onNavigate('exchange')} className="underline">Exchange page</button> to deposit</li>
+            </ul>
           </div>
         </div>
       </div>
