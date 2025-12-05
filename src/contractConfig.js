@@ -8,7 +8,7 @@ export const GAME_BALANCE_ADDRESS = "0x11022f5cccea6262ce91e3bc75f9f912ae848b8e"
 export const HERALD_STAKING_ADDRESS = "0xE8d717084C6a25837C923559760a7a3580FDb571";
 
 // ============ IPFS IMAGE CONFIG ============
-export const IPFS_IMAGE_BASE = "https://rose-worldwide-booby-728.mypinata.cloud/ipfs/bafybeigvh7vjqgpj3jguhdbwktfdntvgqypmuu456usxpgsnrxxlh6pln4";
+export const IPFS_IMAGE_BASE = "https://emerald-adequate-eagle-845.mypinata.cloud/ipfs/bafybeigvh7vjqgpj3jguhdbwktfdntvgqypmuu456usxpgsnrxxlh6pln4";
 
 export const CLAN_NAMES = ['Smizfume', 'Coalheart', 'Warmdice', 'Bervation', 'Konfisof', 'Witkastle', 'Bowkin'];
 export const RARITY_NAMES = ['Bronze', 'Silver', 'Gold'];
