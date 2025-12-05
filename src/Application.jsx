@@ -194,30 +194,39 @@ export default function Application() {
               </button>
             </nav>
 
-            {/* Wallet Connection */}
-            {!connected ? (
-              <button
-                onClick={connectWallet}
-                className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-semibold transition"
-              >
-                Connect Wallet
-              </button>
-            ) : (
-              <div className="flex items-center gap-3">
-                <div className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
-                  <span className="text-sm text-gray-400">Connected:</span>
-                  <span className="ml-2 font-mono text-sm">
-                    {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-                  </span>
-                </div>
-                <button
-                  onClick={disconnectWallet}
-                  className="text-sm text-gray-400 hover:text-white transition"
-                >
-                  Disconnect
-                </button>
-              </div>
-            )}
+           {/* Wallet Connection */}
+{!connected ? (
+  <button
+    onClick={connectWallet}
+    className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-semibold transition"
+  >
+    Connect Wallet
+  </button>
+) : (
+  <div className="flex items-center gap-3 flex-wrap">
+    {/* Token Balances - Simple Display */}
+    <div className="bg-gray-800 px-3 py-2 rounded-lg border border-gray-700 text-sm">
+      <span className="text-blue-400">🍖 0 FOOD</span>
+      <span className="text-gray-600 mx-1">|</span>
+      <span className="text-yellow-400">🪙 0 GOLD</span>
+    </div>
+    
+    {/* Wallet Address */}
+    <div className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
+      <span className="text-sm text-gray-400">Connected:</span>
+      <span className="ml-2 font-mono text-sm">
+        {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+      </span>
+    </div>
+    
+    <button
+      onClick={disconnectWallet}
+      className="text-sm text-gray-400 hover:text-white transition"
+    >
+      Disconnect
+    </button>
+  </div>
+)}
           </div>
         </div>
       </header>
