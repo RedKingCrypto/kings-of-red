@@ -7,7 +7,6 @@ import ExchangePage from './Exchange.jsx';
 import AboutPage from './About.jsx';
 import FAQPage from './FAQ.jsx';
 import DashboardPage from './Dashboard.jsx';
-import FloatingBalance from './FloatingBalance.jsx';
 
 // Import contract addresses
 import { 
@@ -194,7 +193,7 @@ export default function Application() {
               </button>
             </nav>
 
-           {/* Wallet Connection */}
+          {/* Wallet Connection */}
 {!connected ? (
   <button
     onClick={connectWallet}
@@ -204,11 +203,11 @@ export default function Application() {
   </button>
 ) : (
   <div className="flex items-center gap-3 flex-wrap">
-    {/* Token Balances - Simple Display */}
-    <div className="bg-gray-800 px-3 py-2 rounded-lg border border-gray-700 text-sm">
-      <span className="text-blue-400">🍖 0 FOOD</span>
-      <span className="text-gray-600 mx-1">|</span>
-      <span className="text-yellow-400">🪙 0 GOLD</span>
+    {/* Token Balances */}
+    <div className="bg-gray-800/50 px-4 py-2 rounded-lg border border-gray-700">
+      <span className="text-blue-400 font-semibold">🍖 0 FOOD</span>
+      <span className="text-gray-600 mx-2">|</span>
+      <span className="text-yellow-400 font-semibold">🪙 0 GOLD</span>
     </div>
     
     {/* Wallet Address */}
@@ -219,6 +218,15 @@ export default function Application() {
       </span>
     </div>
     
+    {/* Dashboard Button */}
+    <button
+      onClick={() => navigateTo('dashboard')}
+      className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-semibold transition"
+    >
+      Dashboard
+    </button>
+    
+    {/* Disconnect */}
     <button
       onClick={disconnectWallet}
       className="text-sm text-gray-400 hover:text-white transition"
@@ -231,20 +239,7 @@ export default function Application() {
         </div>
       </header>
 
-      {/* Floating Balance Widget - ALWAYS VISIBLE WHEN CONNECTED */}
-      {connected && (
-        <FloatingBalance 
-          connected={connected}
-          walletAddress={walletAddress}
-          contractAddresses={{
-            FOOD_TOKEN: FOOD_TOKEN_ADDRESS,
-            GOLD_TOKEN: GOLD_TOKEN_ADDRESS,
-            GAME_BALANCE: GAME_BALANCE_ADDRESS
-          }}
-          onNavigate={navigateTo}
-        />
-      )}
-
+    
       {/* Page Content */}
       <div className="container mx-auto px-4 py-8">
         {currentPage === 'home' && renderHomePage(navigateTo)}
