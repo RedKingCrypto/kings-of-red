@@ -7,6 +7,19 @@ export const GOLD_TOKEN_ADDRESS = "0xb7a2c42655074736988864f4851d8cf831629f22";
 export const GAME_BALANCE_ADDRESS = "0x11022f5cccea6262ce91e3bc75f9f912ae848b8e";
 export const HERALD_STAKING_ADDRESS = "0xE8d717084C6a25837C923559760a7a3580FDb571";
 
+// ============ IPFS IMAGE CONFIG ============
+export const IPFS_IMAGE_BASE = "https://rose-worldwide-booby-728.mypinata.cloud/ipfs/bafybeigvh7vjqgpj3jguhdbwktfdntvgqypmuu456usxpgsnrxxlh6pln4";
+
+export const CLAN_NAMES = ['Smizfume', 'Coalheart', 'Warmdice', 'Bervation', 'Konfisof', 'Witkastle', 'Bowkin'];
+export const RARITY_NAMES = ['Bronze', 'Silver', 'Gold'];
+
+// Helper function to get Herald image URL
+export const getHeraldImageUrl = (clan, rarity) => {
+  const clanName = CLAN_NAMES[clan].toLowerCase();
+  const rarityName = RARITY_NAMES[rarity].toLowerCase();
+  return `${IPFS_IMAGE_BASE}/herald_${clanName}_${rarityName}.png`;
+};
+
 // ============ NETWORK CONFIG ============
 export const BASE_MAINNET_CONFIG = {
   chainId: '0x2105', // 8453 in hex
