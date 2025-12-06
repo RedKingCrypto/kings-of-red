@@ -8,12 +8,15 @@ import AboutPage from './About.jsx';
 import FAQPage from './faq.jsx';
 import DashboardPage from './Dashboard.jsx';
 
-// Import contract addresses
+// Import contract addresses and ABIs
 import { 
   HERALD_CONTRACT_ADDRESS,
   FOOD_TOKEN_ADDRESS,
   GOLD_TOKEN_ADDRESS,
-  GAME_BALANCE_ADDRESS
+  GAME_BALANCE_ADDRESS,
+  FOOD_TOKEN_ABI,
+  GOLD_TOKEN_ABI,
+  GAME_BALANCE_ABI
 } from './contractConfig';
 
 // PLACEHOLDER VALUES - Customize these
@@ -64,7 +67,6 @@ export default function Application() {
   const loadBalances = async () => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const { FOOD_TOKEN_ABI, GOLD_TOKEN_ABI, GAME_BALANCE_ABI } = await import('./contractConfig');
       
       const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, FOOD_TOKEN_ABI, provider);
       const goldContract = new ethers.Contract(GOLD_TOKEN_ADDRESS, GOLD_TOKEN_ABI, provider);
