@@ -97,25 +97,31 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
         return;
       }
       
-      // Load Herald details
-      // Note: This is a simplified version - full enumeration would require tokenOfOwnerByIndex
-      // For now, we'll check token IDs 0-999 (adjust based on your max supply)
+      // FAST METHOD: Query Transfer events to find user's Heralds
+      // This gets all transfers TO the user's address
+      const transferFilter = heraldContract.filters.Transfer(null, walletAddress);
+      const transferEvents = await heraldContract.queryFilter(transferFilter, 0, 'latest');
+      
+      // Extract unique token IDs from events
+      const potentialTokenIds = [...new Set(transferEvents.map(event => event.args.tokenId.toString()))];
+      
+      // Verify ownership (in case some were transferred away)
       const userHeralds = [];
       
-      for (let tokenId = 0; tokenId < 220; tokenId++) { // Genesis sale max 220 Heralds
+      for (const tokenId of potentialTokenIds) {
         try {
           const owner = await heraldContract.ownerOf(tokenId);
           if (owner.toLowerCase() === walletAddress.toLowerCase()) {
             const [rarity, clan] = await heraldContract.getHerald(tokenId);
             userHeralds.push({
-              tokenId: tokenId.toString(),
+              tokenId: tokenId,
               rarity: parseInt(rarity),
               clan: parseInt(clan),
               imageUrl: getHeraldImageUrl(parseInt(clan), parseInt(rarity))
             });
           }
         } catch (e) {
-          // Token doesn't exist or not owned, skip
+          // Token was burned or doesn't exist, skip
           continue;
         }
       }
