@@ -9,7 +9,10 @@ import {
   HERALD_ABI,
   FOOD_TOKEN_ABI,
   GOLD_TOKEN_ABI,
-  GAME_BALANCE_ABI
+  GAME_BALANCE_ABI,
+  CLAN_NAMES,
+  RARITY_NAMES,
+  getHeraldImageUrl
 } from './contractConfig';
 
 export default function DashboardPage({ connected, walletAddress, onNavigate }) {
@@ -94,8 +97,30 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
         return;
       }
       
-      // For now, just show count (we'll implement full NFT loading later)
-      setHeralds([{ count: heraldCount }]);
+      // Load Herald details
+      // Note: This is a simplified version - full enumeration would require tokenOfOwnerByIndex
+      // For now, we'll check token IDs 0-999 (adjust based on your max supply)
+      const userHeralds = [];
+      
+      for (let tokenId = 0; tokenId < 220; tokenId++) { // Genesis sale max 220 Heralds
+        try {
+          const owner = await heraldContract.ownerOf(tokenId);
+          if (owner.toLowerCase() === walletAddress.toLowerCase()) {
+            const [rarity, clan] = await heraldContract.getHerald(tokenId);
+            userHeralds.push({
+              tokenId: tokenId.toString(),
+              rarity: parseInt(rarity),
+              clan: parseInt(clan),
+              imageUrl: getHeraldImageUrl(parseInt(clan), parseInt(rarity))
+            });
+          }
+        } catch (e) {
+          // Token doesn't exist or not owned, skip
+          continue;
+        }
+      }
+      
+      setHeralds(userHeralds);
       
     } catch (error) {
       console.error('Error loading Heralds:', error);
@@ -254,7 +279,7 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
           {/* NFT Portfolio */}
           <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold">Your NFTs</h3>
+              <h3 className="text-xl font-bold">Your Herald NFTs</h3>
               <Crown className="w-6 h-6 text-red-500" />
             </div>
 
@@ -271,34 +296,57 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
               </div>
             ) : (
               <div>
-                <div className="flex items-center gap-2 p-4 bg-gray-900/50 rounded-lg">
-                  <Crown className="w-8 h-8 text-red-500" />
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
+                  {heralds.map((herald) => (
+                    <div
+                      key={herald.tokenId}
+                      className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden hover:border-red-500 transition group"
+                    >
+                      <div className="aspect-[3/4] relative bg-gray-800">
+                        <img
+                          src={herald.imageUrl}
+                          alt={`Herald #${herald.tokenId}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded text-xs">
+                          <span className={
+                            herald.rarity === 2 ? 'text-yellow-400' :
+                            herald.rarity === 1 ? 'text-gray-300' :
+                            'text-orange-400'
+                          }>
+                            {RARITY_NAMES[herald.rarity]}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-3">
+                        <p className="text-sm font-bold text-center">#{herald.tokenId}</p>
+                        <p className="text-xs text-gray-400 text-center">{CLAN_NAMES[herald.clan]}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
                   <div>
-                    <p className="font-bold text-xl">{heralds[0].count} Herald NFTs</p>
+                    <p className="font-bold">{heralds.length} Herald{heralds.length !== 1 ? 's' : ''} Owned</p>
                     <p className="text-sm text-gray-400">
                       View on{' '}
                       <a
                         href={`https://basescan.org/token/${HERALD_CONTRACT_ADDRESS}?a=${walletAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300"
+                        className="text-blue-400 hover:text-blue-300 underline"
                       >
                         BaseScan
                       </a>
                     </p>
                   </div>
-                </div>
-                
-                <div className="mt-4 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-blue-300">
-                      <p className="font-semibold mb-1">Detailed NFT View Coming Soon!</p>
-                      <p className="text-blue-400/80">
-                        We're building an enhanced NFT gallery that will show all your Heralds with their clans, rarities, and staking status. For now, you can view them on BaseScan.
-                      </p>
-                    </div>
-                  </div>
+                  <button
+                    onClick={() => onNavigate('staking')}
+                    className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-semibold transition"
+                  >
+                    Stake Heralds
+                  </button>
                 </div>
               </div>
             )}
