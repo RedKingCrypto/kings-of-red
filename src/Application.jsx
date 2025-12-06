@@ -8,15 +8,12 @@ import AboutPage from './About.jsx';
 import FAQPage from './faq.jsx';
 import DashboardPage from './Dashboard.jsx';
 
-// Import contract addresses and ABIs
+// Import contract addresses
 import { 
   HERALD_CONTRACT_ADDRESS,
   FOOD_TOKEN_ADDRESS,
   GOLD_TOKEN_ADDRESS,
-  GAME_BALANCE_ADDRESS,
-  FOOD_TOKEN_ABI,
-  GOLD_TOKEN_ABI,
-  GAME_BALANCE_ABI
+  GAME_BALANCE_ADDRESS
 } from './contractConfig';
 
 // PLACEHOLDER VALUES - Customize these
@@ -42,10 +39,6 @@ export default function Application() {
   const [connected, setConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
   
-  // Token balances
-  const [foodBalance, setFoodBalance] = useState('0');
-  const [goldBalance, setGoldBalance] = useState('0');
-  
   // Navigation state
   const [currentPage, setCurrentPage] = useState('home');
 
@@ -53,41 +46,6 @@ export default function Application() {
   useEffect(() => {
     checkIfWalletConnected();
   }, []);
-  
-  // Load balances when connected
-  useEffect(() => {
-    if (connected && walletAddress) {
-      loadBalances();
-      // Refresh balances every 30 seconds
-      const interval = setInterval(loadBalances, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [connected, walletAddress]);
-  
-  const loadBalances = async () => {
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      
-      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, FOOD_TOKEN_ABI, provider);
-      const goldContract = new ethers.Contract(GOLD_TOKEN_ADDRESS, GOLD_TOKEN_ABI, provider);
-      const gameBalanceContract = new ethers.Contract(GAME_BALANCE_ADDRESS, GAME_BALANCE_ABI, provider);
-      
-      const [walletFood, walletGold, gameFood, gameGold] = await Promise.all([
-        foodContract.balanceOf(walletAddress),
-        goldContract.balanceOf(walletAddress),
-        gameBalanceContract.inGameFood(walletAddress),
-        gameBalanceContract.inGameGold(walletAddress)
-      ]);
-      
-      const totalFood = parseFloat(ethers.formatEther(walletFood)) + parseFloat(ethers.formatEther(gameFood));
-      const totalGold = parseFloat(ethers.formatEther(walletGold)) + parseFloat(ethers.formatEther(gameGold));
-      
-      setFoodBalance(totalFood.toFixed(0));
-      setGoldBalance(totalGold.toFixed(0));
-    } catch (error) {
-      console.error('Error loading balances:', error);
-    }
-  };
 
   const checkIfWalletConnected = async () => {
     if (window.ethereum) {
@@ -244,31 +202,13 @@ export default function Application() {
                 Connect Wallet
               </button>
             ) : (
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* Token Balances */}
-                <div className="bg-gray-800/50 px-4 py-2 rounded-lg border border-gray-700">
-                  <span className="text-blue-400 font-semibold">🍖 {foodBalance} FOOD</span>
-                  <span className="text-gray-600 mx-2">|</span>
-                  <span className="text-yellow-400 font-semibold">🪙 {goldBalance} GOLD</span>
-                </div>
-                
-                {/* Wallet Address */}
+              <div className="flex items-center gap-3">
                 <div className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
                   <span className="text-sm text-gray-400">Connected:</span>
                   <span className="ml-2 font-mono text-sm">
                     {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
                   </span>
                 </div>
-                
-                {/* Dashboard Button */}
-                <button
-                  onClick={() => navigateTo('dashboard')}
-                  className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-semibold transition"
-                >
-                  Dashboard
-                </button>
-                
-                {/* Disconnect */}
                 <button
                   onClick={disconnectWallet}
                   className="text-sm text-gray-400 hover:text-white transition"
