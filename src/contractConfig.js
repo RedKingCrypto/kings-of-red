@@ -5,7 +5,7 @@ export const HERALD_CONTRACT_ADDRESS = "0xb282DC4c005C88A3E81D513D09a78f48CA4043
 export const FOOD_TOKEN_ADDRESS = "0x61921e291b88045ee2bc006c5d0a3baddd8a2d22";
 export const GOLD_TOKEN_ADDRESS = "0xb7a2c42655074736988864f4851d8cf831629f22";
 export const GAME_BALANCE_ADDRESS = "0xacD622935D2C3856DAd272029A5A3E36D1AcE923"; // v2
-export const HERALD_STAKING_ADDRESS = "0xE8d717084C6a25837C923559760a7a3580FDb571";
+export const HERALD_STAKING_ADDRESS = "0x2cd116Ba4f7710a8fCFd32974e82369d88929C91";
 
 // ============ IPFS IMAGE CONFIG ============
 export const IPFS_IMAGE_BASE = "https://emerald-adequate-eagle-845.mypinata.cloud/ipfs/bafybeigvh7vjqgpj3jguhdbwktfdntvgqypmuu456usxpgsnrxxlh6pln4";
