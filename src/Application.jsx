@@ -5,7 +5,7 @@ import MintPage from './mint.jsx';
 import StakingPage from './Staking.jsx';
 import ExchangePage from './Exchange.jsx';
 import AboutPage from './About.jsx';
-import FAQPage from './FAQ.jsx';
+import FAQPage from './faq.jsx';
 import DashboardPage from './Dashboard.jsx';
 
 // Import contract addresses
