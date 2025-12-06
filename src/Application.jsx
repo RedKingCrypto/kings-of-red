@@ -87,11 +87,6 @@ export default function Application() {
     }
   };
 
-  // Check if wallet is already connected on load
-  useEffect(() => {
-    checkIfWalletConnected();
-  }, []);
-
   const checkIfWalletConnected = async () => {
     if (window.ethereum) {
       const accounts = await window.ethereum.request({ method: 'eth_accounts' });
