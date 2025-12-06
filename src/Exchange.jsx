@@ -334,6 +334,7 @@ export default function ExchangePage({ connected, walletAddress, onNavigate }) {
           <ArrowDownLeft className="w-5 h-5 inline mr-2" />
           Deposit
         </button>
+        {/* WITHDRAW DISABLED FOR NOW - UNCOMMENT WHEN READY TO ENABLE
         <button
           onClick={() => setActiveTab('withdraw')}
           className={`flex-1 px-6 py-3 rounded-lg font-semibold transition ${
@@ -345,6 +346,7 @@ export default function ExchangePage({ connected, walletAddress, onNavigate }) {
           <ArrowUpRight className="w-5 h-5 inline mr-2" />
           Withdraw
         </button>
+        */}
         <button
           onClick={() => setActiveTab('swap')}
           className={`flex-1 px-6 py-3 rounded-lg font-semibold transition ${
