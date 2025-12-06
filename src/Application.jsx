@@ -7,6 +7,7 @@ import ExchangePage from './Exchange.jsx';
 import AboutPage from './About.jsx';
 import FAQPage from './faq.jsx';
 import DashboardPage from './Dashboard.jsx';
+import BattlePage from './Battle.jsx';
 
 // Import contract addresses
 import { 
@@ -275,6 +276,9 @@ export default function Application() {
         {currentPage === 'about' && (
           <AboutPage onNavigate={navigateTo} />
         )}
+        {currentPage === 'battle' && (
+  <BattlePage onNavigate={navigateTo} />
+)}
         {currentPage === 'faq' && (
           <FAQPage onNavigate={navigateTo} />
         )}
