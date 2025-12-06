@@ -221,20 +221,6 @@ export default function Application() {
         </div>
       </header>
 
-      {/* Floating Balance Widget - ALWAYS VISIBLE WHEN CONNECTED */}
-      {connected && (
-        <FloatingBalance 
-          connected={connected}
-          walletAddress={walletAddress}
-          contractAddresses={{
-            FOOD_TOKEN: FOOD_TOKEN_ADDRESS,
-            GOLD_TOKEN: GOLD_TOKEN_ADDRESS,
-            GAME_BALANCE: GAME_BALANCE_ADDRESS
-          }}
-          onNavigate={navigateTo}
-        />
-      )}
-
       {/* Page Content */}
       <div className="container mx-auto px-4 py-8">
         {currentPage === 'home' && renderHomePage(navigateTo)}
