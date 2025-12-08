@@ -5,10 +5,12 @@ import {
   HERALD_CONTRACT_ADDRESS,
   FOOD_TOKEN_ADDRESS,
   GOLD_TOKEN_ADDRESS,
+  WOOD_TOKEN_ADDRESS,
   GAME_BALANCE_ADDRESS,
   HERALD_ABI,
   FOOD_TOKEN_ABI,
   GOLD_TOKEN_ABI,
+  WOOD_TOKEN_ABI,
   GAME_BALANCE_ABI,
   CLAN_NAMES,
   RARITY_NAMES,
@@ -20,8 +22,10 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
   const [balances, setBalances] = useState({
     walletFood: '0',
     walletGold: '0',
+    walletWood: '0',
     inGameFood: '0',
-    inGameGold: '0'
+    inGameGold: '0',
+    inGameWood: '0'
   });
   const [heralds, setHeralds] = useState([]);
   const [totalValue, setTotalValue] = useState('0');
@@ -53,29 +57,35 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
       // Token contracts
       const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, FOOD_TOKEN_ABI, provider);
       const goldContract = new ethers.Contract(GOLD_TOKEN_ADDRESS, GOLD_TOKEN_ABI, provider);
+      const woodContract = new ethers.Contract(WOOD_TOKEN_ADDRESS, WOOD_TOKEN_ABI, provider);
       
       // Game balance contract
       const gameBalanceContract = new ethers.Contract(GAME_BALANCE_ADDRESS, GAME_BALANCE_ABI, provider);
       
       // Get all balances
-      const [walletFood, walletGold, gameFood, gameGold] = await Promise.all([
+      const [walletFood, walletGold, walletWood, gameFood, gameGold, gameWood] = await Promise.all([
         foodContract.balanceOf(walletAddress),
         goldContract.balanceOf(walletAddress),
+        woodContract.balanceOf(walletAddress),
         gameBalanceContract.inGameFood(walletAddress),
-        gameBalanceContract.inGameGold(walletAddress)
+        gameBalanceContract.inGameGold(walletAddress),
+        gameBalanceContract.inGameWood(walletAddress)
       ]);
       
       setBalances({
         walletFood: parseFloat(ethers.formatEther(walletFood)).toFixed(2),
         walletGold: parseFloat(ethers.formatEther(walletGold)).toFixed(2),
+        walletWood: parseFloat(ethers.formatEther(walletWood)).toFixed(2),
         inGameFood: parseFloat(ethers.formatEther(gameFood)).toFixed(2),
-        inGameGold: parseFloat(ethers.formatEther(gameGold)).toFixed(2)
+        inGameGold: parseFloat(ethers.formatEther(gameGold)).toFixed(2),
+        inGameWood: parseFloat(ethers.formatEther(gameWood)).toFixed(2)
       });
       
-      // Calculate total value (example: 1 GOLD = 4 FOOD in value)
+      // Calculate total value (1 GOLD = 4 FOOD, 1 WOOD = 2 FOOD in value)
       const totalFoodValue = parseFloat(ethers.formatEther(walletFood)) + parseFloat(ethers.formatEther(gameFood));
       const totalGoldValue = parseFloat(ethers.formatEther(walletGold)) + parseFloat(ethers.formatEther(gameGold));
-      const totalInFood = totalFoodValue + (totalGoldValue * 4);
+      const totalWoodValue = parseFloat(ethers.formatEther(walletWood)) + parseFloat(ethers.formatEther(gameWood));
+      const totalInFood = totalFoodValue + (totalGoldValue * 4) + (totalWoodValue * 2);
       setTotalValue(totalInFood.toFixed(2));
       
     } catch (error) {
@@ -179,7 +189,7 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
       ) : (
         <>
           {/* Token Balances Grid */}
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
             {/* FOOD Balance Card */}
             <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
@@ -251,6 +261,44 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
                   <span className="font-semibold">Total GOLD</span>
                   <span className="text-2xl font-bold text-yellow-400">
                     {(parseFloat(balances.inGameGold) + parseFloat(balances.walletGold)).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* WOOD Balance Card */}
+            <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <Crown className="w-8 h-8 text-amber-600" />
+                  <div>
+                    <h3 className="text-xl font-bold">$KORWOOD</h3>
+                    <p className="text-xs text-gray-400">WOOD Token</p>
+                  </div>
+                </div>
+                <a
+                  href={`https://basescan.org/token/${WOOD_TOKEN_ADDRESS}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-400 hover:text-white"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-gray-900/50 rounded">
+                  <span className="text-gray-400">In-Game Balance</span>
+                  <span className="text-xl font-bold text-amber-600">{balances.inGameWood}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-900/50 rounded">
+                  <span className="text-gray-400">Wallet Balance</span>
+                  <span className="text-xl font-bold">{balances.walletWood}</span>
+                </div>
+                <div className="border-t border-gray-700 pt-3 flex justify-between items-center">
+                  <span className="font-semibold">Total WOOD</span>
+                  <span className="text-2xl font-bold text-amber-600">
+                    {(parseFloat(balances.inGameWood) + parseFloat(balances.walletWood)).toFixed(2)}
                   </span>
                 </div>
               </div>

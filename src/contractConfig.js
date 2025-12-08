@@ -4,8 +4,9 @@
 export const HERALD_CONTRACT_ADDRESS = "0xb282DC4c005C88A3E81D513D09a78f48CA404311";
 export const FOOD_TOKEN_ADDRESS = "0x61921e291b88045ee2bc006c5d0a3baddd8a2d22";
 export const GOLD_TOKEN_ADDRESS = "0xb7a2c42655074736988864f4851d8cf831629f22";
-export const GAME_BALANCE_ADDRESS = "0xacD622935D2C3856DAd272029A5A3E36D1AcE923"; // v2
-export const HERALD_STAKING_ADDRESS = "0x2cd116Ba4f7710a8fCFd32974e82369d88929C91";
+export const WOOD_TOKEN_ADDRESS = "0x6BACc6CF837983B49cf645bC287981388FD210E2"; // KORWOOD
+export const GAME_BALANCE_ADDRESS = "0xebd49A32d6Ba59D1de20f71ea996287fd007DC80"; // v3
+export const HERALD_STAKING_ADDRESS = "0x2cd116Ba4f7710a8fCFd32974e82369d88929C91"; // v2
 
 // ============ IPFS IMAGE CONFIG ============
 export const IPFS_IMAGE_BASE = "https://emerald-adequate-eagle-845.mypinata.cloud/ipfs/bafybeigvh7vjqgpj3jguhdbwktfdntvgqypmuu456usxpgsnrxxlh6pln4";
@@ -56,26 +57,44 @@ export const GOLD_TOKEN_ABI = [
   "function decimals() view returns (uint8)"
 ];
 
+export const WOOD_TOKEN_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)"
+];
+
 // ============ GAME BALANCE MANAGER ABI ============
 export const GAME_BALANCE_ABI = [
   "function inGameFood(address) view returns (uint256)",
   "function inGameGold(address) view returns (uint256)",
-  "function getBalances(address user) view returns (uint256 food, uint256 gold)",
+  "function inGameWood(address) view returns (uint256)",
+  "function getBalances(address user) view returns (uint256 food, uint256 gold, uint256 wood)",
   "function depositFood(uint256 amount)",
   "function depositGold(uint256 amount)",
+  "function depositWood(uint256 amount)",
   "function withdrawFood(uint256 amount)",
   "function withdrawGold(uint256 amount)",
+  "function withdrawWood(uint256 amount)",
   "function swapFoodForGold(uint256 foodAmount)",
   "function swapGoldForFood(uint256 goldAmount)",
+  "function swapFoodForWood(uint256 foodAmount)",
+  "function swapWoodForFood(uint256 woodAmount)",
+  "function swapGoldForWood(uint256 goldAmount)",
+  "function swapWoodForGold(uint256 woodAmount)",
   "function canWithdrawFood(address) view returns (bool)",
   "function canWithdrawGold(address) view returns (bool)",
-  "function timeUntilFoodWithdrawal(address) view returns (uint256)",
-  "function timeUntilGoldWithdrawal(address) view returns (uint256)",
-  "function getRemainingFoodWithdrawal(address) view returns (uint256)",
-  "function getRemainingGoldWithdrawal(address) view returns (uint256)",
-  "function swapRatio() view returns (uint256)",
+  "function canWithdrawWood(address) view returns (bool)",
   "function lastFoodWithdrawal(address) view returns (uint256)",
   "function lastGoldWithdrawal(address) view returns (uint256)",
+  "function lastWoodWithdrawal(address) view returns (uint256)",
+  "function foodGoldRatio() view returns (uint256)",
+  "function foodWoodRatio() view returns (uint256)",
+  "function goldWoodRatio() view returns (uint256)",
   "event Deposited(address indexed user, string tokenType, uint256 amount)",
   "event Withdrawn(address indexed user, string tokenType, uint256 amount, uint256 tax)",
   "event Swapped(address indexed user, string fromToken, string toToken, uint256 amountIn, uint256 amountOut, uint256 fee)"
