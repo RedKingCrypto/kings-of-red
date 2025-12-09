@@ -7,6 +7,8 @@ import ExchangePage from './Exchange.jsx';
 import AboutPage from './About.jsx';
 import FAQPage from './faq.jsx';
 import DashboardPage from './Dashboard.jsx';
+import LeaderboardPage from './Leaderboard.jsx';
+import BattlePage from './Battle.jsx';
 
 // Import contract addresses
 import { 
@@ -258,6 +260,21 @@ export default function Application() {
         )}
         {currentPage === 'faq' && (
           <FAQPage onNavigate={navigateTo} />
+        )}
+        {/* Hidden Routes (Not in navigation) */}
+        {currentPage === 'leaderboard' && (
+          <LeaderboardPage 
+            connected={connected}
+            walletAddress={walletAddress}
+            onNavigate={navigateTo}
+          />
+        )}
+        {currentPage === 'battle' && (
+          <BattlePage 
+            connected={connected}
+            walletAddress={walletAddress}
+            onNavigate={navigateTo}
+          />
         )}
       </div>
 
