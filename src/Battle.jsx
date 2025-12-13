@@ -1,439 +1,654 @@
 import React, { useState, useEffect } from 'react';
-import { Swords, Heart, Trophy, Skull, ArrowLeft, Zap, Shield } from 'lucide-react';
+import { Swords, Heart, Trophy, Skull, ArrowLeft, Zap, Shield, Crown, Target } from 'lucide-react';
 
-export default function BattlePage({ onNavigate }) {
-  const [gameState, setGameState] = useState('pre-battle'); // pre-battle, fighting, victory, defeat
+export default function BattlePage({ connected, walletAddress, onNavigate }) {
+  // Battle State
+  const [gameState, setGameState] = useState('arena-intro'); // arena-intro, enemy-select, pre-battle, fighting, victory, defeat, complete
+  const [currentEnemy, setCurrentEnemy] = useState(null); // 1, 2, or 3
+  const [enemiesDefeated, setEnemiesDefeated] = useState([]);
+  
+  // HP Tracking
   const [fighterHP, setFighterHP] = useState(3);
-  const [monsterHP, setMonsterHP] = useState(3);
-  const [currentTurn, setCurrentTurn] = useState('player'); // player or monster
-  const [battleLog, setBattleLog] = useState([]);
+  const [enemyHP, setEnemyHP] = useState(3);
+  
+  // Combat Flow
+  const [currentTurn, setCurrentTurn] = useState('player');
   const [isAnimating, setIsAnimating] = useState(false);
-  const [attackAnimation, setAttackAnimation] = useState(null); // staff, bullets, hit, miss
+  const [weaponAnimation, setWeaponAnimation] = useState(null); // video playing
+  const [outcomeText, setOutcomeText] = useState(''); // "Fighter Hits", "Enemy Misses", etc.
+  const [battleLog, setBattleLog] = useState([]);
   const [round, setRound] = useState(1);
 
-  // Fighter stats
-  const fighter = {
-    name: "Holy Guard",
-    weapon: "Sacred Wooden Staff",
-    damage: "1 HP",
-    accuracy: 70, // 70% hit chance
-    description: "A devout bodyguard wielding a blessed wooden club"
+  // Arena Configuration
+  const arena = {
+    name: "The Castle Grounds",
+    clan: "Witkastle",
+    description: "Ancient battleground where honor meets treachery",
+    backgroundVideo: "/videos/castle_grounds_arena.mp4",
+    staticImage: "/images/castle_grounds_arena.png" // Fallback image
   };
 
-  // Monster stats
-  const monster = {
-    name: "Cyber Sentinel",
-    weapon: "Dual Machine Guns",
-    damage: "1 HP",
-    accuracy: 65, // 65% hit chance
-    description: "A futuristic killing machine from the year 2525"
+  // Enemy Configurations
+  const enemies = {
+    1: {
+      name: "Zimrek",
+      title: "Professional Assassin",
+      description: "Discreet, lethal, not noble-born but trusted for dirty work",
+      weapon: "Blunderbuss",
+      weaponVideo: "/videos/blunderbuss_fire.mp4",
+      characterVideo: "/videos/zimrek.mp4", // Enemy character video
+      staticImage: "/images/zimrek.png", // Fallback
+      accuracy: 65,
+      hp: 3
+    },
+    2: {
+      name: "Lord Jeroboam",
+      title: "Elite Conspirator",
+      description: "Wealthy, calculated antagonist — educated, dangerous and elite",
+      weapon: "Flintlock Pistol",
+      weaponVideo: "/videos/flintlock_fire.mp4",
+      characterVideo: "/videos/lord_jeroboam.mp4", // Enemy character video
+      staticImage: "/images/lord_jeroboam.png", // Fallback
+      accuracy: 70,
+      hp: 3
+    },
+    3: {
+      name: "Nebchud Baddon",
+      title: "Corrupted Ruler",
+      description: "Intimidating, mythical — a corrupted ruler, not a common brute",
+      weapon: "Gilded Sceptre",
+      weaponVideo: "/videos/gilded_sceptre_strike.mp4",
+      characterVideo: "/videos/nebchud_baddon.mp4", // Enemy character video
+      staticImage: "/images/nebchud_baddon.png", // Fallback
+      accuracy: 75,
+      hp: 3
+    }
   };
 
+  // Fighter Configuration (will come from selected NFT later)
+  const [fighter, setFighter] = useState({
+    name: "Pirate Fighter",
+    clan: "Witkastle",
+    rarity: "Gold",
+    weapon: "Sailor's Dirk",
+    weaponVideo: "/videos/sailors_dirk.mp4",
+    characterVideo: "/videos/pirate_fighter.mp4", // Fighter character video
+    staticImage: "/images/pirate_fighter.png", // Fallback
+    accuracy: 40, // Base 40% (Gold Fighter vs Enemy 1)
+    hp: 3
+  });
+
+  // Battle Configuration (Flexible - can be changed)
+  const [battleConfig, setBattleConfig] = useState({
+    entryCost: {
+      token: 'FOOD', // FOOD, GOLD, WOOD, or REDKING
+      amount: 5
+    },
+    rewards: {
+      enemy1: { FOOD: 10, GOLD: 2, WOOD: 1 },
+      enemy2: { FOOD: 25, GOLD: 5, WOOD: 3 },
+      enemy3: { FOOD: 50, GOLD: 10, WOOD: 10 },
+      completion: { FOOD: 20, GOLD: 5, WOOD: 5 } // Bonus for clearing all 3
+    }
+  });
+
+  // Add to battle log
   const addLog = (message) => {
-    setBattleLog(prev => [message, ...prev].slice(0, 5)); // Keep last 5 messages
+    setBattleLog(prev => [message, ...prev].slice(0, 8));
   };
 
-  const playerAttack = () => {
-    if (isAnimating || gameState !== 'fighting') return;
-    
-    setIsAnimating(true);
-    
-    // Random hit chance
-    const hitRoll = Math.random() * 100;
-    const didHit = hitRoll <= fighter.accuracy;
-    
-    // Staff swing animation
-    setAttackAnimation('staff-swing');
-    
-    setTimeout(() => {
-      if (didHit) {
-        setAttackAnimation('staff-hit');
-        const newHP = monsterHP - 1;
-        setMonsterHP(newHP);
-        addLog(`⚔️ ${fighter.name} swings his staff - DIRECT HIT! (-1 HP)`);
-        
-        if (newHP <= 0) {
-          setTimeout(() => {
-            setGameState('victory');
-            addLog(`🏆 VICTORY! ${monster.name} has been defeated!`);
-          }, 1000);
-        } else {
-          // Monster's turn after delay
-          setTimeout(() => {
-            setCurrentTurn('monster');
-            monsterAttack();
-          }, 1500);
-        }
-      } else {
-        setAttackAnimation('miss');
-        addLog(`💨 ${fighter.name} swings but misses!`);
-        
-        // Monster's turn after delay
-        setTimeout(() => {
-          setCurrentTurn('monster');
-          monsterAttack();
-        }, 1500);
-      }
-      
-      setTimeout(() => {
-        setAttackAnimation(null);
-        setIsAnimating(false);
-      }, 1000);
-    }, 800);
+  // Start arena (show intro)
+  const startArena = () => {
+    setGameState('arena-intro');
   };
 
-  const monsterAttack = () => {
-    setIsAnimating(true);
-    
-    const hitRoll = Math.random() * 100;
-    const didHit = hitRoll <= monster.accuracy;
-    
-    // Bullets animation
-    setAttackAnimation('bullets');
-    
-    setTimeout(() => {
-      if (didHit) {
-        setAttackAnimation('bullet-hit');
-        const newHP = fighterHP - 1;
-        setFighterHP(newHP);
-        addLog(`🔫 ${monster.name} fires machine guns - HIT! (-1 HP)`);
-        
-        if (newHP <= 0) {
-          setTimeout(() => {
-            setGameState('defeat');
-            addLog(`💀 DEFEAT! ${fighter.name} has fallen!`);
-          }, 1000);
-        } else {
-          // Player's turn
-          setTimeout(() => {
-            setCurrentTurn('player');
-            setRound(prev => prev + 1);
-          }, 1500);
-        }
-      } else {
-        setAttackAnimation('miss');
-        addLog(`💨 ${monster.name}'s bullets miss the target!`);
-        
-        // Player's turn
-        setTimeout(() => {
-          setCurrentTurn('player');
-          setRound(prev => prev + 1);
-        }, 1500);
-      }
-      
-      setTimeout(() => {
-        setAttackAnimation(null);
-        setIsAnimating(false);
-      }, 1000);
-    }, 800);
+  // Proceed to enemy selection
+  const selectEnemyPhase = () => {
+    setGameState('enemy-select');
   };
 
+  // Select enemy and start battle
+  const selectEnemy = (enemyNum) => {
+    if (enemiesDefeated.includes(enemyNum)) {
+      return; // Already defeated
+    }
+    setCurrentEnemy(enemyNum);
+    setEnemyHP(enemies[enemyNum].hp);
+    setFighterHP(3); // Reset fighter HP for each battle
+    setBattleLog([]);
+    setRound(1);
+    setGameState('pre-battle');
+  };
+
+  // Start fighting
   const startBattle = () => {
     setGameState('fighting');
     setCurrentTurn('player');
-    addLog(`⚔️ BATTLE START! Round 1 begins!`);
+    addLog(`Battle begins! Round ${round}`);
   };
 
-  const resetBattle = () => {
-    setGameState('pre-battle');
-    setFighterHP(3);
-    setMonsterHP(3);
-    setCurrentTurn('player');
+  // Player Attack
+  const playerAttack = () => {
+    if (isAnimating || gameState !== 'fighting' || currentTurn !== 'player') return;
+    
+    setIsAnimating(true);
+    setOutcomeText(''); // Clear previous outcome
+    
+    // Show fighter weapon animation
+    setWeaponAnimation(fighter.weaponVideo);
+    
+    // Roll for hit
+    const hitRoll = Math.random() * 100;
+    const didHit = hitRoll <= fighter.accuracy;
+    
+    setTimeout(() => {
+      setWeaponAnimation(null); // Hide weapon video
+      
+      if (didHit) {
+        setOutcomeText('FIGHTER HITS!');
+        const newHP = enemyHP - 1;
+        setEnemyHP(newHP);
+        addLog(`${fighter.name} strikes with ${fighter.weapon}! Hit! (${newHP} HP remaining)`);
+        
+        if (newHP <= 0) {
+          setTimeout(() => {
+            enemyDefeated();
+          }, 2000);
+        } else {
+          setTimeout(() => {
+            setCurrentTurn('enemy');
+            setOutcomeText('');
+            enemyAttack();
+          }, 2000);
+        }
+      } else {
+        setOutcomeText('FIGHTER MISSES!');
+        addLog(`${fighter.name} swings ${fighter.weapon}... MISS!`);
+        
+        setTimeout(() => {
+          setCurrentTurn('enemy');
+          setOutcomeText('');
+          enemyAttack();
+        }, 2000);
+      }
+      
+      setIsAnimating(false);
+    }, 3000); // 3 second weapon animation
+  };
+
+  // Enemy Attack (automated)
+  const enemyAttack = () => {
+    setIsAnimating(true);
+    
+    const enemy = enemies[currentEnemy];
+    
+    // Show enemy weapon animation
+    setWeaponAnimation(enemy.weaponVideo);
+    
+    // Roll for hit
+    const hitRoll = Math.random() * 100;
+    const didHit = hitRoll <= enemy.accuracy;
+    
+    setTimeout(() => {
+      setWeaponAnimation(null);
+      
+      if (didHit) {
+        setOutcomeText('ENEMY HITS!');
+        const newHP = fighterHP - 1;
+        setFighterHP(newHP);
+        addLog(`${enemy.name} attacks with ${enemy.weapon}! Hit! (${newHP} HP remaining)`);
+        
+        if (newHP <= 0) {
+          setTimeout(() => {
+            playerDefeated();
+          }, 2000);
+        } else {
+          setTimeout(() => {
+            setRound(r => r + 1);
+            setCurrentTurn('player');
+            setOutcomeText('');
+            addLog(`Round ${round + 1} begins!`);
+          }, 2000);
+        }
+      } else {
+        setOutcomeText('ENEMY MISSES!');
+        addLog(`${enemy.name} fires ${enemy.weapon}... MISS!`);
+        
+        setTimeout(() => {
+          setRound(r => r + 1);
+          setCurrentTurn('player');
+          setOutcomeText('');
+          addLog(`Round ${round + 1} begins!`);
+        }, 2000);
+      }
+      
+      setIsAnimating(false);
+    }, 3000);
+  };
+
+  // Enemy Defeated
+  const enemyDefeated = () => {
+    const enemy = enemies[currentEnemy];
+    setGameState('victory');
+    addLog(`${enemy.name} has been defeated!`);
+    setEnemiesDefeated(prev => [...prev, currentEnemy]);
+    
+    // Check if all 3 enemies defeated
+    if (enemiesDefeated.length + 1 === 3) {
+      // All enemies defeated!
+      setTimeout(() => {
+        setGameState('complete');
+      }, 3000);
+    }
+  };
+
+  // Player Defeated
+  const playerDefeated = () => {
+    setGameState('defeat');
+    addLog(`${fighter.name} has fallen...`);
+  };
+
+  // Continue to next enemy
+  const continueToNextEnemy = () => {
+    setCurrentEnemy(null);
+    setGameState('enemy-select');
     setBattleLog([]);
-    setRound(1);
-    setAttackAnimation(null);
   };
 
-  const renderHearts = (hp, color) => {
+  // Return to dashboard
+  const exitArena = () => {
+    if (onNavigate) {
+      onNavigate('dashboard');
+    }
+  };
+
+  if (!connected) {
     return (
-      <div className="flex gap-1">
-        {[1, 2, 3].map((i) => (
-          <Heart
-            key={i}
-            className={`w-8 h-8 ${
-              i <= hp 
-                ? color === 'red' ? 'fill-red-500 text-red-500' : 'fill-blue-500 text-blue-500'
-                : 'fill-gray-700 text-gray-700'
-            } transition-all duration-300`}
-          />
-        ))}
+      <div className="max-w-4xl mx-auto text-center py-16">
+        <Swords className="w-16 h-16 text-red-500 mx-auto mb-4" />
+        <h2 className="text-3xl font-bold mb-4">Battle Arena</h2>
+        <p className="text-gray-400 mb-8">Connect your wallet to enter the arena</p>
       </div>
     );
-  };
+  }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Background Video */}
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-      >
-        <source src="/uploads/Arena_-_Castle_battleground.mp4" type="video/mp4" />
-      </video>
+    <div className="max-w-6xl mx-auto">
+      {/* Arena Intro */}
+      {gameState === 'arena-intro' && (
+        <div className="text-center">
+          <div className="mb-8">
+            <h1 className="text-5xl font-bold mb-2">{arena.name}</h1>
+            <p className="text-xl text-gray-400 mb-1">{arena.clan} Clan Territory</p>
+            <p className="text-gray-500">{arena.description}</p>
+          </div>
 
-      {/* Dark Overlay */}
-      <div className="absolute inset-0 bg-black/50" />
-
-      {/* Content */}
-      <div className="relative z-10 container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={() => onNavigate('staking')}
-            className="flex items-center gap-2 bg-gray-900/80 hover:bg-gray-800/80 px-4 py-2 rounded-lg transition"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Back to Staking
-          </button>
-          <h1 className="text-3xl font-bold text-white drop-shadow-lg">
-            BATTLE ARENA
-          </h1>
-          <div className="w-32" /> {/* Spacer */}
-        </div>
-
-        {/* Pre-Battle Screen */}
-        {gameState === 'pre-battle' && (
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-black/80 backdrop-blur border border-red-800 rounded-lg p-8 text-center">
-              <Swords className="w-16 h-16 text-red-500 mx-auto mb-4" />
-              <h2 className="text-4xl font-bold mb-4">PREPARE FOR BATTLE</h2>
-              
-              <div className="grid md:grid-cols-2 gap-6 my-8">
-                {/* Fighter Info */}
-                <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-6">
-                  <h3 className="text-2xl font-bold text-blue-400 mb-2">{fighter.name}</h3>
-                  <div className="aspect-square bg-gray-900 rounded-lg mb-4 overflow-hidden">
-                    <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                      <source src="/uploads/Fighter.mp4" type="video/mp4" />
-                    </video>
-                  </div>
-                  <div className="text-left space-y-2 text-sm">
-                    <p><strong>Weapon:</strong> {fighter.weapon}</p>
-                    <p><strong>Damage:</strong> {fighter.damage}</p>
-                    <p><strong>Accuracy:</strong> {fighter.accuracy}%</p>
-                    <p className="text-xs text-gray-400 italic">{fighter.description}</p>
-                  </div>
-                </div>
-
-                {/* Monster Info */}
-                <div className="bg-red-900/30 border border-red-700 rounded-lg p-6">
-                  <h3 className="text-2xl font-bold text-red-400 mb-2">{monster.name}</h3>
-                  <div className="aspect-square bg-gray-900 rounded-lg mb-4 overflow-hidden">
-                    <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                      <source src="/uploads/Monster.mp4" type="video/mp4" />
-                    </video>
-                  </div>
-                  <div className="text-left space-y-2 text-sm">
-                    <p><strong>Weapon:</strong> {monster.weapon}</p>
-                    <p><strong>Damage:</strong> {monster.damage}</p>
-                    <p><strong>Accuracy:</strong> {monster.accuracy}%</p>
-                    <p className="text-xs text-gray-400 italic">{monster.description}</p>
-                  </div>
-                </div>
-              </div>
-
+          {/* Arena Video/Image */}
+          <div className="relative w-full h-96 bg-gray-900 rounded-lg overflow-hidden mb-8">
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+              poster={arena.staticImage}
+            >
+              <source src={arena.backgroundVideo} type="video/mp4" />
+              {/* Fallback to static image */}
+              <img src={arena.staticImage} alt={arena.name} className="w-full h-full object-cover" />
+            </video>
+            
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+            
+            <div className="absolute bottom-8 left-0 right-0 text-center">
+              <h2 className="text-3xl font-bold text-white mb-4">Three Enemies Await</h2>
               <button
-                onClick={startBattle}
-                className="bg-red-600 hover:bg-red-700 px-12 py-4 rounded-lg font-bold text-2xl transition transform hover:scale-105"
+                onClick={selectEnemyPhase}
+                className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-bold text-xl transition"
               >
-                ⚔️ FIGHT!
+                Enter Battle ({battleConfig.entryCost.amount} {battleConfig.entryCost.token})
               </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Battle Screen */}
-        {gameState === 'fighting' && (
-          <div className="max-w-6xl mx-auto">
-            {/* Round Counter */}
-            <div className="text-center mb-4">
-              <div className="inline-block bg-black/80 px-6 py-2 rounded-lg border border-yellow-600">
-                <p className="text-yellow-400 font-bold text-xl">ROUND {round}</p>
+      {/* Enemy Selection */}
+      {gameState === 'enemy-select' && (
+        <div>
+          <div className="text-center mb-8">
+            <h2 className="text-4xl font-bold mb-2">Choose Your Opponent</h2>
+            <p className="text-gray-400">{arena.name} • {enemiesDefeated.length}/3 Defeated</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {[1, 2, 3].map(enemyNum => {
+              const enemy = enemies[enemyNum];
+              const isDefeated = enemiesDefeated.includes(enemyNum);
+              
+              return (
+                <div
+                  key={enemyNum}
+                  className={`bg-gray-800/50 border-2 rounded-lg p-6 transition ${
+                    isDefeated
+                      ? 'border-green-600 opacity-50'
+                      : 'border-gray-700 hover:border-red-600 cursor-pointer'
+                  }`}
+                  onClick={() => !isDefeated && selectEnemy(enemyNum)}
+                >
+                  {/* Enemy Character Video/Image */}
+                  <div className="w-full h-64 bg-gray-900 rounded-lg mb-4 overflow-hidden">
+                    <video
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover"
+                      poster={enemy.staticImage}
+                    >
+                      <source src={enemy.characterVideo} type="video/mp4" />
+                      {/* Fallback to static image */}
+                      <img src={enemy.staticImage} alt={enemy.name} className="w-full h-full object-cover" />
+                    </video>
+                  </div>
+
+                  <div className="text-center">
+                    <h3 className="text-2xl font-bold mb-1">{enemy.name}</h3>
+                    <p className="text-sm text-gray-400 mb-2">{enemy.title}</p>
+                    <p className="text-xs text-gray-500 mb-4">{enemy.description}</p>
+                    
+                    <div className="flex items-center justify-center gap-2 mb-4">
+                      <Target className="w-4 h-4 text-red-400" />
+                      <span className="text-sm">Weapon: {enemy.weapon}</span>
+                    </div>
+
+                    {isDefeated ? (
+                      <div className="bg-green-900/30 border border-green-600 rounded px-4 py-2">
+                        <Trophy className="w-5 h-5 inline mr-2 text-green-400" />
+                        <span className="text-green-400 font-bold">DEFEATED</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="text-sm font-semibold text-yellow-400">
+                          Rewards: {battleConfig.rewards[`enemy${enemyNum}`].FOOD} FOOD, {battleConfig.rewards[`enemy${enemyNum}`].GOLD} GOLD, {battleConfig.rewards[`enemy${enemyNum}`].WOOD} WOOD
+                        </div>
+                        <button className="w-full bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-bold transition">
+                          Fight {enemy.name}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="text-center mt-8">
+            <button
+              onClick={exitArena}
+              className="bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded-lg font-semibold transition"
+            >
+              <ArrowLeft className="w-4 h-4 inline mr-2" />
+              Exit Arena
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pre-Battle Screen */}
+      {gameState === 'pre-battle' && currentEnemy && (
+        <div className="text-center">
+          <h2 className="text-4xl font-bold mb-8">Prepare for Battle</h2>
+          
+          <div className="grid md:grid-cols-2 gap-8 mb-8">
+            {/* Fighter */}
+            <div className="bg-blue-900/20 border-2 border-blue-600 rounded-lg p-6">
+              <h3 className="text-2xl font-bold mb-4">{fighter.name}</h3>
+              <div className="w-48 h-48 bg-gray-900 rounded-lg mx-auto mb-4 overflow-hidden">
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover rounded-lg"
+                  poster={fighter.staticImage}
+                >
+                  <source src={fighter.characterVideo} type="video/mp4" />
+                  <img src={fighter.staticImage} alt={fighter.name} className="w-full h-full object-cover rounded-lg" />
+                </video>
+              </div>
+              <p className="text-sm text-gray-400 mb-2">Weapon: {fighter.weapon}</p>
+              <p className="text-sm text-gray-400">Accuracy: {fighter.accuracy}%</p>
+            </div>
+
+            {/* Enemy */}
+            <div className="bg-red-900/20 border-2 border-red-600 rounded-lg p-6">
+              <h3 className="text-2xl font-bold mb-4">{enemies[currentEnemy].name}</h3>
+              <div className="w-48 h-48 bg-gray-900 rounded-lg mx-auto mb-4 overflow-hidden">
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover rounded-lg"
+                  poster={enemies[currentEnemy].staticImage}
+                >
+                  <source src={enemies[currentEnemy].characterVideo} type="video/mp4" />
+                  <img src={enemies[currentEnemy].staticImage} alt={enemies[currentEnemy].name} className="w-full h-full object-cover rounded-lg" />
+                </video>
+              </div>
+              <p className="text-sm text-gray-400 mb-2">Weapon: {enemies[currentEnemy].weapon}</p>
+              <p className="text-sm text-gray-400">Accuracy: {enemies[currentEnemy].accuracy}%</p>
+            </div>
+          </div>
+
+          <button
+            onClick={startBattle}
+            className="bg-red-600 hover:bg-red-700 px-12 py-4 rounded-lg font-bold text-xl transition"
+          >
+            <Swords className="w-6 h-6 inline mr-2" />
+            BEGIN BATTLE
+          </button>
+        </div>
+      )}
+
+      {/* Active Battle */}
+      {gameState === 'fighting' && currentEnemy && (
+        <div>
+          {/* Arena Name Header */}
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-400">{arena.name}</h2>
+            <p className="text-sm text-gray-500">Round {round}</p>
+          </div>
+
+          {/* Battle Arena */}
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            {/* Fighter Side */}
+            <div className="bg-blue-900/20 border-2 border-blue-600 rounded-lg p-6">
+              <div className="text-center mb-4">
+                <h3 className="text-xl font-bold mb-2">{fighter.name}</h3>
+                <div className="flex justify-center gap-1 mb-2">
+                  {[...Array(3)].map((_, i) => (
+                    <Heart
+                      key={i}
+                      className={`w-6 h-6 ${i < fighterHP ? 'text-red-500 fill-current' : 'text-gray-600'}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="w-full h-48 bg-gray-900 rounded-lg overflow-hidden">
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover"
+                  poster={fighter.staticImage}
+                >
+                  <source src={fighter.characterVideo} type="video/mp4" />
+                  <img src={fighter.staticImage} alt={fighter.name} className="w-full h-full object-cover" />
+                </video>
               </div>
             </div>
 
-            {/* Battle Arena */}
-            <div className="bg-black/60 backdrop-blur border border-gray-700 rounded-lg p-6 mb-6">
-              <div className="grid grid-cols-3 gap-4 items-center min-h-[400px]">
-                {/* Fighter */}
-                <div className="relative">
-                  <div className="text-center mb-2">
-                    <h3 className="text-xl font-bold text-blue-400">{fighter.name}</h3>
-                    {renderHearts(fighterHP, 'blue')}
-                  </div>
-                  <div className="aspect-square bg-blue-900/20 border-2 border-blue-700 rounded-lg overflow-hidden relative">
-                    <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                      <source src="/uploads/Fighter.mp4" type="video/mp4" />
-                    </video>
-                    {currentTurn === 'player' && !isAnimating && (
-                      <div className="absolute inset-0 border-4 border-yellow-400 rounded-lg animate-pulse" />
-                    )}
-                  </div>
-                  <div className="text-center mt-2">
-                    <p className="text-xs text-gray-400">{fighter.weapon}</p>
-                  </div>
+            {/* Center Combat Area */}
+            <div className="flex flex-col justify-center items-center">
+              {/* Weapon Animation OR Outcome Text */}
+              {weaponAnimation ? (
+                <div className="w-full h-48 bg-black rounded-lg overflow-hidden mb-4">
+                  <video
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-contain"
+                  >
+                    <source src={weaponAnimation} type="video/mp4" />
+                  </video>
                 </div>
-
-                {/* Battle Effects */}
-                <div className="flex items-center justify-center relative h-full">
-                  {attackAnimation === 'staff-swing' && (
-                    <div className="text-8xl animate-ping">🪵</div>
-                  )}
-                  {attackAnimation === 'staff-hit' && (
-                    <div className="text-8xl animate-bounce">💥</div>
-                  )}
-                  {attackAnimation === 'bullets' && (
-                    <div className="flex gap-2">
-                      <div className="text-6xl animate-ping">🔫</div>
-                      <div className="text-4xl">💨💨💨</div>
-                    </div>
-                  )}
-                  {attackAnimation === 'bullet-hit' && (
-                    <div className="text-8xl animate-bounce">💥</div>
-                  )}
-                  {attackAnimation === 'miss' && (
-                    <div className="text-6xl">💨</div>
-                  )}
-                  {!attackAnimation && (
-                    <div className="text-6xl text-gray-600">⚔️</div>
-                  )}
+              ) : outcomeText ? (
+                <div className={`text-3xl font-bold mb-4 p-6 rounded-lg ${
+                  outcomeText.includes('FIGHTER') 
+                    ? outcomeText.includes('HITS') ? 'bg-green-900/50 text-green-400' : 'bg-gray-900/50 text-gray-400'
+                    : outcomeText.includes('HITS') ? 'bg-red-900/50 text-red-400' : 'bg-gray-900/50 text-gray-400'
+                }`}>
+                  {outcomeText}
                 </div>
-
-                {/* Monster */}
-                <div className="relative">
-                  <div className="text-center mb-2">
-                    <h3 className="text-xl font-bold text-red-400">{monster.name}</h3>
-                    {renderHearts(monsterHP, 'red')}
-                  </div>
-                  <div className="aspect-square bg-red-900/20 border-2 border-red-700 rounded-lg overflow-hidden relative">
-                    <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                      <source src="/uploads/Monster.mp4" type="video/mp4" />
-                    </video>
-                    {currentTurn === 'monster' && !isAnimating && (
-                      <div className="absolute inset-0 border-4 border-red-500 rounded-lg animate-pulse" />
-                    )}
-                  </div>
-                  <div className="text-center mt-2">
-                    <p className="text-xs text-gray-400">{monster.weapon}</p>
-                  </div>
+              ) : (
+                <div className="h-48 flex items-center justify-center">
+                  <Swords className="w-16 h-16 text-gray-600" />
                 </div>
-              </div>
+              )}
 
-              {/* Action Buttons */}
-              <div className="mt-6 flex justify-center gap-4">
+              {/* Attack Button */}
+              {currentTurn === 'player' && !isAnimating && (
                 <button
                   onClick={playerAttack}
-                  disabled={currentTurn !== 'player' || isAnimating}
-                  className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-8 py-3 rounded-lg font-bold text-lg transition transform hover:scale-105 flex items-center gap-2"
+                  className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-bold transition"
                 >
-                  <Zap className="w-5 h-5" />
+                  <Swords className="w-5 h-5 inline mr-2" />
                   ATTACK
                 </button>
-                <button
-                  disabled
-                  className="bg-gray-700 cursor-not-allowed px-8 py-3 rounded-lg font-bold text-lg flex items-center gap-2 opacity-50"
-                >
-                  <Shield className="w-5 h-5" />
-                  DEFEND
-                </button>
-              </div>
+              )}
 
-              {/* Turn Indicator */}
-              <div className="mt-4 text-center">
-                {currentTurn === 'player' && !isAnimating && (
-                  <p className="text-yellow-400 font-bold animate-pulse">YOUR TURN</p>
-                )}
-                {currentTurn === 'monster' && !isAnimating && (
-                  <p className="text-red-400 font-bold animate-pulse">ENEMY TURN</p>
-                )}
-                {isAnimating && (
-                  <p className="text-gray-400">Attacking...</p>
-                )}
-              </div>
+              {currentTurn === 'enemy' && (
+                <div className="text-gray-400">Enemy's Turn...</div>
+              )}
             </div>
 
-            {/* Battle Log */}
-            <div className="bg-black/80 border border-gray-700 rounded-lg p-4">
-              <h3 className="text-lg font-bold mb-2 text-gray-300">Battle Log</h3>
-              <div className="space-y-1 font-mono text-sm">
-                {battleLog.map((log, i) => (
-                  <p key={i} className="text-gray-400">{log}</p>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Victory Screen */}
-        {gameState === 'victory' && (
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-gradient-to-br from-yellow-900/90 to-orange-900/90 backdrop-blur border-4 border-yellow-500 rounded-lg p-12 text-center">
-              <Trophy className="w-24 h-24 text-yellow-400 mx-auto mb-6 animate-bounce" />
-              <h2 className="text-5xl font-bold mb-4 text-yellow-300">VICTORY!</h2>
-              <p className="text-2xl mb-8">You have defeated the {monster.name}!</p>
-              
-              <div className="bg-black/50 rounded-lg p-6 mb-8">
-                <h3 className="text-xl font-bold mb-4 text-yellow-400">Rewards</h3>
-                <div className="space-y-2">
-                  <p className="text-lg">🍖 +50 FOOD</p>
-                  <p className="text-lg">🪙 +10 GOLD</p>
-                  <p className="text-lg">⭐ +100 XP</p>
+            {/* Enemy Side */}
+            <div className="bg-red-900/20 border-2 border-red-600 rounded-lg p-6">
+              <div className="text-center mb-4">
+                <h3 className="text-xl font-bold mb-2">{enemies[currentEnemy].name}</h3>
+                <div className="flex justify-center gap-1 mb-2">
+                  {[...Array(3)].map((_, i) => (
+                    <Heart
+                      key={i}
+                      className={`w-6 h-6 ${i < enemyHP ? 'text-red-500 fill-current' : 'text-gray-600'}`}
+                    />
+                  ))}
                 </div>
               </div>
-
-              <div className="flex gap-4 justify-center">
-                <button
-                  onClick={resetBattle}
-                  className="bg-green-600 hover:bg-green-700 px-8 py-3 rounded-lg font-bold text-lg transition"
+              <div className="w-full h-48 bg-gray-900 rounded-lg overflow-hidden">
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover"
+                  poster={enemies[currentEnemy].staticImage}
                 >
-                  Battle Again
-                </button>
-                <button
-                  onClick={() => onNavigate('staking')}
-                  className="bg-gray-700 hover:bg-gray-600 px-8 py-3 rounded-lg font-bold text-lg transition"
-                >
-                  Return to Staking
-                </button>
+                  <source src={enemies[currentEnemy].characterVideo} type="video/mp4" />
+                  <img src={enemies[currentEnemy].staticImage} alt={enemies[currentEnemy].name} className="w-full h-full object-cover" />
+                </video>
               </div>
             </div>
           </div>
-        )}
 
-        {/* Defeat Screen */}
-        {gameState === 'defeat' && (
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-gradient-to-br from-gray-900/90 to-red-900/90 backdrop-blur border-4 border-red-700 rounded-lg p-12 text-center">
-              <Skull className="w-24 h-24 text-red-500 mx-auto mb-6" />
-              <h2 className="text-5xl font-bold mb-4 text-red-400">DEFEAT</h2>
-              <p className="text-2xl mb-8">The {monster.name} has bested you in combat.</p>
-              
-              <div className="bg-black/50 rounded-lg p-6 mb-8">
-                <p className="text-lg text-gray-400">
-                  Your fighter needs rest. Try again with better strategy!
-                </p>
-              </div>
+          {/* Battle Log */}
+          <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 max-h-48 overflow-y-auto">
+            <h4 className="font-bold mb-2 text-gray-400">Battle Log:</h4>
+            {battleLog.map((log, i) => (
+              <p key={i} className="text-sm text-gray-500 mb-1">{log}</p>
+            ))}
+          </div>
+        </div>
+      )}
 
-              <div className="flex gap-4 justify-center">
-                <button
-                  onClick={resetBattle}
-                  className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-bold text-lg transition"
-                >
-                  Try Again
-                </button>
-                <button
-                  onClick={() => onNavigate('staking')}
-                  className="bg-gray-700 hover:bg-gray-600 px-8 py-3 rounded-lg font-bold text-lg transition"
-                >
-                  Return to Staking
-                </button>
-              </div>
+      {/* Victory Screen */}
+      {gameState === 'victory' && currentEnemy && (
+        <div className="text-center">
+          <Trophy className="w-24 h-24 text-yellow-400 mx-auto mb-6" />
+          <h2 className="text-5xl font-bold mb-4 text-yellow-400">VICTORY!</h2>
+          <p className="text-2xl mb-8">{enemies[currentEnemy].name} has been defeated!</p>
+
+          <div className="bg-green-900/20 border border-green-600 rounded-lg p-6 max-w-md mx-auto mb-8">
+            <h3 className="font-bold mb-4">Rewards Earned:</h3>
+            <div className="space-y-2">
+              <p>🍖 {battleConfig.rewards[`enemy${currentEnemy}`].FOOD} FOOD</p>
+              <p>🪙 {battleConfig.rewards[`enemy${currentEnemy}`].GOLD} GOLD</p>
+              <p>🪵 {battleConfig.rewards[`enemy${currentEnemy}`].WOOD} WOOD</p>
             </div>
           </div>
-        )}
-      </div>
+
+          <div className="space-x-4">
+            {enemiesDefeated.length + 1 < 3 && (
+              <button
+                onClick={continueToNextEnemy}
+                className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-bold transition"
+              >
+                Fight Next Enemy
+              </button>
+            )}
+            <button
+              onClick={exitArena}
+              className="bg-gray-700 hover:bg-gray-600 px-8 py-4 rounded-lg font-bold transition"
+            >
+              Exit Arena
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Defeat Screen */}
+      {gameState === 'defeat' && (
+        <div className="text-center">
+          <Skull className="w-24 h-24 text-red-500 mx-auto mb-6" />
+          <h2 className="text-5xl font-bold mb-4 text-red-500">DEFEATED</h2>
+          <p className="text-2xl mb-8">{fighter.name} has fallen in battle...</p>
+
+          <button
+            onClick={exitArena}
+            className="bg-gray-700 hover:bg-gray-600 px-8 py-4 rounded-lg font-bold transition"
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      )}
+
+      {/* Complete Screen (All 3 Defeated) */}
+      {gameState === 'complete' && (
+        <div className="text-center">
+          <Crown className="w-24 h-24 text-yellow-400 mx-auto mb-6 animate-pulse" />
+          <h2 className="text-5xl font-bold mb-4 text-yellow-400">GRAND CHAMPION!</h2>
+          <p className="text-2xl mb-8">All enemies of The Castle Grounds have been vanquished!</p>
+
+          <div className="bg-yellow-900/20 border-2 border-yellow-600 rounded-lg p-6 max-w-md mx-auto mb-8">
+            <h3 className="font-bold mb-4 text-xl">Total Rewards + Completion Bonus:</h3>
+            <div className="space-y-2 text-lg">
+              <p>🍖 {battleConfig.rewards.enemy1.FOOD + battleConfig.rewards.enemy2.FOOD + battleConfig.rewards.enemy3.FOOD + battleConfig.rewards.completion.FOOD} FOOD</p>
+              <p>🪙 {battleConfig.rewards.enemy1.GOLD + battleConfig.rewards.enemy2.GOLD + battleConfig.rewards.enemy3.GOLD + battleConfig.rewards.completion.GOLD} GOLD</p>
+              <p>🪵 {battleConfig.rewards.enemy1.WOOD + battleConfig.rewards.enemy2.WOOD + battleConfig.rewards.enemy3.WOOD + battleConfig.rewards.completion.WOOD} WOOD</p>
+            </div>
+          </div>
+
+          <button
+            onClick={exitArena}
+            className="bg-yellow-600 hover:bg-yellow-700 px-8 py-4 rounded-lg font-bold transition"
+          >
+            Return Victorious
+          </button>
+        </div>
+      )}
     </div>
   );
 }
