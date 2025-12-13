@@ -187,6 +187,10 @@ export default function Application() {
               >
                 FAQ
               </button>
+
+ <a href="https://medium.com/@Red-King" target="_blank" rel="noopener noreferrer" className="hover:text-red-400 transition">
+  Docs
+</a>
               <button 
                 onClick={() => navigateTo('about')}
                 className={`hover:text-red-400 transition ${currentPage === 'about' ? 'text-red-500' : ''}`}
