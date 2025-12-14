@@ -112,10 +112,19 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     if (enemiesDefeated.includes(enemyNum)) {
       return; // Already defeated
     }
+    
+    // Check if this enemy is available (sequential progression)
+    const isAvailable = enemyNum === 1 || enemiesDefeated.includes(enemyNum - 1);
+    if (!isAvailable) {
+      return; // Not available yet
+    }
+    
     setCurrentEnemy(enemyNum);
     setEnemyHP(enemies[enemyNum].hp);
     setFighterHP(3); // Reset fighter HP for each battle
     setBattleLog([]);
+    setOutcomeText(''); // Clear outcome text
+    setWeaponAnimation(null); // Clear weapon animation
     setRound(1);
     setGameState('pre-battle');
   };
@@ -124,6 +133,10 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
   const startBattle = () => {
     setGameState('fighting');
     setCurrentTurn('player');
+    setOutcomeText(''); // Clear any previous outcome text
+    setWeaponAnimation(null); // Clear any previous weapon animation
+    setBattleLog([]); // Clear battle log
+    setRound(1); // Reset round
     addLog(`Battle begins! Round ${round}`);
   };
 
@@ -173,7 +186,7 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
       }
       
       setIsAnimating(false);
-    }, 3000); // 3 second weapon animation
+    }, 2000); // 2 second weapon animation (reduced from 3)
   };
 
   // Enemy Attack (automated)
@@ -223,7 +236,7 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
       }
       
       setIsAnimating(false);
-    }, 3000);
+    }, 2000); // 2 seconds (reduced from 3)
   };
 
   // Enemy Defeated
@@ -325,6 +338,8 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
             {[1, 2, 3].map(enemyNum => {
               const enemy = enemies[enemyNum];
               const isDefeated = enemiesDefeated.includes(enemyNum);
+              const isAvailable = enemyNum === 1 || enemiesDefeated.includes(enemyNum - 1);
+              const isCurrent = enemyNum === (enemiesDefeated.length + 1);
               
               return (
                 <div
@@ -332,24 +347,31 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
                   className={`bg-gray-800/50 border-2 rounded-lg p-6 transition ${
                     isDefeated
                       ? 'border-green-600 opacity-50'
-                      : 'border-gray-700 hover:border-red-600 cursor-pointer'
+                      : isAvailable
+                      ? 'border-gray-700 hover:border-red-600 cursor-pointer'
+                      : 'border-gray-800 opacity-30 cursor-not-allowed'
                   }`}
-                  onClick={() => !isDefeated && selectEnemy(enemyNum)}
+                  onClick={() => isAvailable && !isDefeated && selectEnemy(enemyNum)}
                 >
                   {/* Enemy Character Video/Image */}
                   <div className="w-full h-64 bg-gray-900 rounded-lg mb-4 overflow-hidden">
-                    <video
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-full object-cover"
-                      poster={enemy.staticImage}
-                    >
-                      <source src={enemy.characterVideo} type="video/mp4" />
-                      {/* Fallback to static image */}
+                    {isCurrent && !isDefeated ? (
+                      // Current available enemy - show video
+                      <video
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="w-full h-full object-cover"
+                        poster={enemy.staticImage}
+                      >
+                        <source src={enemy.characterVideo} type="video/mp4" />
+                        <img src={enemy.staticImage} alt={enemy.name} className="w-full h-full object-cover" />
+                      </video>
+                    ) : (
+                      // Locked or defeated enemies - show static image
                       <img src={enemy.staticImage} alt={enemy.name} className="w-full h-full object-cover" />
-                    </video>
+                    )}
                   </div>
 
                   <div className="text-center">
@@ -367,7 +389,7 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
                         <Trophy className="w-5 h-5 inline mr-2 text-green-400" />
                         <span className="text-green-400 font-bold">DEFEATED</span>
                       </div>
-                    ) : (
+                    ) : isAvailable ? (
                       <div className="space-y-2">
                         <div className="text-sm font-semibold text-yellow-400">
                           Rewards: {battleConfig.rewards[`enemy${enemyNum}`].FOOD} FOOD, {battleConfig.rewards[`enemy${enemyNum}`].GOLD} GOLD, {battleConfig.rewards[`enemy${enemyNum}`].WOOD} WOOD
@@ -375,6 +397,11 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
                         <button className="w-full bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-bold transition">
                           Fight {enemy.name}
                         </button>
+                      </div>
+                    ) : (
+                      <div className="bg-gray-900/50 border border-gray-700 rounded px-4 py-2">
+                        <span className="text-gray-500 font-bold">LOCKED</span>
+                        <p className="text-xs text-gray-600 mt-1">Defeat Enemy #{enemyNum - 1} first</p>
                       </div>
                     )}
                   </div>
