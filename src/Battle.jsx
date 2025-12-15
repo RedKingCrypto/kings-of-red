@@ -36,9 +36,8 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
       description: "Discreet, lethal, not noble-born but trusted for dirty work",
       weapon: "Blunderbuss",
       weaponVideo: "/videos/blunderbuss_fire.mp4",
-      characterVideo: "/videos/zimrek.mp4", // Enemy character video
-      staticImage: "/images/zimrek.png", // Fallback
-      accuracy: 65,
+      characterVideo: "/videos/zimrek.mp4",
+      staticImage: "/images/zimrek.png",
       hp: 3
     },
     2: {
@@ -47,9 +46,8 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
       description: "Wealthy, calculated antagonist — educated, dangerous and elite",
       weapon: "Flintlock Pistol",
       weaponVideo: "/videos/flintlock_fire.mp4",
-      characterVideo: "/videos/lord_jeroboam.mp4", // Enemy character video
-      staticImage: "/images/lord_jeroboam.png", // Fallback
-      accuracy: 70,
+      characterVideo: "/videos/lord_jeroboam.mp4",
+      staticImage: "/images/lord_jeroboam.png",
       hp: 3
     },
     3: {
@@ -58,23 +56,45 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
       description: "Intimidating, mythical — a corrupted ruler, not a common brute",
       weapon: "Gilded Sceptre",
       weaponVideo: "/videos/gilded_sceptre_strike.mp4",
-      characterVideo: "/videos/nebchud_baddon.mp4", // Enemy character video
-      staticImage: "/images/nebchud_baddon.png", // Fallback
-      accuracy: 75,
+      characterVideo: "/videos/nebchud_baddon.mp4",
+      staticImage: "/images/nebchud_baddon.png",
       hp: 3
     }
+  };
+
+  // Calculate Fighter's Hit Chance based on rarity and enemy
+  const calculateFighterAccuracy = (fighterRarity, enemyNum) => {
+    // Fighter's chance to hit enemy
+    const hitChances = {
+      Bronze: [20, 10, 3],   // vs Enemy 1, 2, 3
+      Silver: [30, 20, 10],
+      Gold: [40, 30, 20]
+    };
+    
+    return hitChances[fighterRarity][enemyNum - 1];
+  };
+  
+  // Calculate Enemy's Hit Chance based on enemy number and fighter rarity
+  const calculateEnemyAccuracy = (enemyNum, fighterRarity) => {
+    // Enemy's chance to hit fighter
+    const hitChances = {
+      1: { Gold: 70, Silver: 75, Bronze: 85 },  // First Enemy
+      2: { Gold: 72, Silver: 80, Bronze: 90 },  // Second Enemy
+      3: { Gold: 75, Silver: 85, Bronze: 95 }   // Third Enemy
+    };
+    
+    return hitChances[enemyNum][fighterRarity];
   };
 
   // Fighter Configuration (will come from selected NFT later)
   const [fighter, setFighter] = useState({
     name: "Pirate Fighter",
     clan: "Witkastle",
-    rarity: "Gold",
+    rarity: "Gold", // Bronze, Silver, or Gold
     weapon: "Sailor's Dirk",
     weaponVideo: "/videos/sailors_dirk.mp4",
-    characterVideo: "/videos/pirate_fighter.mp4", // Fighter character video
-    staticImage: "/images/pirate_fighter.png", // Fallback
-    accuracy: 40, // Base 40% (Gold Fighter vs Enemy 1)
+    characterVideo: "/videos/pirate_fighter.mp4",
+    staticImage: "/images/pirate_fighter.png",
     hp: 3
   });
 
@@ -147,12 +167,15 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     setIsAnimating(true);
     setOutcomeText(''); // Clear previous outcome
     
+    // Calculate fighter's accuracy for this enemy
+    const accuracy = calculateFighterAccuracy(fighter.rarity, currentEnemy);
+    
     // Show fighter weapon animation
     setWeaponAnimation(fighter.weaponVideo);
     
     // Roll for hit
     const hitRoll = Math.random() * 100;
-    const didHit = hitRoll <= fighter.accuracy;
+    const didHit = hitRoll <= accuracy;
     
     setTimeout(() => {
       setWeaponAnimation(null); // Hide weapon video
@@ -195,12 +218,15 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     
     const enemy = enemies[currentEnemy];
     
+    // Calculate enemy's accuracy against this fighter
+    const accuracy = calculateEnemyAccuracy(currentEnemy, fighter.rarity);
+    
     // Show enemy weapon animation
     setWeaponAnimation(enemy.weaponVideo);
     
     // Roll for hit
     const hitRoll = Math.random() * 100;
-    const didHit = hitRoll <= enemy.accuracy;
+    const didHit = hitRoll <= accuracy;
     
     setTimeout(() => {
       setWeaponAnimation(null);
@@ -444,8 +470,9 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
                   <img src={fighter.staticImage} alt={fighter.name} className="w-full h-full object-cover rounded-lg" />
                 </video>
               </div>
+              <p className="text-sm text-gray-400 mb-2">Rarity: {fighter.rarity}</p>
               <p className="text-sm text-gray-400 mb-2">Weapon: {fighter.weapon}</p>
-              <p className="text-sm text-gray-400">Accuracy: {fighter.accuracy}%</p>
+              <p className="text-sm text-yellow-400">Hit Chance: {calculateFighterAccuracy(fighter.rarity, currentEnemy)}%</p>
             </div>
 
             {/* Enemy */}
@@ -465,7 +492,7 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
                 </video>
               </div>
               <p className="text-sm text-gray-400 mb-2">Weapon: {enemies[currentEnemy].weapon}</p>
-              <p className="text-sm text-gray-400">Accuracy: {enemies[currentEnemy].accuracy}%</p>
+              <p className="text-sm text-red-400">Hit Chance: {calculateEnemyAccuracy(currentEnemy, fighter.rarity)}%</p>
             </div>
           </div>
 
