@@ -153,22 +153,81 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
 
   // Boost Usage Functions
   const useBoost = (boostId) => {
+    const boost = activeBoosts.find(b => b.id === boostId);
+    if (!boost) return;
+    
     switch(boostId) {
+      case 'konfisof_minor':
+        // Battle Boost Minor: +15% hit for THIS battle only
+        addLog('🎯 Battle Boost (+15%): Fighter accuracy increased!');
+        // Mark as used for this battle
+        setActiveBoosts(boosts => boosts.map(b => 
+          b.id === boostId ? {...b, usedThisBattle: true} : b
+        ));
+        break;
+        
+      case 'konfisof_major':
+        // Battle Boost Major: +40% hit for THIS battle only
+        addLog('🎯 Battle Boost (+40%): Fighter accuracy greatly increased!');
+        setActiveBoosts(boosts => boosts.map(b => 
+          b.id === boostId ? {...b, usedThisBattle: true} : b
+        ));
+        break;
+        
       case 'bervation_prayer':
+        // Holy Prayer: Restore 1 HP immediately
         setFighterHP(hp => Math.min(hp + 1, 3));
         addLog('🙏 Holy Prayer: Restored 1 HP!');
+        // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
         
+      case 'witkastle_morale':
+        // Morale Boost: +10% hit, -10% enemy for THIS battle
+        addLog('💪 Morale Boost: Team morale increased!');
+        setActiveBoosts(boosts => boosts.map(b => 
+          b.id === boostId ? {...b, usedThisBattle: true} : b
+        ));
+        break;
+        
       case 'smizfume_poison':
+        // Poison Potion: Enemy -20% for next 2 attacks
         setPoisonedAttacksRemaining(2);
         addLog('🧪 Poison Potion: Enemy weakened for 2 attacks!');
+        // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
         
       case 'coalheart_freeze':
+        // Freeze: Enemy skips next attack
         setEnemyFrozen(true);
         addLog('❄️ Freeze: Enemy will skip next attack!');
+        // Remove from inventory (consumed)
+        setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
+        break;
+        
+      case 'warmdice_treasure':
+        // Treasure Chest: Random reward immediately
+        const treasureRoll = Math.random() * 100;
+        if (treasureRoll < 60) {
+          const amount = Math.floor(Math.random() * 11) + 5;
+          addLog(`💰 Treasure Chest: Found ${amount} FOOD!`);
+        } else if (treasureRoll < 90) {
+          const amount = Math.floor(Math.random() * 3) + 1;
+          addLog(`💰 Treasure Chest: Found ${amount} GOLD!`);
+        } else {
+          const amount = Math.floor(Math.random() * 2) + 1;
+          addLog(`💰 Treasure Chest: Found ${amount} WOOD!`);
+        }
+        // Remove from inventory (consumed)
+        setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
+        break;
+        
+      case 'bowkin_trap':
+        // Trap: Enemy loses 1 HP immediately
+        setEnemyHP(hp => Math.max(hp - 1, 0));
+        addLog('🪤 Trap: Enemy stepped in trap! Lost 1 HP!');
+        // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
     }
@@ -215,39 +274,23 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
   const startBattle = () => {
     setGameState('fighting');
     setCurrentTurn('player');
-    setOutcomeText(''); // Clear any previous outcome text
-    setWeaponAnimation(null); // Clear any previous weapon animation
-    setBattleLog([]); // Clear battle log
-    setRound(1); // Reset round
+    setOutcomeText('');
+    setWeaponAnimation(null);
+    setBattleLog([]);
+    setRound(1);
     
-    // TESTING: Give player one of each boost for first battle
-    if (currentEnemy === 1) {
+    // TESTING: Give player one of each boost for first battle ONLY if they don't have any yet
+    if (currentEnemy === 1 && activeBoosts.length === 0) {
       setActiveBoosts([
-        { id: 'konfisof_minor', name: 'Battle Boost (Minor)', emoji: '🎯', effect: '+15% hit' },
-        { id: 'bervation_prayer', name: 'Holy Prayer', emoji: '🙏', effect: 'Restore 1 HP', usable: true },
-        { id: 'witkastle_morale', name: 'Morale Boost', emoji: '💪', effect: '+10% hit, -10% enemy' },
-        { id: 'smizfume_poison', name: 'Poison Potion', emoji: '🧪', effect: 'Enemy -20% (2 attacks)', usable: true },
-        { id: 'coalheart_freeze', name: 'Freeze', emoji: '❄️', effect: 'Enemy skips turn', usable: true },
-        { id: 'warmdice_treasure', name: 'Treasure Chest', emoji: '💰', effect: 'Random reward' },
-        { id: 'bowkin_trap', name: 'Trap', emoji: '🪤', effect: 'Enemy -1 HP' }
+        { id: 'konfisof_minor', name: 'Battle Boost (+15%)', emoji: '🎯', clan: 'Konfisof', effect: '+15% hit' },
+        { id: 'konfisof_major', name: 'Battle Boost (+40%)', emoji: '🎯', clan: 'Konfisof', effect: '+40% hit' },
+        { id: 'bervation_prayer', name: 'Holy Prayer', emoji: '🙏', clan: 'Bervation', effect: 'Restore 1 HP' },
+        { id: 'witkastle_morale', name: 'Morale Boost', emoji: '💪', clan: 'Witkastle', effect: '+10% hit, -10% enemy' },
+        { id: 'smizfume_poison', name: 'Poison Potion', emoji: '🧪', clan: 'Smizfume', effect: 'Enemy -20% (2 attacks)' },
+        { id: 'coalheart_freeze', name: 'Freeze', emoji: '❄️', clan: 'Coalheart', effect: 'Enemy skips turn' },
+        { id: 'warmdice_treasure', name: 'Treasure Chest', emoji: '💰', clan: 'Warmdice', effect: 'Random reward' },
+        { id: 'bowkin_trap', name: 'Trap', emoji: '🪤', clan: 'Bowkin', effect: 'Enemy -1 HP' }
       ]);
-      
-      // Apply trap immediately (enemy loses 1 HP)
-      setEnemyHP(enemies[currentEnemy].hp - 1);
-      addLog('🪤 Enemy stepped in trap! Lost 1 HP!');
-      
-      // Open treasure chest
-      const treasureRoll = Math.random() * 100;
-      if (treasureRoll < 60) {
-        const amount = Math.floor(Math.random() * 11) + 5; // 5-15 FOOD
-        addLog(`💰 Treasure Chest: Found ${amount} FOOD!`);
-      } else if (treasureRoll < 90) {
-        const amount = Math.floor(Math.random() * 3) + 1; // 1-3 GOLD
-        addLog(`💰 Treasure Chest: Found ${amount} GOLD!`);
-      } else {
-        const amount = Math.floor(Math.random() * 2) + 1; // 1-2 WOOD
-        addLog(`💰 Treasure Chest: Found ${amount} WOOD!`);
-      }
     }
     
     addLog(`Battle begins! Round ${round}`);
@@ -258,16 +301,21 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     if (isAnimating || gameState !== 'fighting' || currentTurn !== 'player') return;
     
     setIsAnimating(true);
-    setOutcomeText(''); // Clear previous outcome
+    setOutcomeText('');
     
     // Calculate fighter's accuracy for this enemy
     let accuracy = calculateFighterAccuracy(fighter.rarity, currentEnemy);
     
-    // Apply boost effects
-    if (activeBoosts.some(b => b.id === 'konfisof_minor')) {
+    // Apply boost effects ONLY if they've been used this battle
+    const usedBoosts = activeBoosts.filter(b => b.usedThisBattle);
+    
+    if (usedBoosts.some(b => b.id === 'konfisof_minor')) {
       accuracy += 15;
     }
-    if (activeBoosts.some(b => b.id === 'witkastle_morale')) {
+    if (usedBoosts.some(b => b.id === 'konfisof_major')) {
+      accuracy += 40;
+    }
+    if (usedBoosts.some(b => b.id === 'witkastle_morale')) {
       accuracy += 10;
     }
     
@@ -279,7 +327,7 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     const didHit = hitRoll <= accuracy;
     
     setTimeout(() => {
-      setWeaponAnimation(null); // Hide weapon video
+      setWeaponAnimation(null);
       
       if (didHit) {
         setOutcomeText('FIGHTER HITS!');
@@ -340,8 +388,10 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     // Calculate enemy's accuracy against this fighter
     let accuracy = calculateEnemyAccuracy(currentEnemy, fighter.rarity);
     
-    // Apply boost effects
-    if (activeBoosts.some(b => b.id === 'witkastle_morale')) {
+    // Apply boost effects ONLY if they've been used this battle
+    const usedBoosts = activeBoosts.filter(b => b.usedThisBattle);
+    
+    if (usedBoosts.some(b => b.id === 'witkastle_morale')) {
       accuracy -= 10; // Morale reduces enemy hit chance
     }
     
@@ -431,6 +481,9 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
 
   // Continue to next enemy
   const continueToNextEnemy = () => {
+    // Clear "used this battle" flags - boosts persist but need to be re-activated
+    setActiveBoosts(boosts => boosts.map(b => ({...b, usedThisBattle: false})));
+    
     setCurrentEnemy(null);
     setGameState('enemy-select');
     setBattleLog([]);
@@ -686,6 +739,20 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
                     />
                   ))}
                 </div>
+                {/* Dynamic Hit Chance Display */}
+                <div className="text-sm">
+                  <span className="text-yellow-400">Hit: </span>
+                  <span className="font-bold text-yellow-400">
+                    {(() => {
+                      let acc = calculateFighterAccuracy(fighter.rarity, currentEnemy);
+                      const usedBoosts = activeBoosts.filter(b => b.usedThisBattle);
+                      if (usedBoosts.some(b => b.id === 'konfisof_minor')) acc += 15;
+                      if (usedBoosts.some(b => b.id === 'konfisof_major')) acc += 40;
+                      if (usedBoosts.some(b => b.id === 'witkastle_morale')) acc += 10;
+                      return acc;
+                    })()}%
+                  </span>
+                </div>
               </div>
               <div className="w-full h-48 bg-gray-900 rounded-lg overflow-hidden">
                 <video
@@ -707,48 +774,38 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
               {/* Active Boosts Display */}
               {activeBoosts.length > 0 && (
                 <div className="mb-4 p-3 bg-purple-900/20 border border-purple-600 rounded-lg w-full">
-                  <p className="text-xs text-purple-400 mb-2 text-center font-bold">Active Boosts:</p>
-                  <div className="flex flex-wrap gap-1 justify-center">
-                    {activeBoosts.map(boost => (
-                      <span 
-                        key={boost.id}
-                        className="px-2 py-1 bg-purple-900/50 border border-purple-500 rounded text-xs"
-                        title={boost.effect}
-                      >
-                        {boost.emoji} {boost.name}
-                      </span>
-                    ))}
+                  <p className="text-xs text-purple-400 mb-3 text-center font-bold">Available Battle Boosts:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {activeBoosts.map(boost => {
+                      const isUsed = boost.usedThisBattle;
+                      
+                      return (
+                        <button
+                          key={boost.id}
+                          onClick={() => useBoost(boost.id)}
+                          disabled={isUsed || isAnimating || currentTurn !== 'player'}
+                          className={`p-2 rounded border text-xs transition ${
+                            isUsed
+                              ? 'bg-gray-900/50 border-gray-700 text-gray-600 cursor-not-allowed'
+                              : currentTurn !== 'player'
+                              ? 'bg-purple-900/30 border-purple-700 text-purple-400 cursor-wait'
+                              : 'bg-purple-900/50 border-purple-500 text-purple-200 hover:bg-purple-800/70 cursor-pointer'
+                          }`}
+                          title={boost.effect}
+                        >
+                          <div className="text-lg mb-1">{boost.emoji}</div>
+                          <div className="font-bold">{boost.name}</div>
+                          <div className="text-xs opacity-75 mt-1">{boost.effect}</div>
+                          {isUsed && (
+                            <div className="text-xs text-green-400 mt-1">✓ Used</div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
-                </div>
-              )}
-              
-              {/* Usable Boosts (Holy Prayer, Poison, Freeze) */}
-              {currentTurn === 'player' && !isAnimating && (
-                <div className="mb-4 w-full">
-                  {activeBoosts.some(b => b.id === 'bervation_prayer') && fighterHP < 3 && (
-                    <button
-                      onClick={() => useBoost('bervation_prayer')}
-                      className="w-full mb-2 px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-sm font-bold transition"
-                    >
-                      🙏 Use Holy Prayer (+1 HP)
-                    </button>
-                  )}
-                  {activeBoosts.some(b => b.id === 'smizfume_poison') && poisonedAttacksRemaining === 0 && (
-                    <button
-                      onClick={() => useBoost('smizfume_poison')}
-                      className="w-full mb-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded text-sm font-bold transition"
-                    >
-                      🧪 Use Poison (-20% enemy x2)
-                    </button>
-                  )}
-                  {activeBoosts.some(b => b.id === 'coalheart_freeze') && !enemyFrozen && (
-                    <button
-                      onClick={() => useBoost('coalheart_freeze')}
-                      className="w-full mb-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-bold transition"
-                    >
-                      ❄️ Use Freeze (Skip enemy turn)
-                    </button>
-                  )}
+                  <p className="text-xs text-gray-400 text-center mt-3">
+                    Click to use • Battle Boosts last entire battle • Other boosts consumed on use
+                  </p>
                 </div>
               )}
               
@@ -805,6 +862,22 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
                       className={`w-6 h-6 ${i < enemyHP ? 'text-red-500 fill-current' : 'text-gray-600'}`}
                     />
                   ))}
+                </div>
+                {/* Dynamic Enemy Hit Chance Display */}
+                <div className="text-sm">
+                  <span className="text-red-400">Hit: </span>
+                  <span className="font-bold text-red-400">
+                    {(() => {
+                      let acc = calculateEnemyAccuracy(currentEnemy, fighter.rarity);
+                      const usedBoosts = activeBoosts.filter(b => b.usedThisBattle);
+                      if (usedBoosts.some(b => b.id === 'witkastle_morale')) acc -= 10;
+                      if (poisonedAttacksRemaining > 0) acc -= 20;
+                      return acc;
+                    })()}%
+                  </span>
+                  {poisonedAttacksRemaining > 0 && (
+                    <span className="text-xs text-purple-400 ml-1">🧪</span>
+                  )}
                 </div>
               </div>
               <div className="w-full h-48 bg-gray-900 rounded-lg overflow-hidden">
