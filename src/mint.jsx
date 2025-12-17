@@ -32,12 +32,36 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
   });
   const [loading, setLoading] = useState(false);
 
-  // Check URL for affiliate code on mount
+ // Check URL for affiliate code on mount AND load stored code
   useEffect(() => {
+    // Check URL first
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
     if (refCode) {
       setAffiliateCode(refCode);
+    } else {
+      // If no code in URL, check localStorage
+      const storedCode = localStorage.getItem('referralCode');
+      const expiry = localStorage.getItem('referralExpiry');
+      
+      if (storedCode && expiry) {
+        const expiryTime = parseInt(expiry);
+        
+        if (Date.now() < expiryTime) {
+          // Code still valid
+          setAffiliateCode(storedCode);
+          console.log(`✅ Using stored referral: ${storedCode}`);
+          
+          // Calculate days remaining
+          const daysRemaining = Math.ceil((expiryTime - Date.now()) / (24 * 60 * 60 * 1000));
+          console.log(`Referral valid for ${daysRemaining} more days`);
+        } else {
+          // Code expired
+          localStorage.removeItem('referralCode');
+          localStorage.removeItem('referralExpiry');
+          console.log('⏰ Referral code expired');
+        }
+      }
     }
   }, []);
 
@@ -285,6 +309,26 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
       <div className="container mx-auto px-4 py-8">
         {/* Hero Section */}
         <div className="text-center mb-12">
+          {/* Active Referral Code Indicator */}
+        {affiliateCode && (
+          <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/50 rounded-lg p-4 mb-8 max-w-2xl mx-auto">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <span className="text-2xl">🤝</span>
+              <span className="font-bold text-green-400">Referral Active</span>
+            </div>
+            <p className="text-sm text-gray-300 text-center">
+              Code: <strong className="text-white">{affiliateCode}</strong>
+            </p>
+            <p className="text-xs text-gray-400 text-center mt-1">
+              Your mint will support this referrer (they earn 7% commission)
+            </p>
+            {!window.location.search.includes('ref=') && (
+              <p className="text-xs text-green-400 text-center mt-2">
+                ✅ Code saved from previous visit
+              </p>
+            )}
+          </div>
+        )}
           <div className="inline-block mb-4">
             <Sparkles className="w-16 h-16 mx-auto text-yellow-400 animate-pulse" />
           </div>

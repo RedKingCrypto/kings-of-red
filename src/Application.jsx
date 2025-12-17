@@ -44,9 +44,34 @@ export default function Application() {
   // Navigation state
   const [currentPage, setCurrentPage] = useState('home');
 
-  // Check if wallet is already connected on load
+  // Check if wallet is already connected on load and handle referral codes
   useEffect(() => {
     checkIfWalletConnected();
+    
+    // Store referral code if present in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref');
+    
+    if (refCode) {
+      // Sanitize the code (alphanumeric only)
+      const cleanCode = refCode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 20);
+      
+      // Check if we already have a code that hasn't expired
+      const existingCode = localStorage.getItem('referralCode');
+      const existingExpiry = localStorage.getItem('referralExpiry');
+      
+      // Only store if no code exists or the existing one has expired (first-click attribution)
+      if (!existingCode || !existingExpiry || Date.now() >= parseInt(existingExpiry)) {
+        // Store with 7-day expiry
+        const expiryTime = Date.now() + (7 * 24 * 60 * 60 * 1000);
+        localStorage.setItem('referralCode', cleanCode);
+        localStorage.setItem('referralExpiry', expiryTime.toString());
+        
+        console.log(`✅ Referral code stored: ${cleanCode} (expires in 7 days)`);
+      } else {
+        console.log(`Already have referral code: ${existingCode}`);
+      }
+    }
   }, []);
 
   const checkIfWalletConnected = async () => {
@@ -187,10 +212,14 @@ export default function Application() {
               >
                 FAQ
               </button>
-
- <a href="https://medium.com/@Red-King" target="_blank" rel="noopener noreferrer" className="hover:text-red-400 transition">
-  Docs
-</a>
+              <a 
+                href="https://medium.com/@Red-King" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="hover:text-red-400 transition"
+              >
+                Docs
+              </a>
               <button 
                 onClick={() => navigateTo('about')}
                 className={`hover:text-red-400 transition ${currentPage === 'about' ? 'text-red-500' : ''}`}
