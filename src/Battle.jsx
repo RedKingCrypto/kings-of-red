@@ -18,6 +18,12 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
   const [outcomeText, setOutcomeText] = useState(''); // "Fighter Hits", "Enemy Misses", etc.
   const [battleLog, setBattleLog] = useState([]);
   const [round, setRound] = useState(1);
+  const [earnedRewards, setEarnedRewards] = useState(null); // Calculated rewards
+
+  // Battle Boosts State
+  const [activeBoosts, setActiveBoosts] = useState([]);
+  const [poisonedAttacksRemaining, setPoisonedAttacksRemaining] = useState(0);
+  const [enemyFrozen, setEnemyFrozen] = useState(false);
 
   // Arena Configuration
   const arena = {
@@ -102,15 +108,71 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
   const [battleConfig, setBattleConfig] = useState({
     entryCost: {
       token: 'FOOD', // FOOD, GOLD, WOOD, or REDKING
-      amount: 50 // Changed from 5 to 50
+      amount: 50
     },
-    rewards: {
-      enemy1: { FOOD: 10, GOLD: 2, WOOD: 1 },
-      enemy2: { FOOD: 25, GOLD: 5, WOOD: 3 },
-      enemy3: { FOOD: 50, GOLD: 10, WOOD: 10 },
-      completion: { FOOD: 20, GOLD: 5, WOOD: 5 } // Bonus for clearing all 3
+    // Reward ranges (min-max)
+    rewardRanges: {
+      enemy1: { 
+        FOOD: [21, 25], 
+        WOOD: [2, 9] 
+      },
+      enemy2: { 
+        FOOD: [63, 84], 
+        GOLD: [8, 17] 
+      },
+      enemy3: { 
+        FOOD: [98, 133], 
+        WOOD: [14, 21],
+        RKT: [0.5, 0.9] // RedKing Token
+      },
+      completion: { 
+        FOOD: [20, 30], 
+        GOLD: [5, 10], 
+        WOOD: [5, 8] 
+      } // Bonus for clearing all 3
     }
   });
+
+  // Calculate random reward within range
+  const calculateReward = (enemyNum) => {
+    const range = battleConfig.rewardRanges[`enemy${enemyNum}`];
+    const rewards = {};
+    
+    for (const [token, [min, max]] of Object.entries(range)) {
+      if (token === 'RKT') {
+        // RedKing has decimals
+        rewards[token] = (Math.random() * (max - min) + min).toFixed(2);
+      } else {
+        // FOOD, GOLD, WOOD are integers
+        rewards[token] = Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+    }
+    
+    return rewards;
+  };
+
+  // Boost Usage Functions
+  const useBoost = (boostId) => {
+    switch(boostId) {
+      case 'bervation_prayer':
+        setFighterHP(hp => Math.min(hp + 1, 3));
+        addLog('🙏 Holy Prayer: Restored 1 HP!');
+        setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
+        break;
+        
+      case 'smizfume_poison':
+        setPoisonedAttacksRemaining(2);
+        addLog('🧪 Poison Potion: Enemy weakened for 2 attacks!');
+        setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
+        break;
+        
+      case 'coalheart_freeze':
+        setEnemyFrozen(true);
+        addLog('❄️ Freeze: Enemy will skip next attack!');
+        setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
+        break;
+    }
+  };
 
   // Add to battle log
   const addLog = (message) => {
@@ -157,6 +219,37 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     setWeaponAnimation(null); // Clear any previous weapon animation
     setBattleLog([]); // Clear battle log
     setRound(1); // Reset round
+    
+    // TESTING: Give player one of each boost for first battle
+    if (currentEnemy === 1) {
+      setActiveBoosts([
+        { id: 'konfisof_minor', name: 'Battle Boost (Minor)', emoji: '🎯', effect: '+15% hit' },
+        { id: 'bervation_prayer', name: 'Holy Prayer', emoji: '🙏', effect: 'Restore 1 HP', usable: true },
+        { id: 'witkastle_morale', name: 'Morale Boost', emoji: '💪', effect: '+10% hit, -10% enemy' },
+        { id: 'smizfume_poison', name: 'Poison Potion', emoji: '🧪', effect: 'Enemy -20% (2 attacks)', usable: true },
+        { id: 'coalheart_freeze', name: 'Freeze', emoji: '❄️', effect: 'Enemy skips turn', usable: true },
+        { id: 'warmdice_treasure', name: 'Treasure Chest', emoji: '💰', effect: 'Random reward' },
+        { id: 'bowkin_trap', name: 'Trap', emoji: '🪤', effect: 'Enemy -1 HP' }
+      ]);
+      
+      // Apply trap immediately (enemy loses 1 HP)
+      setEnemyHP(enemies[currentEnemy].hp - 1);
+      addLog('🪤 Enemy stepped in trap! Lost 1 HP!');
+      
+      // Open treasure chest
+      const treasureRoll = Math.random() * 100;
+      if (treasureRoll < 60) {
+        const amount = Math.floor(Math.random() * 11) + 5; // 5-15 FOOD
+        addLog(`💰 Treasure Chest: Found ${amount} FOOD!`);
+      } else if (treasureRoll < 90) {
+        const amount = Math.floor(Math.random() * 3) + 1; // 1-3 GOLD
+        addLog(`💰 Treasure Chest: Found ${amount} GOLD!`);
+      } else {
+        const amount = Math.floor(Math.random() * 2) + 1; // 1-2 WOOD
+        addLog(`💰 Treasure Chest: Found ${amount} WOOD!`);
+      }
+    }
+    
     addLog(`Battle begins! Round ${round}`);
   };
 
@@ -168,7 +261,15 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     setOutcomeText(''); // Clear previous outcome
     
     // Calculate fighter's accuracy for this enemy
-    const accuracy = calculateFighterAccuracy(fighter.rarity, currentEnemy);
+    let accuracy = calculateFighterAccuracy(fighter.rarity, currentEnemy);
+    
+    // Apply boost effects
+    if (activeBoosts.some(b => b.id === 'konfisof_minor')) {
+      accuracy += 15;
+    }
+    if (activeBoosts.some(b => b.id === 'witkastle_morale')) {
+      accuracy += 10;
+    }
     
     // Show fighter weapon animation
     setWeaponAnimation(fighter.weaponVideo);
@@ -194,7 +295,16 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
           setTimeout(() => {
             setCurrentTurn('enemy');
             setOutcomeText('');
-            enemyAttack();
+            
+            // Check if enemy is frozen
+            if (enemyFrozen) {
+              setEnemyFrozen(false);
+              setRound(r => r + 1);
+              setCurrentTurn('player');
+              addLog('❄️ Enemy is frozen! Skips attack!');
+            } else {
+              enemyAttack();
+            }
           }, 2000);
         }
       } else {
@@ -204,12 +314,21 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
         setTimeout(() => {
           setCurrentTurn('enemy');
           setOutcomeText('');
-          enemyAttack();
+          
+          // Check if enemy is frozen
+          if (enemyFrozen) {
+            setEnemyFrozen(false);
+            setRound(r => r + 1);
+            setCurrentTurn('player');
+            addLog('❄️ Enemy is frozen! Skips attack!');
+          } else {
+            enemyAttack();
+          }
         }, 2000);
       }
       
       setIsAnimating(false);
-    }, 2000); // 2 second weapon animation (reduced from 3)
+    }, 2000);
   };
 
   // Enemy Attack (automated)
@@ -219,7 +338,18 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     const enemy = enemies[currentEnemy];
     
     // Calculate enemy's accuracy against this fighter
-    const accuracy = calculateEnemyAccuracy(currentEnemy, fighter.rarity);
+    let accuracy = calculateEnemyAccuracy(currentEnemy, fighter.rarity);
+    
+    // Apply boost effects
+    if (activeBoosts.some(b => b.id === 'witkastle_morale')) {
+      accuracy -= 10; // Morale reduces enemy hit chance
+    }
+    
+    if (poisonedAttacksRemaining > 0) {
+      accuracy -= 20; // Poison reduces enemy hit chance
+      setPoisonedAttacksRemaining(p => p - 1);
+      addLog(`🧪 Enemy is poisoned! (${poisonedAttacksRemaining - 1} attacks remaining)`);
+    }
     
     // Show enemy weapon animation
     setWeaponAnimation(enemy.weaponVideo);
@@ -230,7 +360,8 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     
     // DEBUG: Log the calculation
     console.log(`Enemy ${currentEnemy} attacking ${fighter.rarity} Fighter:`);
-    console.log(`- Accuracy: ${accuracy}%`);
+    console.log(`- Base Accuracy: ${calculateEnemyAccuracy(currentEnemy, fighter.rarity)}%`);
+    console.log(`- Modified Accuracy: ${accuracy}%`);
     console.log(`- Roll: ${hitRoll.toFixed(2)}`);
     console.log(`- Result: ${didHit ? 'HIT' : 'MISS'}`);
     
@@ -268,12 +399,17 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
       }
       
       setIsAnimating(false);
-    }, 2000); // 2 seconds (reduced from 3)
+    }, 2000);
   };
 
   // Enemy Defeated
   const enemyDefeated = () => {
     const enemy = enemies[currentEnemy];
+    
+    // Calculate random rewards!
+    const rewards = calculateReward(currentEnemy);
+    setEarnedRewards(rewards);
+    
     setGameState('victory');
     addLog(`${enemy.name} has been defeated!`);
     setEnemiesDefeated(prev => [...prev, currentEnemy]);
@@ -422,14 +558,9 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
                         <span className="text-green-400 font-bold">DEFEATED</span>
                       </div>
                     ) : isAvailable ? (
-                      <div className="space-y-2">
-                        <div className="text-sm font-semibold text-yellow-400">
-                          Rewards: {battleConfig.rewards[`enemy${enemyNum}`].FOOD} FOOD, {battleConfig.rewards[`enemy${enemyNum}`].GOLD} GOLD, {battleConfig.rewards[`enemy${enemyNum}`].WOOD} WOOD
-                        </div>
-                        <button className="w-full bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-bold transition">
-                          Fight {enemy.name}
-                        </button>
-                      </div>
+                      <button className="w-full bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-bold transition">
+                        Fight {enemy.name}
+                      </button>
                     ) : (
                       <div className="bg-gray-900/50 border border-gray-700 rounded px-4 py-2">
                         <span className="text-gray-500 font-bold">LOCKED</span>
@@ -573,6 +704,54 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
 
             {/* Center Combat Area */}
             <div className="flex flex-col justify-center items-center">
+              {/* Active Boosts Display */}
+              {activeBoosts.length > 0 && (
+                <div className="mb-4 p-3 bg-purple-900/20 border border-purple-600 rounded-lg w-full">
+                  <p className="text-xs text-purple-400 mb-2 text-center font-bold">Active Boosts:</p>
+                  <div className="flex flex-wrap gap-1 justify-center">
+                    {activeBoosts.map(boost => (
+                      <span 
+                        key={boost.id}
+                        className="px-2 py-1 bg-purple-900/50 border border-purple-500 rounded text-xs"
+                        title={boost.effect}
+                      >
+                        {boost.emoji} {boost.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Usable Boosts (Holy Prayer, Poison, Freeze) */}
+              {currentTurn === 'player' && !isAnimating && (
+                <div className="mb-4 w-full">
+                  {activeBoosts.some(b => b.id === 'bervation_prayer') && fighterHP < 3 && (
+                    <button
+                      onClick={() => useBoost('bervation_prayer')}
+                      className="w-full mb-2 px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-sm font-bold transition"
+                    >
+                      🙏 Use Holy Prayer (+1 HP)
+                    </button>
+                  )}
+                  {activeBoosts.some(b => b.id === 'smizfume_poison') && poisonedAttacksRemaining === 0 && (
+                    <button
+                      onClick={() => useBoost('smizfume_poison')}
+                      className="w-full mb-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded text-sm font-bold transition"
+                    >
+                      🧪 Use Poison (-20% enemy x2)
+                    </button>
+                  )}
+                  {activeBoosts.some(b => b.id === 'coalheart_freeze') && !enemyFrozen && (
+                    <button
+                      onClick={() => useBoost('coalheart_freeze')}
+                      className="w-full mb-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-bold transition"
+                    >
+                      ❄️ Use Freeze (Skip enemy turn)
+                    </button>
+                  )}
+                </div>
+              )}
+              
               {/* Weapon Animation OR Outcome Text */}
               {weaponAnimation ? (
                 <div className="w-full h-48 bg-black rounded-lg overflow-hidden mb-4">
@@ -655,7 +834,7 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
       )}
 
       {/* Victory Screen */}
-      {gameState === 'victory' && currentEnemy && (
+      {gameState === 'victory' && currentEnemy && earnedRewards && (
         <div className="text-center">
           <Trophy className="w-24 h-24 text-yellow-400 mx-auto mb-6" />
           <h2 className="text-5xl font-bold mb-4 text-yellow-400">VICTORY!</h2>
@@ -664,9 +843,15 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
           <div className="bg-green-900/20 border border-green-600 rounded-lg p-6 max-w-md mx-auto mb-8">
             <h3 className="font-bold mb-4">Rewards Earned:</h3>
             <div className="space-y-2">
-              <p>🍖 {battleConfig.rewards[`enemy${currentEnemy}`].FOOD} FOOD</p>
-              <p>🪙 {battleConfig.rewards[`enemy${currentEnemy}`].GOLD} GOLD</p>
-              <p>🪵 {battleConfig.rewards[`enemy${currentEnemy}`].WOOD} WOOD</p>
+              {Object.entries(earnedRewards).map(([token, amount]) => (
+                <p key={token} className="text-lg">
+                  {token === 'FOOD' && '🍖'} 
+                  {token === 'GOLD' && '🪙'} 
+                  {token === 'WOOD' && '🪵'}
+                  {token === 'RKT' && '👑'}
+                  {' '}{amount} {token}
+                </p>
+              ))}
             </div>
           </div>
 
