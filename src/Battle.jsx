@@ -718,29 +718,59 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
 
       {/* Active Battle */}
       {gameState === 'fighting' && currentEnemy && (
-        <div>
-          {/* Arena Name Header */}
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-400">{arena.name}</h2>
-            <p className="text-sm text-gray-500">Round {round}</p>
-          </div>
+        <div className="max-w-7xl mx-auto">
+          {/* Battle Boosts at Top - Always Visible */}
+          {activeBoosts.length > 0 && (
+            <div className="mb-4 p-3 bg-purple-900/20 border border-purple-600 rounded-lg">
+              <p className="text-xs text-purple-400 mb-2 text-center font-bold">Battle Boosts (Click to Use):</p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {activeBoosts.map(boost => {
+                  const isUsed = boost.usedThisBattle;
+                  
+                  return (
+                    <button
+                      key={boost.id}
+                      onClick={() => useBoost(boost.id)}
+                      disabled={isUsed || isAnimating || currentTurn !== 'player'}
+                      className={`px-3 py-2 rounded border text-xs transition ${
+                        isUsed
+                          ? 'bg-gray-900/50 border-gray-700 text-gray-600 cursor-not-allowed'
+                          : currentTurn !== 'player'
+                          ? 'bg-purple-900/30 border-purple-700 text-purple-400 cursor-wait'
+                          : 'bg-purple-900/50 border-purple-500 text-purple-200 hover:bg-purple-800/70 cursor-pointer'
+                      }`}
+                      title={boost.effect}
+                    >
+                      <span className="text-lg">{boost.emoji}</span>
+                      <span className="ml-1 font-bold">{boost.name}</span>
+                      {isUsed && <span className="ml-1 text-green-400">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-          {/* Battle Arena */}
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
-            {/* Fighter Side */}
-            <div className="bg-blue-900/20 border-2 border-blue-600 rounded-lg p-6">
-              <div className="text-center mb-4">
-                <h3 className="text-xl font-bold mb-2">{fighter.name}</h3>
+          {/* Compact Battle Arena - Single Screen */}
+          <div className="bg-gray-900/50 rounded-lg p-4 mb-4">
+            {/* Arena Name & Round */}
+            <div className="text-center mb-3">
+              <h2 className="text-xl font-bold text-gray-400">{arena.name} - Round {round}</h2>
+            </div>
+
+            <div className="grid grid-cols-7 gap-3 items-center">
+              {/* Fighter Side - 2 columns */}
+              <div className="col-span-2 text-center">
+                <h3 className="text-lg font-bold mb-2">{fighter.name}</h3>
                 <div className="flex justify-center gap-1 mb-2">
                   {[...Array(3)].map((_, i) => (
                     <Heart
                       key={i}
-                      className={`w-6 h-6 ${i < fighterHP ? 'text-red-500 fill-current' : 'text-gray-600'}`}
+                      className={`w-5 h-5 ${i < fighterHP ? 'text-red-500 fill-current' : 'text-gray-600'}`}
                     />
                   ))}
                 </div>
-                {/* Dynamic Hit Chance Display */}
-                <div className="text-sm">
+                <div className="text-sm mb-2">
                   <span className="text-yellow-400">Hit: </span>
                   <span className="font-bold text-yellow-400">
                     {(() => {
@@ -753,118 +783,83 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
                     })()}%
                   </span>
                 </div>
-              </div>
-              <div className="w-full h-48 bg-gray-900 rounded-lg overflow-hidden">
-                <video
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover"
-                  poster={fighter.staticImage}
-                >
-                  <source src={fighter.characterVideo} type="video/mp4" />
-                  <img src={fighter.staticImage} alt={fighter.name} className="w-full h-full object-cover" />
-                </video>
-              </div>
-            </div>
-
-            {/* Center Combat Area */}
-            <div className="flex flex-col justify-center items-center">
-              {/* Active Boosts Display */}
-              {activeBoosts.length > 0 && (
-                <div className="mb-4 p-3 bg-purple-900/20 border border-purple-600 rounded-lg w-full">
-                  <p className="text-xs text-purple-400 mb-3 text-center font-bold">Available Battle Boosts:</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {activeBoosts.map(boost => {
-                      const isUsed = boost.usedThisBattle;
-                      
-                      return (
-                        <button
-                          key={boost.id}
-                          onClick={() => useBoost(boost.id)}
-                          disabled={isUsed || isAnimating || currentTurn !== 'player'}
-                          className={`p-2 rounded border text-xs transition ${
-                            isUsed
-                              ? 'bg-gray-900/50 border-gray-700 text-gray-600 cursor-not-allowed'
-                              : currentTurn !== 'player'
-                              ? 'bg-purple-900/30 border-purple-700 text-purple-400 cursor-wait'
-                              : 'bg-purple-900/50 border-purple-500 text-purple-200 hover:bg-purple-800/70 cursor-pointer'
-                          }`}
-                          title={boost.effect}
-                        >
-                          <div className="text-lg mb-1">{boost.emoji}</div>
-                          <div className="font-bold">{boost.name}</div>
-                          <div className="text-xs opacity-75 mt-1">{boost.effect}</div>
-                          {isUsed && (
-                            <div className="text-xs text-green-400 mt-1">✓ Used</div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-gray-400 text-center mt-3">
-                    Click to use • Battle Boosts last entire battle • Other boosts consumed on use
-                  </p>
-                </div>
-              )}
-              
-              {/* Weapon Animation OR Outcome Text */}
-              {weaponAnimation ? (
-                <div className="w-full h-48 bg-black rounded-lg overflow-hidden mb-4">
+                <div className="w-full h-32 bg-gray-900 rounded-lg overflow-hidden">
                   <video
                     autoPlay
+                    loop
                     muted
                     playsInline
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-cover"
+                    poster={fighter.staticImage}
                   >
-                    <source src={weaponAnimation} type="video/mp4" />
+                    <source src={fighter.characterVideo} type="video/mp4" />
+                    <img src={fighter.staticImage} alt={fighter.name} className="w-full h-full object-cover" />
                   </video>
                 </div>
-              ) : outcomeText ? (
-                <div className={`text-3xl font-bold mb-4 p-6 rounded-lg ${
-                  outcomeText.includes('FIGHTER') 
-                    ? outcomeText.includes('HITS') ? 'bg-green-900/50 text-green-400' : 'bg-gray-900/50 text-gray-400'
-                    : outcomeText.includes('HITS') ? 'bg-red-900/50 text-red-400' : 'bg-gray-900/50 text-gray-400'
-                }`}>
-                  {outcomeText}
-                </div>
-              ) : (
-                <div className="h-48 flex items-center justify-center">
-                  <Swords className="w-16 h-16 text-gray-600" />
-                </div>
-              )}
+              </div>
 
-              {/* Attack Button */}
-              {currentTurn === 'player' && !isAnimating && (
-                <button
-                  onClick={playerAttack}
-                  className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-bold transition"
-                >
-                  <Swords className="w-5 h-5 inline mr-2" />
-                  ATTACK
-                </button>
-              )}
+              {/* Center Combat - 3 columns */}
+              <div className="col-span-3 flex flex-col justify-center items-center">
+                {weaponAnimation ? (
+                  <div className="w-full h-32 bg-black rounded-lg overflow-hidden mb-2">
+                    <video
+                      autoPlay
+                      muted
+                      playsInline
+                      className="w-full h-full object-contain"
+                    >
+                      <source src={weaponAnimation} type="video/mp4" />
+                    </video>
+                  </div>
+                ) : outcomeText ? (
+                  <div className={`text-2xl font-bold mb-2 p-3 rounded-lg ${
+                    outcomeText.includes('FIGHTER') 
+                      ? outcomeText.includes('HITS') ? 'bg-green-900/50 text-green-400' : 'bg-gray-900/50 text-gray-400'
+                      : outcomeText.includes('HITS') ? 'bg-red-900/50 text-red-400' : 'bg-gray-900/50 text-gray-400'
+                  }`}>
+                    {outcomeText}
+                  </div>
+                ) : (
+                  <div className="h-24 flex items-center justify-center">
+                    <Swords className="w-12 h-12 text-gray-600" />
+                  </div>
+                )}
 
-              {currentTurn === 'enemy' && (
-                <div className="text-gray-400">Enemy's Turn...</div>
-              )}
-            </div>
+                {currentTurn === 'player' && !isAnimating && (
+                  <button
+                    onClick={playerAttack}
+                    className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-bold transition w-full"
+                  >
+                    <Swords className="w-5 h-5 inline mr-2" />
+                    ATTACK
+                  </button>
+                )}
 
-            {/* Enemy Side */}
-            <div className="bg-red-900/20 border-2 border-red-600 rounded-lg p-6">
-              <div className="text-center mb-4">
-                <h3 className="text-xl font-bold mb-2">{enemies[currentEnemy].name}</h3>
+                {currentTurn === 'enemy' && !isAnimating && (
+                  <div className="text-center py-2 px-4 bg-red-900/50 rounded-lg w-full">
+                    <p className="text-red-400 font-bold">Enemy's Turn...</p>
+                  </div>
+                )}
+
+                {isAnimating && (
+                  <div className="text-center py-2 w-full">
+                    <div className="animate-spin w-6 h-6 border-4 border-gray-600 border-t-red-500 rounded-full mx-auto"></div>
+                  </div>
+                )}
+              </div>
+
+              {/* Enemy Side - 2 columns */}
+              <div className="col-span-2 text-center">
+                <h3 className="text-lg font-bold mb-2">{enemies[currentEnemy].name}</h3>
                 <div className="flex justify-center gap-1 mb-2">
                   {[...Array(3)].map((_, i) => (
                     <Heart
                       key={i}
-                      className={`w-6 h-6 ${i < enemyHP ? 'text-red-500 fill-current' : 'text-gray-600'}`}
+                      className={`w-5 h-5 ${i < enemyHP ? 'text-red-500 fill-current' : 'text-gray-600'}`}
                     />
                   ))}
                 </div>
-                {/* Dynamic Enemy Hit Chance Display */}
-                <div className="text-sm">
+                <div className="text-sm mb-2">
                   <span className="text-red-400">Hit: </span>
                   <span className="font-bold text-red-400">
                     {(() => {
@@ -879,32 +874,35 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
                     <span className="text-xs text-purple-400 ml-1">🧪</span>
                   )}
                 </div>
-              </div>
-              <div className="w-full h-48 bg-gray-900 rounded-lg overflow-hidden">
-                <video
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover"
-                  poster={enemies[currentEnemy].staticImage}
-                >
-                  <source src={enemies[currentEnemy].characterVideo} type="video/mp4" />
-                  <img src={enemies[currentEnemy].staticImage} alt={enemies[currentEnemy].name} className="w-full h-full object-cover" />
-                </video>
+                <div className="w-full h-32 bg-gray-900 rounded-lg overflow-hidden">
+                  <video
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                    poster={enemies[currentEnemy].staticImage}
+                  >
+                    <source src={enemies[currentEnemy].characterVideo} type="video/mp4" />
+                    <img src={enemies[currentEnemy].staticImage} alt={enemies[currentEnemy].name} className="w-full h-full object-cover" />
+                  </video>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Battle Log */}
-          <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 max-h-48 overflow-y-auto">
-            <h4 className="font-bold mb-2 text-gray-400">Battle Log:</h4>
-            {battleLog.map((log, i) => (
-              <p key={i} className="text-sm text-gray-500 mb-1">{log}</p>
-            ))}
+          {/* Battle Log - Compact */}
+          <div className="bg-gray-900/50 rounded-lg p-3">
+            <h3 className="text-sm font-bold mb-2 text-gray-400">Battle Log:</h3>
+            <div className="space-y-1 max-h-24 overflow-y-auto">
+              {battleLog.slice(0, 5).map((log, idx) => (
+                <p key={idx} className="text-xs text-gray-400">{log}</p>
+              ))}
+            </div>
           </div>
         </div>
       )}
+
 
       {/* Victory Screen */}
       {gameState === 'victory' && currentEnemy && earnedRewards && (
@@ -928,22 +926,25 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
             </div>
           </div>
 
-          <div className="space-x-4">
-            {enemiesDefeated.length + 1 < 3 && (
-              <button
-                onClick={continueToNextEnemy}
-                className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-bold transition"
-              >
-                Fight Next Enemy
-              </button>
-            )}
+          {/* Check if there are more enemies to fight */}
+          {currentEnemy < 3 ? (
             <button
-              onClick={exitArena}
-              className="bg-gray-700 hover:bg-gray-600 px-8 py-4 rounded-lg font-bold transition"
+              onClick={continueToNextEnemy}
+              className="bg-red-600 hover:bg-red-700 px-12 py-4 rounded-lg font-bold text-xl transition"
             >
-              Exit Arena
+              Fight Next Enemy
             </button>
-          </div>
+          ) : (
+            <div>
+              <p className="text-xl text-green-400 mb-6">🏆 All enemies defeated! Arena conquered!</p>
+              <button
+                onClick={exitArena}
+                className="bg-green-600 hover:bg-green-700 px-12 py-4 rounded-lg font-bold text-xl transition"
+              >
+                Claim Victory & Exit
+              </button>
+            </div>
+          )}
         </div>
       )}
 
