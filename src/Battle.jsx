@@ -102,7 +102,7 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
   const [battleConfig, setBattleConfig] = useState({
     entryCost: {
       token: 'FOOD', // FOOD, GOLD, WOOD, or REDKING
-      amount: 5
+      amount: 50 // Changed from 5 to 50
     },
     rewards: {
       enemy1: { FOOD: 10, GOLD: 2, WOOD: 1 },
@@ -227,6 +227,12 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     // Roll for hit
     const hitRoll = Math.random() * 100;
     const didHit = hitRoll <= accuracy;
+    
+    // DEBUG: Log the calculation
+    console.log(`Enemy ${currentEnemy} attacking ${fighter.rarity} Fighter:`);
+    console.log(`- Accuracy: ${accuracy}%`);
+    console.log(`- Roll: ${hitRoll.toFixed(2)}`);
+    console.log(`- Result: ${didHit ? 'HIT' : 'MISS'}`);
     
     setTimeout(() => {
       setWeaponAnimation(null);
@@ -452,6 +458,26 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
       {gameState === 'pre-battle' && currentEnemy && (
         <div className="text-center">
           <h2 className="text-4xl font-bold mb-8">Prepare for Battle</h2>
+          
+          {/* Fighter Rarity Selector (Temporary for Testing) */}
+          <div className="mb-6 p-4 bg-gray-900/50 border border-gray-700 rounded-lg max-w-md mx-auto">
+            <p className="text-sm text-gray-400 mb-2">Select Fighter Rarity (Testing):</p>
+            <div className="flex gap-2 justify-center">
+              {['Bronze', 'Silver', 'Gold'].map(rarity => (
+                <button
+                  key={rarity}
+                  onClick={() => setFighter({...fighter, rarity})}
+                  className={`px-4 py-2 rounded font-bold transition ${
+                    fighter.rarity === rarity
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                  }`}
+                >
+                  {rarity}
+                </button>
+              ))}
+            </div>
+          </div>
           
           <div className="grid md:grid-cols-2 gap-8 mb-8">
             {/* Fighter */}
