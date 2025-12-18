@@ -113,16 +113,16 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     // Reward ranges (min-max)
     rewardRanges: {
       enemy1: { 
-        FOOD: [21, 25], 
-        WOOD: [2, 9] 
+        FOOD: [25, 49], 
+        WOOD: [5, 14] 
       },
       enemy2: { 
-        FOOD: [63, 84], 
-        GOLD: [8, 17] 
+        FOOD: [84, 119], 
+        GOLD: [14, 21] 
       },
       enemy3: { 
-        FOOD: [98, 133], 
-        WOOD: [14, 21],
+        FOOD: [133, 182], 
+        WOOD: [21, 35],
         RKT: [0.5, 0.9] // RedKing Token
       },
       completion: { 
@@ -160,6 +160,11 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
       case 'konfisof_minor':
         // Battle Boost Minor: +15% hit for THIS battle only
         addLog('🎯 Battle Boost (+15%): Fighter accuracy increased!');
+        // Show animation if available
+        if (boost.animation) {
+          setWeaponAnimation(boost.animation);
+          setTimeout(() => setWeaponAnimation(null), 2000);
+        }
         // Mark as used for this battle
         setActiveBoosts(boosts => boosts.map(b => 
           b.id === boostId ? {...b, usedThisBattle: true} : b
@@ -169,6 +174,10 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
       case 'konfisof_major':
         // Battle Boost Major: +40% hit for THIS battle only
         addLog('🎯 Battle Boost (+40%): Fighter accuracy greatly increased!');
+        if (boost.animation) {
+          setWeaponAnimation(boost.animation);
+          setTimeout(() => setWeaponAnimation(null), 2000);
+        }
         setActiveBoosts(boosts => boosts.map(b => 
           b.id === boostId ? {...b, usedThisBattle: true} : b
         ));
@@ -178,6 +187,10 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
         // Holy Prayer: Restore 1 HP immediately
         setFighterHP(hp => Math.min(hp + 1, 3));
         addLog('🙏 Holy Prayer: Restored 1 HP!');
+        if (boost.animation) {
+          setWeaponAnimation(boost.animation);
+          setTimeout(() => setWeaponAnimation(null), 2000);
+        }
         // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
@@ -185,6 +198,10 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
       case 'witkastle_morale':
         // Morale Boost: +10% hit, -10% enemy for THIS battle
         addLog('💪 Morale Boost: Team morale increased!');
+        if (boost.animation) {
+          setWeaponAnimation(boost.animation);
+          setTimeout(() => setWeaponAnimation(null), 2000);
+        }
         setActiveBoosts(boosts => boosts.map(b => 
           b.id === boostId ? {...b, usedThisBattle: true} : b
         ));
@@ -194,6 +211,10 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
         // Poison Potion: Enemy -20% for next 2 attacks
         setPoisonedAttacksRemaining(2);
         addLog('🧪 Poison Potion: Enemy weakened for 2 attacks!');
+        if (boost.animation) {
+          setWeaponAnimation(boost.animation);
+          setTimeout(() => setWeaponAnimation(null), 2000);
+        }
         // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
@@ -202,23 +223,38 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
         // Freeze: Enemy skips next attack
         setEnemyFrozen(true);
         addLog('❄️ Freeze: Enemy will skip next attack!');
+        if (boost.animation) {
+          setWeaponAnimation(boost.animation);
+          setTimeout(() => setWeaponAnimation(null), 2000);
+        }
         // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
         
       case 'warmdice_treasure':
-        // Treasure Chest: Random reward immediately
-        const treasureRoll = Math.random() * 100;
-        if (treasureRoll < 60) {
-          const amount = Math.floor(Math.random() * 11) + 5;
-          addLog(`💰 Treasure Chest: Found ${amount} FOOD!`);
-        } else if (treasureRoll < 90) {
-          const amount = Math.floor(Math.random() * 3) + 1;
-          addLog(`💰 Treasure Chest: Found ${amount} GOLD!`);
+        // Treasure Chest: Random reward - 10-17 GOLD + 5-10 WOOD
+        const goldAmount = Math.floor(Math.random() * 8) + 10; // 10-17 GOLD
+        const woodAmount = Math.floor(Math.random() * 6) + 5; // 5-10 WOOD
+        
+        // Show in weapon area
+        setOutcomeText(`💰 TREASURE!
+${goldAmount} GOLD + ${woodAmount} WOOD`);
+        
+        addLog(`💰 Treasure Chest: Found ${goldAmount} GOLD + ${woodAmount} WOOD!`);
+        
+        // Show animation if available, otherwise just show text
+        if (boost.animation) {
+          setWeaponAnimation(boost.animation);
+          setTimeout(() => {
+            setWeaponAnimation(null);
+            setOutcomeText('');
+          }, 3000);
         } else {
-          const amount = Math.floor(Math.random() * 2) + 1;
-          addLog(`💰 Treasure Chest: Found ${amount} WOOD!`);
+          setTimeout(() => {
+            setOutcomeText('');
+          }, 3000);
         }
+        
         // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
@@ -227,6 +263,10 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
         // Trap: Enemy loses 1 HP immediately
         setEnemyHP(hp => Math.max(hp - 1, 0));
         addLog('🪤 Trap: Enemy stepped in trap! Lost 1 HP!');
+        if (boost.animation) {
+          setWeaponAnimation(boost.animation);
+          setTimeout(() => setWeaponAnimation(null), 2000);
+        }
         // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
@@ -282,14 +322,70 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     // TESTING: Give player one of each boost for first battle ONLY if they don't have any yet
     if (currentEnemy === 1 && activeBoosts.length === 0) {
       setActiveBoosts([
-        { id: 'konfisof_minor', name: 'Battle Boost (+15%)', emoji: '🎯', clan: 'Konfisof', effect: '+15% hit' },
-        { id: 'konfisof_major', name: 'Battle Boost (+40%)', emoji: '🎯', clan: 'Konfisof', effect: '+40% hit' },
-        { id: 'bervation_prayer', name: 'Holy Prayer', emoji: '🙏', clan: 'Bervation', effect: 'Restore 1 HP' },
-        { id: 'witkastle_morale', name: 'Morale Boost', emoji: '💪', clan: 'Witkastle', effect: '+10% hit, -10% enemy' },
-        { id: 'smizfume_poison', name: 'Poison Potion', emoji: '🧪', clan: 'Smizfume', effect: 'Enemy -20% (2 attacks)' },
-        { id: 'coalheart_freeze', name: 'Freeze', emoji: '❄️', clan: 'Coalheart', effect: 'Enemy skips turn' },
-        { id: 'warmdice_treasure', name: 'Treasure Chest', emoji: '💰', clan: 'Warmdice', effect: 'Random reward' },
-        { id: 'bowkin_trap', name: 'Trap', emoji: '🪤', clan: 'Bowkin', effect: 'Enemy -1 HP' }
+        { 
+          id: 'konfisof_minor', 
+          name: 'Battle Boost (+15%)', 
+          emoji: '🎯', 
+          clan: 'Konfisof', 
+          effect: '+15% hit',
+          animation: '/animations/battle_boost_minor.gif' // Your GIF path
+        },
+        { 
+          id: 'konfisof_major', 
+          name: 'Battle Boost (+40%)', 
+          emoji: '🎯', 
+          clan: 'Konfisof', 
+          effect: '+40% hit',
+          animation: '/animations/battle_boost_major.gif'
+        },
+        { 
+          id: 'bervation_prayer', 
+          name: 'Holy Prayer', 
+          emoji: '🙏', 
+          clan: 'Bervation', 
+          effect: 'Restore 1 HP',
+          animation: '/animations/holy_prayer.gif'
+        },
+        { 
+          id: 'witkastle_morale', 
+          name: 'Morale Boost', 
+          emoji: '💪', 
+          clan: 'Witkastle', 
+          effect: '+10% hit, -10% enemy',
+          animation: '/animations/morale_boost.gif'
+        },
+        { 
+          id: 'smizfume_poison', 
+          name: 'Poison Potion', 
+          emoji: '🧪', 
+          clan: 'Smizfume', 
+          effect: 'Enemy -20% (2 attacks)',
+          animation: '/animations/poison_potion.gif'
+        },
+        { 
+          id: 'coalheart_freeze', 
+          name: 'Freeze', 
+          emoji: '❄️', 
+          clan: 'Coalheart', 
+          effect: 'Enemy skips turn',
+          animation: '/animations/freeze.gif'
+        },
+        { 
+          id: 'warmdice_treasure', 
+          name: 'Treasure Chest', 
+          emoji: '💰', 
+          clan: 'Warmdice', 
+          effect: 'Random reward',
+          animation: '/animations/treasure_chest.gif'
+        },
+        { 
+          id: 'bowkin_trap', 
+          name: 'Trap', 
+          emoji: '🪤', 
+          clan: 'Bowkin', 
+          effect: 'Enemy -1 HP',
+          animation: '/animations/trap.gif'
+        }
       ]);
     }
     
@@ -464,13 +560,7 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
     addLog(`${enemy.name} has been defeated!`);
     setEnemiesDefeated(prev => [...prev, currentEnemy]);
     
-    // Check if all 3 enemies defeated
-    if (enemiesDefeated.length + 1 === 3) {
-      // All enemies defeated!
-      setTimeout(() => {
-        setGameState('complete');
-      }, 3000);
-    }
+    // Don't auto-redirect - let player see victory screen and choose when to exit
   };
 
   // Player Defeated
@@ -481,8 +571,19 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
 
   // Continue to next enemy
   const continueToNextEnemy = () => {
-    // Clear "used this battle" flags - boosts persist but need to be re-activated
-    setActiveBoosts(boosts => boosts.map(b => ({...b, usedThisBattle: false})));
+    // Remove Battle Boosts that were used (they're consumed after the battle ends)
+    // Keep instant-effect boosts that weren't used
+    setActiveBoosts(boosts => boosts.filter(b => {
+      // Remove Battle Boosts that were used this battle
+      if (b.usedThisBattle && 
+          (b.id === 'konfisof_minor' || 
+           b.id === 'konfisof_major' || 
+           b.id === 'witkastle_morale')) {
+        return false; // Remove it
+      }
+      // Keep everything else and reset usedThisBattle flag
+      return true;
+    }).map(b => ({...b, usedThisBattle: false})));
     
     setCurrentEnemy(null);
     setGameState('enemy-select');
@@ -802,19 +903,29 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
               <div className="col-span-3 flex flex-col justify-center items-center">
                 {weaponAnimation ? (
                   <div className="w-full h-32 bg-black rounded-lg overflow-hidden mb-2">
-                    <video
-                      autoPlay
-                      muted
-                      playsInline
-                      className="w-full h-full object-contain"
-                    >
-                      <source src={weaponAnimation} type="video/mp4" />
-                    </video>
+                    {weaponAnimation.endsWith('.gif') ? (
+                      <img 
+                        src={weaponAnimation} 
+                        alt="Boost animation" 
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <video
+                        autoPlay
+                        muted
+                        playsInline
+                        className="w-full h-full object-contain"
+                      >
+                        <source src={weaponAnimation} type="video/mp4" />
+                      </video>
+                    )}
                   </div>
                 ) : outcomeText ? (
-                  <div className={`text-2xl font-bold mb-2 p-3 rounded-lg ${
+                  <div className={`text-2xl font-bold mb-2 p-3 rounded-lg whitespace-pre-line ${
                     outcomeText.includes('FIGHTER') 
                       ? outcomeText.includes('HITS') ? 'bg-green-900/50 text-green-400' : 'bg-gray-900/50 text-gray-400'
+                      : outcomeText.includes('TREASURE') 
+                      ? 'bg-yellow-900/50 text-yellow-400'
                       : outcomeText.includes('HITS') ? 'bg-red-900/50 text-red-400' : 'bg-gray-900/50 text-gray-400'
                   }`}>
                     {outcomeText}
