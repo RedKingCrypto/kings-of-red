@@ -8,22 +8,7 @@ export default function AboutPage() {
     <div className="min-h-screen">
       <div className="container mx-auto px-4 py-12 max-w-4xl">
         <div className="container mx-auto px-4 py-12 max-w-4xl">
-        {/* Contact info */}
-        <section className="mb-99">
-          <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-            <Swords className="w-8 h-8 text-red-500" />
-            How to keep in touch?
-          </h2>
-          <div className="bg-gray-800/50 rounded-lg p-6 space-y-4">
-            <p className="text-gray-300 leading-relaxed">
-              Telegram Discussion Channel: https://t.me/redkingcrypto </ br>
-              Twitter: https://x.com/RedKingDefi   </ br>
-              YouTube: https://www.youtube.com/watch?v=vRGD2sMYx2g   </ br>
-              Docs: https://medium.com/@Red-King</p>
-                </div>
-        </section>
-
-        {/* Game Overview */}
+          {/* Game Overview */}
         <section className="mb-12">
           <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
             <Swords className="w-8 h-8 text-red-500" />
@@ -36,6 +21,11 @@ export default function AboutPage() {
             <p className="text-gray-300 leading-relaxed">
               Each card type serves a unique gameplay purpose, from resource generation to battle enhancements. The game features strategic elements including staking, token mining, PvE battles, and NFT crafting systems. 
             </p>
+             <p className="text-gray-300 leading-relaxed">
+              Telegram Discussion Channel: https://t.me/redkingcrypto </ br>
+              Twitter: https://x.com/RedKingDefi   </ br>
+              YouTube: https://www.youtube.com/watch?v=vRGD2sMYx2g   </ br>
+              Docs: https://medium.com/@Red-King</p>
           </div>
         </section>
 
