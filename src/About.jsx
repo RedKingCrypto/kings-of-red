@@ -4,30 +4,32 @@ import { Crown, Coins, Swords, Shield, Flame, AlertTriangle, BookOpen, FileText,
 export default function AboutPage() {
   const [showWhitepaper, setShowWhitepaper] = useState(false);
   
-  return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-12 max-w-4xl">
-        <div className="container mx-auto px-4 py-12 max-w-4xl">
-          {/* Game Overview */}
-        <section className="mb-12">
-          <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-            <Swords className="w-8 h-8 text-red-500" />
-            What is Kings of Red?
-          </h2>
-          <div className="bg-gray-800/50 rounded-lg p-6 space-y-4">
-            <p className="text-gray-300 leading-relaxed">
-              Kings of Red is a collectible trading card game built on the Base blockchain network. Players collect NFT cards representing Heralds, Alphas, Fighters, Pets, Ladies, Weapons, and Badges across seven legendary clans.
-            </p>
-            <p className="text-gray-300 leading-relaxed">
-              Each card type serves a unique gameplay purpose, from resource generation to battle enhancements. The game features strategic elements including staking, token mining, PvE battles, and NFT crafting systems. 
-            </p>
-             <p className="text-gray-300 leading-relaxed">
-              Telegram Discussion Channel: https://t.me/redkingcrypto </ br>
-              Twitter: https://x.com/RedKingDefi   </ br>
-              YouTube: https://www.youtube.com/watch?v=vRGD2sMYx2g   </ br>
-              Docs: https://medium.com/@Red-King</p>
-          </div>
-        </section>
+ return (
+  <div className="min-h-screen">
+    <div className="container mx-auto px-4 py-12 max-w-4xl">
+      {/* Game Overview */}
+      <section className="mb-12">
+        <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
+          <Swords className="w-8 h-8 text-red-500" />
+          What is Kings of Red?
+        </h2>
+        <div className="bg-gray-800/50 rounded-lg p-6 space-y-4">
+          <p className="text-gray-300 leading-relaxed">
+            Kings of Red is a collectible trading card game built on the Base blockchain network. Players collect NFT cards representing Heralds, Alphas, Fighters, Pets, Ladies, Weapons, and Badges across seven legendary clans.
+          </p>
+          <p className="text-gray-300 leading-relaxed">
+            Each card type serves a unique gameplay purpose, from resource generation to battle enhancements. The game features strategic elements including staking, token mining, PvE battles, and NFT crafting systems. 
+          </p>
+          <p className="text-gray-300 leading-relaxed">
+            <strong>Join Our Community:</strong><br />
+            Telegram: <a href="https://t.me/redkingcrypto" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">https://t.me/redkingcrypto</a><br />
+            Twitter: <a href="https://x.com/RedKingDefi" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">@RedKingDefi</a><br />
+            YouTube: <a href="https://www.youtube.com/watch?v=vRGD2sMYx2g" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">Introduction Video</a>
+          </p>
+        </div>
+      </section>
+    </div>
+
 
         {/* Gameplay Features */}
         <section className="mb-12">
