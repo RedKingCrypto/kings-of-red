@@ -318,12 +318,22 @@ export default function Application() {
             <p>Kings of Red © 2025 • Built on Base Network</p>
             <p className="mt-2">
               <a 
-                href="https://basescan.org/address/0xb282DC4c005C88A3E81D513D09a78f48CA404311"
+                href="https://t.me/redkingcrypto"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:text-blue-300"
               >
-                View Herald Contract on BaseScan
+                Join the Telegram Discussion Channel
+              </a>
+            </p>
+            <p className="mt-2">
+              <a 
+                href="https://x.com/RedKingDefi"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300"
+              >
+                Follow on X/Twitter
               </a>
             </p>
             <p className="mt-1 text-xs">
