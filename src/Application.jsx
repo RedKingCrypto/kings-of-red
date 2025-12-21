@@ -9,6 +9,7 @@ import FAQPage from './faq.jsx';
 import DashboardPage from './Dashboard.jsx';
 import LeaderboardPage from './Leaderboard.jsx';
 import BattlePage from './Battle.jsx';
+import MintFighter from './components/MintFighter';
 
 // Import contract addresses
 import { 
@@ -40,9 +41,12 @@ export default function Application() {
   // Wallet state
   const [connected, setConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
+  const [provider, setProvider] = useState(null);
+  const [signer, setSigner] = useState(null);
   
   // Navigation state
   const [currentPage, setCurrentPage] = useState('home');
+  const [showMintDropdown, setShowMintDropdown] = useState(false);
 
   // Check if wallet is already connected on load and handle referral codes
   useEffect(() => {
@@ -80,6 +84,11 @@ export default function Application() {
       if (accounts.length > 0) {
         setWalletAddress(accounts[0]);
         setConnected(true);
+        
+        // Set provider and signer
+        const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+        setProvider(web3Provider);
+        setSigner(web3Provider.getSigner());
       }
     }
   };
@@ -129,6 +138,11 @@ export default function Application() {
       
       setWalletAddress(accounts[0]);
       setConnected(true);
+      
+      // Set provider and signer
+      const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+      setProvider(web3Provider);
+      setSigner(web3Provider.getSigner());
     } catch (error) {
       console.error('Error connecting wallet:', error);
     }
@@ -137,6 +151,8 @@ export default function Application() {
   const disconnectWallet = () => {
     setConnected(false);
     setWalletAddress('');
+    setProvider(null);
+    setSigner(null);
   };
 
   const navigateTo = (page) => {
@@ -159,102 +175,117 @@ export default function Application() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showMintDropdown && !e.target.closest('.mint-dropdown')) {
+        setShowMintDropdown(false);
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showMintDropdown]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
-      {/* Header / Navigation */}
-      <header className="border-b border-red-800/50 bg-black/40 backdrop-blur sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            {/* Logo */}
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigateTo('home')}>
-              <Crown className="w-8 h-8 text-red-500" />
-              <div>
-                <h1 className="text-2xl font-bold">KINGS OF RED</h1>
-                <p className="text-xs text-gray-400">NFT Trading Card Game</p>
-              </div>
-            </div>
-
-            {/* Navigation */}
-            <nav className="flex gap-6 items-center flex-wrap">
-              <button 
-                onClick={() => navigateTo('home')}
-                className={`hover:text-red-400 transition ${currentPage === 'home' ? 'text-red-500' : ''}`}
-              >
-                Home
-              </button>
-              <button 
-                onClick={() => navigateTo('mint')}
-                className={`hover:text-red-400 transition ${currentPage === 'mint' ? 'text-red-500' : ''}`}
+      {/* Navigation */}
+      <nav className="bg-gray-800 p-4">
+        <div className="container mx-auto flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-red-500">Kings of Red</h1>
+          
+          <div className="flex gap-4 items-center">
+            <button
+              onClick={() => setCurrentPage('home')}
+              className={`px-4 py-2 rounded ${currentPage === 'home' ? 'bg-red-600' : 'hover:bg-gray-700'}`}
+            >
+              Home
+            </button>
+            
+            {/* Mint Dropdown */}
+            <div className="relative mint-dropdown">
+              <button
+                onClick={() => setShowMintDropdown(!showMintDropdown)}
+                className={`px-4 py-2 rounded flex items-center gap-2 ${
+                  currentPage === 'mint' || currentPage === 'mint-fighter' ? 'bg-red-600' : 'hover:bg-gray-700'
+                }`}
               >
                 Mint
+                <svg 
+                  className={`w-4 h-4 transition-transform ${showMintDropdown ? 'rotate-180' : ''}`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
-              <button 
-                onClick={() => navigateTo('dashboard')}
-                className={`hover:text-red-400 transition ${currentPage === 'dashboard' ? 'text-red-500' : ''}`}
-              >
-                Dashboard
-              </button>
-              <button 
-                onClick={() => navigateTo('staking')}
-                className={`hover:text-red-400 transition ${currentPage === 'staking' ? 'text-red-500' : ''}`}
-              >
-                Staking
-              </button>
-              <button 
-                onClick={() => navigateTo('exchange')}
-                className={`hover:text-red-400 transition ${currentPage === 'exchange' ? 'text-red-500' : ''}`}
-              >
-                Exchange
-              </button>
-              <button 
-                onClick={() => navigateTo('faq')}
-                className={`hover:text-red-400 transition ${currentPage === 'faq' ? 'text-red-500' : ''}`}
-              >
-                FAQ
-              </button>
-              <a 
-                href="https://medium.com/@Red-King" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="hover:text-red-400 transition"
-              >
-                Docs
-              </a>
-              <button 
-                onClick={() => navigateTo('about')}
-                className={`hover:text-red-400 transition ${currentPage === 'about' ? 'text-red-500' : ''}`}
-              >
-                About
-              </button>
-            </nav>
+              
+              {showMintDropdown && (
+                <div className="absolute top-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg min-w-[200px] z-50">
+                  <button
+                    onClick={() => {
+                      setCurrentPage('mint');
+                      setShowMintDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-700 rounded-t-lg flex items-center gap-2"
+                  >
+                    <span className="text-xl">👑</span>
+                    <div>
+                      <div className="font-bold">Herald NFTs</div>
+                      <div className="text-xs text-gray-400">Staking & Mining</div>
+                    </div>
+                  </button>
+                  
+                  <div className="border-t border-gray-700" />
+                  
+                  <button
+                    onClick={() => {
+                      setCurrentPage('mint-fighter');
+                      setShowMintDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-700 rounded-b-lg flex items-center gap-2"
+                  >
+                    <span className="text-xl">⚔️</span>
+                    <div>
+                      <div className="font-bold">Fighter NFTs</div>
+                      <div className="text-xs text-gray-400">Battle System</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            <button
+              onClick={() => setCurrentPage('about')}
+              className={`px-4 py-2 rounded ${currentPage === 'about' ? 'bg-red-600' : 'hover:bg-gray-700'}`}
+            >
+              About
+            </button>
+            
+            <button
+              onClick={() => setCurrentPage('dashboard')}
+              className={`px-4 py-2 rounded ${currentPage === 'dashboard' ? 'bg-red-600' : 'hover:bg-gray-700'}`}
+            >
+              Dashboard
+            </button>
 
-            {/* Wallet Connection */}
+            {/* Wallet Connection Button */}
             {!connected ? (
               <button
                 onClick={connectWallet}
-                className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-semibold transition"
+                className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-bold"
               >
                 Connect Wallet
               </button>
             ) : (
-              <div className="flex items-center gap-3">
-                <div className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
-                  <span className="text-sm text-gray-400">Connected:</span>
-                  <span className="ml-2 font-mono text-sm">
-                    {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-                  </span>
-                </div>
-                <button
-                  onClick={disconnectWallet}
-                  className="text-sm text-gray-400 hover:text-white transition"
-                >
-                  Disconnect
-                </button>
+              <div className="bg-gray-700 px-4 py-2 rounded font-mono text-sm">
+                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
               </div>
             )}
           </div>
         </div>
-      </header>
+      </nav>
 
       {/* Page Content */}
       <div className="container mx-auto px-4 py-8">
@@ -265,6 +296,13 @@ export default function Application() {
             connected={connected}
             walletAddress={walletAddress}
             connectWallet={connectWallet}
+          />
+        )}
+        {currentPage === 'mint-fighter' && (
+          <MintFighter 
+            provider={provider}
+            signer={signer}
+            address={walletAddress}
           />
         )}
         {currentPage === 'dashboard' && (
@@ -379,6 +417,12 @@ function renderHomePage(navigateTo) {
             className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-bold text-lg transition"
           >
             Mint Herald NFTs
+          </button>
+          <button
+            onClick={() => navigateTo('mint-fighter')}
+            className="bg-purple-600 hover:bg-purple-700 px-8 py-4 rounded-lg font-bold text-lg transition"
+          >
+            Mint Fighter NFTs
           </button>
           <button
             onClick={() => navigateTo('about')}
