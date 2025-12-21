@@ -190,102 +190,149 @@ export default function Application() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
       {/* Navigation */}
-      <nav className="bg-gray-800 p-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-red-500">Kings of Red</h1>
-          
-          <div className="flex gap-4 items-center">
-            <button
-              onClick={() => setCurrentPage('home')}
-              className={`px-4 py-2 rounded ${currentPage === 'home' ? 'bg-red-600' : 'hover:bg-gray-700'}`}
-            >
-              Home
-            </button>
-            
-            {/* Mint Dropdown */}
-            <div className="relative mint-dropdown">
-              <button
-                onClick={() => setShowMintDropdown(!showMintDropdown)}
-                className={`px-4 py-2 rounded flex items-center gap-2 ${
-                  currentPage === 'mint' || currentPage === 'mint-fighter' ? 'bg-red-600' : 'hover:bg-gray-700'
-                }`}
-              >
-                Mint
-                <svg 
-                  className={`w-4 h-4 transition-transform ${showMintDropdown ? 'rotate-180' : ''}`}
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              
-              {showMintDropdown && (
-                <div className="absolute top-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg min-w-[200px] z-50">
-                  <button
-                    onClick={() => {
-                      setCurrentPage('mint');
-                      setShowMintDropdown(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-700 rounded-t-lg flex items-center gap-2"
-                  >
-                    <span className="text-xl">👑</span>
-                    <div>
-                      <div className="font-bold">Herald NFTs</div>
-                      <div className="text-xs text-gray-400">Staking & Mining</div>
-                    </div>
-                  </button>
-                  
-                  <div className="border-t border-gray-700" />
-                  
-                  <button
-                    onClick={() => {
-                      setCurrentPage('mint-fighter');
-                      setShowMintDropdown(false);
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-700 rounded-b-lg flex items-center gap-2"
-                  >
-                    <span className="text-xl">⚔️</span>
-                    <div>
-                      <div className="font-bold">Fighter NFTs</div>
-                      <div className="text-xs text-gray-400">Battle System</div>
-                    </div>
-                  </button>
-                </div>
-              )}
-            </div>
-            
-            <button
-              onClick={() => setCurrentPage('about')}
-              className={`px-4 py-2 rounded ${currentPage === 'about' ? 'bg-red-600' : 'hover:bg-gray-700'}`}
-            >
-              About
-            </button>
-            
-            <button
-              onClick={() => setCurrentPage('dashboard')}
-              className={`px-4 py-2 rounded ${currentPage === 'dashboard' ? 'bg-red-600' : 'hover:bg-gray-700'}`}
-            >
-              Dashboard
-            </button>
+     /* ============================================
+   COMPLETE NAVBAR REPLACEMENT
+   Copy from <nav> to </nav> and replace your entire navbar
+   ============================================ */
 
-            {/* Wallet Connection Button */}
-            {!connected ? (
-              <button
-                onClick={connectWallet}
-                className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-bold"
-              >
-                Connect Wallet
-              </button>
-            ) : (
-              <div className="bg-gray-700 px-4 py-2 rounded font-mono text-sm">
-                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+<nav className="bg-gray-800 p-4">
+  <div className="container mx-auto flex justify-between items-center">
+    {/* Logo/Title */}
+    <h1 
+      className="text-2xl font-bold text-red-500 cursor-pointer"
+      onClick={() => setCurrentPage('home')}
+    >
+      Kings of Red
+    </h1>
+    
+    {/* Navigation Buttons */}
+    <div className="flex gap-6 items-center flex-wrap">
+      {/* Home */}
+      <button
+        onClick={() => setCurrentPage('home')}
+        className={`transition ${
+          currentPage === 'home' ? 'text-red-500' : 'hover:text-red-400'
+        }`}
+      >
+        Home
+      </button>
+      
+      {/* Mint Dropdown - THIS IS THE KEY SECTION */}
+      <div className="relative mint-dropdown-container">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            console.log('🔥 Mint clicked! Current state:', showMintDropdown);
+            setShowMintDropdown(!showMintDropdown);
+          }}
+          className={`flex items-center gap-2 transition ${
+            currentPage === 'mint' || currentPage === 'mint-fighter' 
+              ? 'text-red-500' 
+              : 'hover:text-red-400'
+          }`}
+        >
+          Mint
+          <svg 
+            className={`w-4 h-4 transition-transform ${showMintDropdown ? 'rotate-180' : ''}`}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M19 9l-7 7-7-7" 
+            />
+          </svg>
+        </button>
+        
+        {/* Dropdown Menu */}
+        {showMintDropdown && (
+          <div 
+            className="absolute top-full left-0 mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl min-w-[220px] z-50"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Herald Option */}
+            <button
+              onClick={() => {
+                console.log('Herald NFTs clicked');
+                setCurrentPage('mint');
+                setShowMintDropdown(false);
+              }}
+              className="w-full text-left px-4 py-3 hover:bg-gray-700 transition flex items-center gap-3 rounded-t-lg"
+            >
+              <span className="text-2xl">👑</span>
+              <div>
+                <div className="font-bold text-white">Herald NFTs</div>
+                <div className="text-xs text-gray-400">Staking & Mining</div>
               </div>
-            )}
+            </button>
+            
+            {/* Divider */}
+            <div className="border-t border-gray-700"></div>
+            
+            {/* Fighter Option */}
+            <button
+              onClick={() => {
+                console.log('Fighter NFTs clicked');
+                setCurrentPage('mint-fighter');
+                setShowMintDropdown(false);
+              }}
+              className="w-full text-left px-4 py-3 hover:bg-gray-700 transition flex items-center gap-3 rounded-b-lg"
+            >
+              <span className="text-2xl">⚔️</span>
+              <div>
+                <div className="font-bold text-white">Fighter NFTs</div>
+                <div className="text-xs text-gray-400">Battle System</div>
+              </div>
+            </button>
           </div>
-        </div>
-      </nav>
+        )}
+      </div>
+      
+      {/* About */}
+      <button
+        onClick={() => setCurrentPage('about')}
+        className={`transition ${
+          currentPage === 'about' ? 'text-red-500' : 'hover:text-red-400'
+        }`}
+      >
+        About
+      </button>
+      
+      {/* Dashboard */}
+      <button
+        onClick={() => setCurrentPage('dashboard')}
+        className={`transition ${
+          currentPage === 'dashboard' ? 'text-red-500' : 'hover:text-red-400'
+        }`}
+      >
+        Dashboard
+      </button>
+
+      {/* Wallet Connection */}
+      {!connected ? (
+        <button
+          onClick={connectWallet}
+          className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-bold transition"
+        >
+          Connect Wallet
+        </button>
+      ) : (
+        <button
+          onClick={disconnectWallet}
+          className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-mono text-sm transition"
+          title="Click to disconnect"
+        >
+          {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+        </button>
+      )}
+    </div>
+  </div>
+</nav>
+
+
 
       {/* Page Content */}
       <div className="container mx-auto px-4 py-8">
