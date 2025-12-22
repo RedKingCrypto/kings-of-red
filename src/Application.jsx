@@ -46,7 +46,7 @@ export default function Application() {
   
   // Navigation state
   const [currentPage, setCurrentPage] = useState('home');
- 
+
   // Check if wallet is already connected on load and handle referral codes
   useEffect(() => {
     checkIfWalletConnected();
@@ -174,96 +174,83 @@ export default function Application() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
       {/* Navigation */}
-  {/* Navigation */}
+      <nav className="bg-gray-800 p-4">
+        <div className="container mx-auto flex justify-between items-center">
+          <h1 
+            className="text-2xl font-bold text-red-500 cursor-pointer"
+            onClick={() => setCurrentPage('home')}
+          >
+            Kings of Red
+          </h1>
+          
+          <div className="flex gap-6 items-center flex-wrap">
+            <button
+              onClick={() => setCurrentPage('home')}
+              className={`transition ${
+                currentPage === 'home' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              Home
+            </button>
+            
+            <button
+              onClick={() => setCurrentPage('mint')}
+              className={`transition ${
+                currentPage === 'mint' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              Mint Heralds
+            </button>
+            
+            <button
+              onClick={() => setCurrentPage('mint-fighter')}
+              className={`transition ${
+                currentPage === 'mint-fighter' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              Mint Fighters
+            </button>
+            
+            <button
+              onClick={() => setCurrentPage('about')}
+              className={`transition ${
+                currentPage === 'about' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              About
+            </button>
+            
+            <button
+              onClick={() => setCurrentPage('dashboard')}
+              className={`transition ${
+                currentPage === 'dashboard' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              Dashboard
+            </button>
 
-<nav className="bg-gray-800 p-4">
-  <div className="container mx-auto flex justify-between items-center">
-    {/* Logo/Title */}
-    <h1 
-      className="text-2xl font-bold text-red-500 cursor-pointer"
-      onClick={() => setCurrentPage('home')}
-    >
-      Kings of Red
-    </h1>
-    
-    {/* Navigation Buttons */}
-    <div className="flex gap-6 items-center flex-wrap">
-      {/* Home */}
-      <button
-        onClick={() => setCurrentPage('home')}
-        className={`transition ${
-          currentPage === 'home' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        Home
-      </button>
-      
-      {/* Mint Heralds Button */}
-      <button
-        onClick={() => setCurrentPage('mint')}
-        className={`transition ${
-          currentPage === 'mint' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        Mint Heralds
-      </button>
-      
-      {/* Mint Fighters Button */}
-      <button
-        onClick={() => setCurrentPage('mint-fighter')}
-        className={`transition ${
-          currentPage === 'mint-fighter' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        Mint Fighters
-      </button>
-      
-      {/* About */}
-      <button
-        onClick={() => setCurrentPage('about')}
-        className={`transition ${
-          currentPage === 'about' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        About
-      </button>
-      
-      {/* Dashboard */}
-      <button
-        onClick={() => setCurrentPage('dashboard')}
-        className={`transition ${
-          currentPage === 'dashboard' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        Dashboard
-      </button>
-
-      {/* Wallet Connection */}
-      {!connected ? (
-        <button
-          onClick={connectWallet}
-          className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-bold transition"
-        >
-          Connect Wallet
-        </button>
-      ) : (
-        <button
-          onClick={disconnectWallet}
-          className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-mono text-sm transition"
-          title="Click to disconnect"
-        >
-          {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-        </button>
-      )}
-    </div>
-  </div>
-</nav>
-
-
+            {!connected ? (
+              <button
+                onClick={connectWallet}
+                className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-bold transition"
+              >
+                Connect Wallet
+              </button>
+            ) : (
+              <button
+                onClick={disconnectWallet}
+                className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-mono text-sm transition"
+                title="Click to disconnect"
+              >
+                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+              </button>
+            )}
+          </div>
+        </div>
+      </nav>
 
       {/* Page Content */}
       <div className="container mx-auto px-4 py-8">
@@ -310,7 +297,6 @@ export default function Application() {
         {currentPage === 'faq' && (
           <FAQPage onNavigate={navigateTo} />
         )}
-        {/* Hidden Routes (Not in navigation) */}
         {currentPage === 'leaderboard' && (
           <LeaderboardPage 
             connected={connected}
