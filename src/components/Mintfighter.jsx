@@ -370,7 +370,7 @@ const MintFighter = ({ provider, signer, address }) => {
                   className="w-full bg-gray-700 text-white px-4 py-2 rounded-lg"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Referrer gets 7% commission, you get priority support!
+                  Referrer gets 7% commission
                 </p>
               </div>
 

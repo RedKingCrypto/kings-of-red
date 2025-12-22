@@ -10,6 +10,7 @@ import DashboardPage from './Dashboard.jsx';
 import LeaderboardPage from './Leaderboard.jsx';
 import BattlePage from './Battle.jsx';
 import MintFighter from './components/Mintfighter.jsx';
+import BattleBoosts from './components/BattleBoosts.jsx';
 
 // Import contract addresses
 import { 
@@ -246,6 +247,16 @@ export default function Application() {
       >
         Dashboard
       </button>
+
+ {/* Battle Boosts */}
+      <button
+  onClick={() => navigateTo('boosts')}
+  className={`transition ${
+    currentPage === 'boosts' ? 'text-red-500' : 'hover:text-red-400'
+  }`}
+>
+  Battle Boosts
+</button>
       
       {/* FAQ */}
       <button
@@ -327,6 +338,13 @@ export default function Application() {
             walletAddress={walletAddress}
           />
         )}
+        {currentPage === 'boosts' && (
+  <BattleBoosts 
+    provider={provider}
+    signer={signer}
+    address={walletAddress}
+  />
+)}
         {currentPage === 'about' && (
           <AboutPage onNavigate={navigateTo} />
         )}
