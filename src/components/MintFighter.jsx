@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Swords, Crown, Users, Zap, CheckCircle, AlertCircle } from 'lucide-react';
-import { ethers } from 'ethers';
+import * as ethers from 'ethers';
 
 const FIGHTER_CONTRACT = '0x8b2c136B30537Be53BBe1bb7511C4c43A64d6D0d';
 

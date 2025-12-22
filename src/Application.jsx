@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, Coins, Clock, Flame, Shield, Swords } from 'lucide-react';
-import { ethers } from 'ethers';
+import * as ethers from 'ethers';
 import MintPage from './mint.jsx';
 import StakingPage from './Staking.jsx';
 import ExchangePage from './Exchange.jsx';
