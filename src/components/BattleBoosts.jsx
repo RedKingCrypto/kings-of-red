@@ -31,7 +31,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       effect: '+15% Fighter Hit Chance',
       description: 'Increase your Fighter\'s accuracy by 15% for the entire battle.',
       duration: 'Entire battle',
-      type: 'Passive'
+      type: 'Manual'
     },
     {
       id: 2,
@@ -47,7 +47,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       effect: '+40% Fighter Hit Chance',
       description: 'Massively increase your Fighter\'s accuracy by 40% for the entire battle.',
       duration: 'Entire battle',
-      type: 'Passive'
+      type: 'Manual'
     },
     {
       id: 3,
@@ -63,7 +63,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       effect: 'Restore 1 HP',
       description: 'Call upon divine power to restore 1 heart point during battle when needed.',
       duration: 'Use once per battle',
-      type: 'Active'
+      type: 'Manual'
     },
     {
       id: 4,
@@ -79,7 +79,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       effect: '+10% Hit, -10% Enemy Hit',
       description: 'Rally your Fighter while intimidating the enemy. Double benefit!',
       duration: 'Entire battle',
-      type: 'Passive'
+      type: 'Manual'
     },
     {
       id: 5,
@@ -95,7 +95,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       effect: 'Enemy -20% Hit (2 attacks)',
       description: 'Poison the enemy, reducing their accuracy by 20% for their next 2 attacks.',
       duration: '2 enemy attacks',
-      type: 'Active'
+      type: 'Manual'
     },
     {
       id: 6,
@@ -111,7 +111,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       effect: 'Enemy Skips 1 Turn',
       description: 'Freeze the enemy solid, causing them to lose their next attack completely.',
       duration: '1 enemy turn',
-      type: 'Active'
+      type: 'Manual'
     },
     {
       id: 7,
@@ -473,10 +473,11 @@ const BattleBoosts = ({ provider, signer, address }) => {
               <h3 className="text-lg font-bold mb-3 text-yellow-400">🎯 Using Boosts</h3>
               <ul className="space-y-2 text-gray-300">
                 <li>• Purchase boosts with FOOD or GOLD tokens</li>
-                <li>• Select boosts before entering battle</li>
-                <li>• Maximum ONE boost per clan (7 clans total)</li>
-                <li>• Passive boosts activate automatically</li>
-                <li>• Active boosts can be triggered during battle</li>
+                <li>• Purchased boosts remain in your inventory</li>
+                <li>• Choose which boosts to bring into each battle</li>
+                <li>• Maximum ONE boost per clan per battle (7 clans total)</li>
+                <li>• Strategically activate boosts during battle when most effective</li>
+                <li>• Unused boosts are saved for future battles</li>
               </ul>
             </div>
             
