@@ -9,7 +9,7 @@ import FAQPage from './faq.jsx';
 import DashboardPage from './Dashboard.jsx';
 import LeaderboardPage from './Leaderboard.jsx';
 import BattlePage from './Battle.jsx';
-import MintFighter from './components/Mintfighter.jsx';
+import MintFighter from './components/MintFighter.jsx';
 import BattleBoosts from './components/BattleBoosts.jsx';
 
 // Import contract addresses
@@ -84,6 +84,7 @@ export default function Application() {
       if (accounts.length > 0) {
         setWalletAddress(accounts[0]);
         setConnected(true);
+        
         
         // Set provider and signer
         const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -174,6 +175,34 @@ export default function Application() {
     
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Listen for account/network changes
+useEffect(() => {
+  if (window.ethereum) {
+    // Handle account changes
+    window.ethereum.on('accountsChanged', (accounts) => {
+      if (accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+        
+        const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+        setProvider(web3Provider);
+        setSigner(web3Provider.getSigner());
+        
+        console.log('Account changed:', accounts[0]);
+      } else {
+        setWalletAddress('');
+        setConnected(false);
+        setProvider(null);
+        setSigner(null);
+      }
+    });
+    
+    // Reload on network change
+    window.ethereum.on('chainChanged', () => {
+      window.location.reload();
+    });
+  }
+}, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
