@@ -181,7 +181,7 @@ export default function Application() {
   <div className="container mx-auto flex justify-between items-center">
     <h1 
       className="text-2xl font-bold text-red-500 cursor-pointer"
-      onClick={() => setCurrentPage('home')}
+      onClick={() => navigateTo('home')}
     >
       Kings of Red
     </h1>
@@ -189,7 +189,7 @@ export default function Application() {
     <div className="flex gap-6 items-center flex-wrap">
       {/* Home */}
       <button
-        onClick={() => setCurrentPage('home')}
+        onClick={() => navigateTo('home')}
         className={`transition ${
           currentPage === 'home' ? 'text-red-500' : 'hover:text-red-400'
         }`}
@@ -198,28 +198,28 @@ export default function Application() {
       </button>
       
       {/* Mint Heralds */}
-      <button
-        onClick={() => setCurrentPage('mint')}
-        className={`transition ${
-          currentPage === 'mint' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        Mint Heralds
-      </button>
-      
-      {/* Mint Fighters */}
-      <button
-        onClick={() => setCurrentPage('mint-fighter')}
-        className={`transition ${
-          currentPage === 'mint-fighter' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        Mint Fighters
-      </button>
+<button
+  onClick={() => navigateTo('mint')}  // ✅ Changed
+  className={`transition ${
+    currentPage === 'mint' ? 'text-red-500' : 'hover:text-red-400'
+  }`}
+>
+  Mint Heralds
+</button>
+
+{/* Mint Fighters */}
+<button
+  onClick={() => navigateTo('mint-fighter')}  // ✅ Changed
+  className={`transition ${
+    currentPage === 'mint-fighter' ? 'text-red-500' : 'hover:text-red-400'
+  }`}
+>
+  Mint Fighters
+</button>
       
       {/* Staking */}
       <button
-        onClick={() => setCurrentPage('staking')}
+        onClick={() => navigateTo('staking')}
         className={`transition ${
           currentPage === 'staking' ? 'text-red-500' : 'hover:text-red-400'
         }`}
@@ -229,7 +229,7 @@ export default function Application() {
       
       {/* Exchange */}
       <button
-        onClick={() => setCurrentPage('exchange')}
+        onClick={() => navigateTo('exchange')}
         className={`transition ${
           currentPage === 'exchange' ? 'text-red-500' : 'hover:text-red-400'
         }`}
@@ -239,7 +239,7 @@ export default function Application() {
       
       {/* Dashboard */}
       <button
-        onClick={() => setCurrentPage('dashboard')}
+        onClick={() => navigateTo('dashboard')}
         className={`transition ${
           currentPage === 'dashboard' ? 'text-red-500' : 'hover:text-red-400'
         }`}
@@ -249,7 +249,7 @@ export default function Application() {
       
       {/* FAQ */}
       <button
-        onClick={() => setCurrentPage('faq')}
+        onClick={() => navigateTo('faq')}
         className={`transition ${
           currentPage === 'faq' ? 'text-red-500' : 'hover:text-red-400'
         }`}
@@ -259,7 +259,7 @@ export default function Application() {
       
       {/* About */}
       <button
-        onClick={() => setCurrentPage('about')}
+        onClick={() => navigateTo('about')}
         className={`transition ${
           currentPage === 'about' ? 'text-red-500' : 'hover:text-red-400'
         }`}
