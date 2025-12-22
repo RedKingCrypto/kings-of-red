@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, Target, Heart, Shield, Droplet, Snowflake, Gift, TrendingUp, ShoppingCart, CheckCircle, AlertCircle } from 'lucide-react';
+import { Zap, Target, Heart, Shield, Droplet, Snowflake, Gift, TrendingUp, ShoppingCart, CheckCircle, AlertCircle, Coins } from 'lucide-react';
 import { ethers } from 'ethers';
 
-// This will be your Battle Boost contract address (to be deployed later)
+// Battle Boost contract (to be deployed)
 const BOOST_CONTRACT = '0x0000000000000000000000000000000000000000'; // Update after deployment
+
+// Token contracts
+import { FOOD_TOKEN_ADDRESS, GOLD_TOKEN_ADDRESS } from '../contractConfig';
 
 const BattleBoosts = ({ provider, signer, address }) => {
   const [cart, setCart] = useState([]);
   const [purchasing, setPurchasing] = useState(false);
   const [txHash, setTxHash] = useState('');
   const [error, setError] = useState('');
+  const [userBalances, setUserBalances] = useState({ food: 0, gold: 0 });
 
-  // All 8 Battle Boosts
+  // All 8 Battle Boosts with FOOD/GOLD pricing
   const BOOSTS = [
     {
       id: 1,
@@ -21,8 +25,9 @@ const BattleBoosts = ({ provider, signer, address }) => {
       color: 'from-green-600 to-emerald-600',
       borderColor: 'border-green-500',
       bgColor: 'bg-green-900/20',
-      price: '20 FOOD or 2 GOLD',
-      priceUSD: 5,
+      price: 35,
+      currency: 'FOOD',
+      rarity: 'Common',
       effect: '+15% Fighter Hit Chance',
       description: 'Increase your Fighter\'s accuracy by 15% for the entire battle.',
       duration: 'Entire battle',
@@ -36,8 +41,9 @@ const BattleBoosts = ({ provider, signer, address }) => {
       color: 'from-green-600 to-emerald-600',
       borderColor: 'border-green-500',
       bgColor: 'bg-green-900/20',
-      price: '50 FOOD or 5 GOLD',
-      priceUSD: 12,
+      price: 35,
+      currency: 'GOLD',
+      rarity: 'Ultra Rare',
       effect: '+40% Fighter Hit Chance',
       description: 'Massively increase your Fighter\'s accuracy by 40% for the entire battle.',
       duration: 'Entire battle',
@@ -51,8 +57,9 @@ const BattleBoosts = ({ provider, signer, address }) => {
       color: 'from-blue-600 to-cyan-600',
       borderColor: 'border-blue-500',
       bgColor: 'bg-blue-900/20',
-      price: '30 FOOD or 3 GOLD',
-      priceUSD: 7,
+      price: 35,
+      currency: 'FOOD',
+      rarity: 'Common',
       effect: 'Restore 1 HP',
       description: 'Call upon divine power to restore 1 heart point during battle when needed.',
       duration: 'Use once per battle',
@@ -66,8 +73,9 @@ const BattleBoosts = ({ provider, signer, address }) => {
       color: 'from-indigo-600 to-violet-600',
       borderColor: 'border-indigo-500',
       bgColor: 'bg-indigo-900/20',
-      price: '40 FOOD or 4 GOLD',
-      priceUSD: 10,
+      price: 35,
+      currency: 'FOOD',
+      rarity: 'Common',
       effect: '+10% Hit, -10% Enemy Hit',
       description: 'Rally your Fighter while intimidating the enemy. Double benefit!',
       duration: 'Entire battle',
@@ -81,8 +89,9 @@ const BattleBoosts = ({ provider, signer, address }) => {
       color: 'from-purple-600 to-pink-600',
       borderColor: 'border-purple-500',
       bgColor: 'bg-purple-900/20',
-      price: '35 FOOD or 3.5 GOLD',
-      priceUSD: 8,
+      price: 35,
+      currency: 'FOOD',
+      rarity: 'Common',
       effect: 'Enemy -20% Hit (2 attacks)',
       description: 'Poison the enemy, reducing their accuracy by 20% for their next 2 attacks.',
       duration: '2 enemy attacks',
@@ -96,8 +105,9 @@ const BattleBoosts = ({ provider, signer, address }) => {
       color: 'from-red-600 to-orange-600',
       borderColor: 'border-red-500',
       bgColor: 'bg-red-900/20',
-      price: '45 FOOD or 4.5 GOLD',
-      priceUSD: 11,
+      price: 15,
+      currency: 'GOLD',
+      rarity: 'Rare',
       effect: 'Enemy Skips 1 Turn',
       description: 'Freeze the enemy solid, causing them to lose their next attack completely.',
       duration: '1 enemy turn',
@@ -111,8 +121,9 @@ const BattleBoosts = ({ provider, signer, address }) => {
       color: 'from-yellow-600 to-amber-600',
       borderColor: 'border-yellow-500',
       bgColor: 'bg-yellow-900/20',
-      price: '25 FOOD',
-      priceUSD: 6,
+      price: 20,
+      currency: 'FOOD',
+      rarity: 'Common',
       effect: 'Random Token Reward',
       description: 'Open a treasure chest for random rewards: FOOD (60%), GOLD (30%), or WOOD (10%).',
       duration: 'Instant at battle start',
@@ -126,14 +137,43 @@ const BattleBoosts = ({ provider, signer, address }) => {
       color: 'from-teal-600 to-cyan-600',
       borderColor: 'border-teal-500',
       bgColor: 'bg-teal-900/20',
-      price: '50 FOOD or 5 GOLD',
-      priceUSD: 12,
+      price: 20,
+      currency: 'GOLD',
+      rarity: 'Rare',
       effect: 'Enemy Loses 1 HP',
       description: 'Set a deadly trap that damages the enemy before battle even starts!',
       duration: 'Instant at battle start',
       type: 'Damage'
     }
   ];
+
+  // Load user balances
+  useEffect(() => {
+    if (provider && address) {
+      loadBalances();
+    }
+  }, [provider, address]);
+
+  const loadBalances = async () => {
+    try {
+      const TOKEN_ABI = ["function balanceOf(address) view returns (uint256)"];
+      
+      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, TOKEN_ABI, provider);
+      const goldContract = new ethers.Contract(GOLD_TOKEN_ADDRESS, TOKEN_ABI, provider);
+      
+      const [foodBal, goldBal] = await Promise.all([
+        foodContract.balanceOf(address),
+        goldContract.balanceOf(address)
+      ]);
+      
+      setUserBalances({
+        food: parseFloat(ethers.utils.formatEther(foodBal)),
+        gold: parseFloat(ethers.utils.formatEther(goldBal))
+      });
+    } catch (err) {
+      console.error('Error loading balances:', err);
+    }
+  };
 
   const addToCart = (boost) => {
     if (!cart.find(item => item.id === boost.id)) {
@@ -145,8 +185,17 @@ const BattleBoosts = ({ provider, signer, address }) => {
     setCart(cart.filter(item => item.id !== boostId));
   };
 
-  const getTotalPrice = () => {
-    return cart.reduce((sum, boost) => sum + boost.priceUSD, 0);
+  const getTotalCost = () => {
+    const totals = { FOOD: 0, GOLD: 0 };
+    cart.forEach(boost => {
+      totals[boost.currency] += boost.price;
+    });
+    return totals;
+  };
+
+  const canAfford = () => {
+    const totals = getTotalCost();
+    return userBalances.food >= totals.FOOD && userBalances.gold >= totals.GOLD;
   };
 
   const handlePurchase = async () => {
@@ -160,27 +209,63 @@ const BattleBoosts = ({ provider, signer, address }) => {
       return;
     }
 
+    if (!canAfford()) {
+      const totals = getTotalCost();
+      setError(`Insufficient balance! Need ${totals.FOOD} FOOD and ${totals.GOLD} GOLD`);
+      return;
+    }
+
     setPurchasing(true);
     setError('');
     setTxHash('');
 
     try {
       // This will be implemented when Battle Boost contract is deployed
-      alert('Battle Boost purchasing will be available soon!\n\nFor now, boosts are FREE during battles.');
+      // Payment split: 30% burn, 35% owner rewards, 35% treasury
       
-      // Future implementation:
-      // const contract = new ethers.Contract(BOOST_CONTRACT, BOOST_ABI, signer);
-      // const tx = await contract.purchaseBoosts(cart.map(b => b.id), { value: totalCost });
-      // setTxHash(tx.hash);
-      // await tx.wait();
+      alert('Battle Boost purchasing coming soon!\n\n' +
+        'Boosts will cost FOOD/GOLD tokens.\n' +
+        'Payment split: 30% burned, 35% rewards pool, 35% treasury');
+      
+      /* Future implementation:
+      const BOOST_ABI = [
+        "function purchaseBoosts(uint256[] calldata boostIds) external"
+      ];
+      
+      const contract = new ethers.Contract(BOOST_CONTRACT, BOOST_ABI, signer);
+      
+      // Approve tokens first
+      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, TOKEN_ABI, signer);
+      const goldContract = new ethers.Contract(GOLD_TOKEN_ADDRESS, TOKEN_ABI, signer);
+      
+      const totals = getTotalCost();
+      if (totals.FOOD > 0) {
+        await foodContract.approve(BOOST_CONTRACT, ethers.utils.parseEther(totals.FOOD.toString()));
+      }
+      if (totals.GOLD > 0) {
+        await goldContract.approve(BOOST_CONTRACT, ethers.utils.parseEther(totals.GOLD.toString()));
+      }
+      
+      // Purchase
+      const tx = await contract.purchaseBoosts(cart.map(b => b.id));
+      setTxHash(tx.hash);
+      await tx.wait();
+      */
       
       setCart([]);
+      await loadBalances();
     } catch (err) {
       console.error('Purchase error:', err);
       setError(err.message || 'Purchase failed');
     } finally {
       setPurchasing(false);
     }
+  };
+
+  const getRarityColor = (rarity) => {
+    if (rarity === 'Ultra Rare') return 'text-yellow-400';
+    if (rarity === 'Rare') return 'text-purple-400';
+    return 'text-gray-400';
   };
 
   return (
@@ -195,10 +280,21 @@ const BattleBoosts = ({ provider, signer, address }) => {
           <p className="text-xl text-gray-300 mb-6">
             Power up your Fighters with strategic boosts! Use one boost per clan (max 7 per battle).
           </p>
-          <div className="inline-block bg-purple-900/30 border border-purple-500 rounded-lg px-6 py-3">
-            <p className="text-yellow-400 font-bold text-lg">🎮 Currently FREE in Battle!</p>
-            <p className="text-sm text-gray-300">Purchase system coming soon</p>
-          </div>
+          
+          {/* User Balances */}
+          {address && (
+            <div className="inline-flex gap-4 bg-gray-800/50 border border-gray-700 rounded-lg px-6 py-3">
+              <div className="flex items-center gap-2">
+                <Coins className="w-5 h-5 text-yellow-400" />
+                <span className="font-bold">{userBalances.food.toFixed(0)} FOOD</span>
+              </div>
+              <div className="w-px bg-gray-600"></div>
+              <div className="flex items-center gap-2">
+                <Coins className="w-5 h-5 text-yellow-500" />
+                <span className="font-bold">{userBalances.gold.toFixed(0)} GOLD</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Boost Grid */}
@@ -222,8 +318,8 @@ const BattleBoosts = ({ provider, signer, address }) => {
                     <IconComponent className="w-8 h-8 text-white" />
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-gray-400">Price</p>
-                    <p className="text-sm font-bold">${boost.priceUSD}</p>
+                    <p className={`text-xs font-bold ${getRarityColor(boost.rarity)}`}>{boost.rarity}</p>
+                    <p className="text-lg font-bold text-yellow-400">{boost.price} {boost.currency}</p>
                   </div>
                 </div>
 
@@ -251,10 +347,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
                     <span className="text-gray-400">Type:</span>
                     <span className="text-gray-200">{boost.type}</span>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-400">Cost:</span>
-                    <span className="text-yellow-400">{boost.price}</span>
-                  </div>
                 </div>
 
                 {/* Add to Cart Button */}
@@ -266,7 +358,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
                       : 'bg-gradient-to-r from-yellow-500 to-red-600 hover:from-yellow-600 hover:to-red-700'
                   }`}
                 >
-                  {inCart ? 'Remove from Cart' : 'Add to Cart'}
+                  {inCart ? 'Remove' : 'Add to Cart'}
                 </button>
               </div>
             );
@@ -275,7 +367,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
 
         {/* Shopping Cart */}
         {cart.length > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t-2 border-purple-500 p-6 shadow-2xl">
+          <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t-2 border-purple-500 p-6 shadow-2xl z-50">
             <div className="container mx-auto">
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-4">
@@ -292,32 +384,40 @@ const BattleBoosts = ({ provider, signer, address }) => {
 
                 <div className="flex items-center gap-6">
                   <div className="text-right">
-                    <p className="text-sm text-gray-400">Total</p>
-                    <p className="text-2xl font-bold text-yellow-400">${getTotalPrice()}</p>
+                    <p className="text-sm text-gray-400">Total Cost</p>
+                    {(() => {
+                      const totals = getTotalCost();
+                      return (
+                        <div className="flex gap-3 text-lg font-bold">
+                          {totals.FOOD > 0 && <span className="text-yellow-400">{totals.FOOD} FOOD</span>}
+                          {totals.GOLD > 0 && <span className="text-yellow-500">{totals.GOLD} GOLD</span>}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <button
                     onClick={() => setCart([])}
                     className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold transition"
                   >
-                    Clear Cart
+                    Clear
                   </button>
 
                   <button
                     onClick={handlePurchase}
-                    disabled={purchasing || !signer}
+                    disabled={purchasing || !signer || !canAfford()}
                     className={`px-8 py-3 rounded-lg font-bold text-lg transition-all ${
-                      purchasing || !signer
+                      purchasing || !signer || !canAfford()
                         ? 'bg-gray-600 cursor-not-allowed'
                         : 'bg-gradient-to-r from-yellow-500 to-red-600 hover:from-yellow-600 hover:to-red-700 transform hover:scale-105'
                     }`}
                   >
-                    {purchasing ? 'Processing...' : !signer ? 'Connect Wallet' : 'Purchase Now'}
+                    {purchasing ? 'Processing...' : !signer ? 'Connect Wallet' : !canAfford() ? 'Insufficient Balance' : 'Purchase'}
                   </button>
                 </div>
               </div>
 
-              {/* Error/Success Messages */}
+              {/* Messages */}
               {error && (
                 <div className="mt-4 p-3 bg-red-900/30 border border-red-500 rounded-lg flex items-start gap-2">
                   <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -342,30 +442,51 @@ const BattleBoosts = ({ provider, signer, address }) => {
           </div>
         )}
 
-        {/* How It Works */}
+        {/* Payment Info */}
         <div className="mt-12 bg-gray-800/50 rounded-lg p-8">
+          <h2 className="text-2xl font-bold mb-6">Payment & Distribution</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-4 bg-red-900/20 border border-red-500 rounded-lg">
+              <h4 className="font-bold text-red-400 mb-2">🔥 30% Burned</h4>
+              <p className="text-sm text-gray-300">Permanently removed from circulation, increasing scarcity</p>
+            </div>
+
+            <div className="p-4 bg-yellow-900/20 border border-yellow-500 rounded-lg">
+              <h4 className="font-bold text-yellow-400 mb-2">🎁 35% Rewards Pool</h4>
+              <p className="text-sm text-gray-300">Reserved for airdrops and community rewards</p>
+            </div>
+
+            <div className="p-4 bg-blue-900/20 border border-blue-500 rounded-lg">
+              <h4 className="font-bold text-blue-400 mb-2">💼 35% Treasury</h4>
+              <p className="text-sm text-gray-300">Development, marketing, and operations</p>
+            </div>
+          </div>
+        </div>
+
+        {/* How It Works */}
+        <div className="mt-8 bg-gray-800/50 rounded-lg p-8">
           <h2 className="text-2xl font-bold mb-6">How Battle Boosts Work</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h3 className="text-lg font-bold mb-3 text-yellow-400">🎯 Using Boosts</h3>
               <ul className="space-y-2 text-gray-300">
+                <li>• Purchase boosts with FOOD or GOLD tokens</li>
                 <li>• Select boosts before entering battle</li>
                 <li>• Maximum ONE boost per clan (7 clans total)</li>
                 <li>• Passive boosts activate automatically</li>
                 <li>• Active boosts can be triggered during battle</li>
-                <li>• Strategic timing is key to victory!</li>
               </ul>
             </div>
             
             <div>
-              <h3 className="text-lg font-bold mb-3 text-yellow-400">💰 Purchasing</h3>
+              <h3 className="text-lg font-bold mb-3 text-yellow-400">⭐ Rarity Tiers</h3>
               <ul className="space-y-2 text-gray-300">
-                <li>• Boosts are currently FREE in battles</li>
-                <li>• Purchase system coming soon</li>
-                <li>• Will be available with FOOD or GOLD tokens</li>
-                <li>• Can also be earned as battle rewards</li>
-                <li>• Alphas will produce boosts automatically</li>
+                <li className="text-gray-400">• <span className="font-bold">Common:</span> 35 FOOD or 20 FOOD</li>
+                <li className="text-purple-400">• <span className="font-bold">Rare:</span> 15-20 GOLD</li>
+                <li className="text-yellow-400">• <span className="font-bold">Ultra Rare:</span> 35 GOLD</li>
+                <li>• Prices may change based on game balance</li>
               </ul>
             </div>
           </div>

@@ -81,6 +81,16 @@ const MintFighter = ({ provider, signer, address }) => {
   const [myFighters, setMyFighters] = useState([]);
   const [showMyFighters, setShowMyFighters] = useState(false);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('MintFighter Props:', { 
+      hasProvider: !!provider, 
+      hasSigner: !!signer, 
+      address: address,
+      prices: prices.map(p => p ? ethers.utils.formatEther(p) : 'null')
+    });
+  }, [provider, signer, address, prices]);
+
   // Load contract data
   useEffect(() => {
     if (provider) {
@@ -99,11 +109,19 @@ const MintFighter = ({ provider, signer, address }) => {
     try {
       const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, provider);
       
+      console.log('Loading contract data...');
+      
       const [bronze, silver, gold] = await Promise.all([
         contract.bronzePrice(),
         contract.silverPrice(),
         contract.goldPrice()
       ]);
+      
+      console.log('Prices loaded:', { 
+        bronze: ethers.utils.formatEther(bronze), 
+        silver: ethers.utils.formatEther(silver), 
+        gold: ethers.utils.formatEther(gold) 
+      });
       
       setPrices([bronze, silver, gold]);
       
@@ -114,10 +132,15 @@ const MintFighter = ({ provider, signer, address }) => {
         goldMinted.toNumber()
       ]);
       
+      console.log('Supply:', { bronze: bronzeMinted.toNumber(), silver: silverMinted.toNumber(), gold: goldMinted.toNumber() });
+      
       const isGenesis = await contract.genesisSaleActive();
       setGenesisSale(isGenesis);
+      
+      console.log('Genesis sale active:', isGenesis);
     } catch (err) {
       console.error('Error loading contract data:', err);
+      setError('Failed to load contract data. Make sure you\'re on Base network.');
     }
   };
 
@@ -135,8 +158,8 @@ const MintFighter = ({ provider, signer, address }) => {
           rarity: details.rarity,
           clan: details.clan,
           energy: details.energy,
-          wins: details.wins,
-          losses: details.losses,
+          wins: details.wins.toNumber(),
+          losses: details.losses.toNumber(),
           isStaked: details.isStaked
         });
       }
@@ -160,14 +183,26 @@ const MintFighter = ({ provider, signer, address }) => {
     try {
       const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, signer);
       const price = prices[selectedRarity];
+      
+      if (!price) {
+        setError('Price not loaded yet. Please refresh.');
+        setMinting(false);
+        return;
+      }
+      
       const totalCost = price.mul(quantity);
 
-      const tx = await contract.mintFighter(selectedRarity, referralCode, {
+      console.log('Minting:', { rarity: selectedRarity, quantity, totalCost: ethers.utils.formatEther(totalCost) });
+
+      const tx = await contract.mintFighter(selectedRarity, referralCode || '', {
         value: totalCost
       });
 
       setTxHash(tx.hash);
+      console.log('Transaction sent:', tx.hash);
+      
       await tx.wait();
+      console.log('Transaction confirmed!');
 
       // Reload data
       await loadContractData();
@@ -176,7 +211,14 @@ const MintFighter = ({ provider, signer, address }) => {
       alert(`🎉 Success! Minted ${quantity} ${RARITIES[selectedRarity].name} Fighter(s)!`);
     } catch (err) {
       console.error('Minting error:', err);
-      setError(err.message || 'Minting failed');
+      
+      if (err.code === 'INSUFFICIENT_FUNDS') {
+        setError('Insufficient ETH balance');
+      } else if (err.message.includes('user rejected')) {
+        setError('Transaction cancelled');
+      } else {
+        setError(err.message || 'Minting failed');
+      }
     } finally {
       setMinting(false);
     }
@@ -190,7 +232,7 @@ const MintFighter = ({ provider, signer, address }) => {
     return RARITIES[selectedRarity].genesis - supply[selectedRarity];
   };
 
-  const totalPrice = prices[selectedRarity] ? 
+  const totalPrice = prices[selectedRarity] && prices[selectedRarity].gt(0) ? 
     ethers.utils.formatEther(prices[selectedRarity].mul(quantity)) : '0';
 
   return (
@@ -199,108 +241,117 @@ const MintFighter = ({ provider, signer, address }) => {
         
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-yellow-400 via-red-500 to-purple-600 bg-clip-text text-transparent">
-            Mint Your Fighter
+          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-red-500 via-yellow-500 to-purple-600 bg-clip-text text-transparent">
+            Mint Fighter NFTs
           </h1>
           <p className="text-xl text-gray-300 mb-2">
-            Choose your warrior's rarity and join the battle!
+            Choose your Fighter's rarity and join the battle for glory!
           </p>
           {genesisSale && (
-            <div className="inline-block bg-yellow-600/20 border border-yellow-500 rounded-lg px-4 py-2 mt-2">
-              <span className="text-yellow-400 font-bold">🎉 GENESIS SALE ACTIVE</span>
-              <span className="text-gray-300 ml-2">Limited supply at special prices!</span>
-            </div>
+            <p className="text-yellow-400 font-bold text-lg">
+              🔥 Genesis Sale Active - Limited Supply!
+            </p>
           )}
         </div>
 
-        {/* Supply Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          {RARITIES.map((rarity, index) => (
-            <div key={index} className={`${rarity.bgColor} border ${rarity.borderColor} rounded-lg p-4`}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <rarity.icon className="w-6 h-6" />
-                  <h3 className="text-xl font-bold">{rarity.name}</h3>
-                </div>
-                <span className="text-2xl font-bold">
-                  {supply[index]}/{genesisSale ? rarity.genesis : rarity.total}
-                </span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
-                <div 
-                  className={`h-2 rounded-full bg-gradient-to-r ${rarity.color}`}
-                  style={{ width: `${(supply[index] / (genesisSale ? rarity.genesis : rarity.total)) * 100}%` }}
-                />
-              </div>
-              <p className="text-sm text-gray-400 mt-2">
-                {genesisSale ? 
-                  `${rarity.genesis - supply[index]} remaining in Genesis` :
-                  `${rarity.total - supply[index]} remaining total`
-                }
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Rarity Selection */}
+        <div className="mb-12">
+          <h2 className="text-3xl font-bold text-center mb-8">Select Your Fighter Rarity</h2>
           
-          {/* Rarity Selection */}
-          <div className="lg:col-span-2">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <Swords className="w-6 h-6" />
-              Select Rarity
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              {RARITIES.map((rarity) => (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {RARITIES.map((rarity) => {
+              const IconComponent = rarity.icon;
+              const isSelected = selectedRarity === rarity.id;
+              const currentSupply = supply[rarity.id];
+              const maxSupply = genesisSale ? rarity.genesis : rarity.total;
+              const percentage = (currentSupply / maxSupply) * 100;
+              const price = prices[rarity.id];
+              
+              return (
                 <div
                   key={rarity.id}
                   onClick={() => setSelectedRarity(rarity.id)}
-                  className={`cursor-pointer rounded-lg p-6 border-2 transition-all ${
-                    selectedRarity === rarity.id
-                      ? `${rarity.borderColor} ${rarity.bgColor} scale-105`
-                      : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                  className={`cursor-pointer rounded-lg p-6 transition-all transform ${
+                    isSelected
+                      ? `border-4 ${rarity.borderColor} ${rarity.bgColor} scale-105 shadow-2xl`
+                      : 'border-2 border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:scale-102'
                   }`}
                 >
-                  <div className="flex items-center gap-3 mb-4">
-                    <rarity.icon className="w-8 h-8" />
-                    <div>
-                      <h3 className="text-xl font-bold">{rarity.name}</h3>
-                      <p className="text-sm text-gray-400">
-                        {prices[rarity.id] ? ethers.utils.formatEther(prices[rarity.id]) : '...'} ETH
-                      </p>
+                  {/* Icon & Name */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`p-4 rounded-lg bg-gradient-to-br ${rarity.color}`}>
+                      <IconComponent className="w-12 h-12 text-white" />
                     </div>
+                    {isSelected && (
+                      <CheckCircle className="w-8 h-8 text-green-400" />
+                    )}
                   </div>
-                  
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm text-gray-400">Base Hit Rate:</span>
-                      <span className="font-bold text-green-400">{rarity.baseHit}</span>
-                    </div>
-                  </div>
-                  
-                  <ul className="space-y-1">
-                    {rarity.perks.map((perk, i) => (
-                      <li key={i} className="text-xs text-gray-300 flex items-start gap-1">
-                        <CheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
-                        <span>{perk}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
 
-            {/* Clan Info */}
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <Users className="w-6 h-6" />
-              The Seven Clans
-            </h2>
+                  <h3 className="text-2xl font-bold mb-2">{rarity.name} Fighter</h3>
+                  
+                  {/* Price */}
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-400">Price:</p>
+                    <p className="text-2xl font-bold text-yellow-400">
+                      {price ? `${ethers.utils.formatEther(price)} ETH` : 'Loading...'}
+                    </p>
+                  </div>
+
+                  {/* Base Hit Rate */}
+                  <div className="mb-4 p-3 bg-purple-900/30 border border-purple-500 rounded-lg">
+                    <p className="text-sm text-gray-400">Base Hit Rate:</p>
+                    <p className="text-xl font-bold text-purple-400">{rarity.baseHit}</p>
+                  </div>
+
+                  {/* Supply Progress */}
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-gray-400">
+                        {genesisSale ? 'Genesis Supply' : 'Total Supply'}:
+                      </span>
+                      <span className="font-bold">
+                        {currentSupply} / {maxSupply}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-3">
+                      <div
+                        className={`h-3 rounded-full bg-gradient-to-r ${rarity.color}`}
+                        style={{ width: `${percentage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Perks */}
+                  <div>
+                    <p className="text-sm text-gray-400 mb-2">Perks:</p>
+                    <ul className="space-y-1">
+                      {rarity.perks.map((perk, idx) => (
+                        <li key={idx} className="text-xs text-gray-300">
+                          • {perk}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Info Panel */}
+          <div className="lg:col-span-2 space-y-6">
             
-            <div className="bg-gray-800/50 rounded-lg p-6 mb-8">
+            {/* Clan Info */}
+            <div className="bg-gray-800/50 rounded-lg p-6">
+              <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                <Users className="w-6 h-6 text-red-500" />
+                The Seven Clans
+              </h3>
               <p className="text-gray-300 mb-4">
-                Your Fighter will be randomly assigned to one of the seven legendary clans. 
-                Each clan has unique strengths and abilities!
+                Each Fighter belongs to one of seven clans. Your Fighter's clan is randomly assigned at mint, with equal distribution across all rarities.
               </p>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -345,7 +396,7 @@ const MintFighter = ({ provider, signer, address }) => {
               {/* Quantity */}
               <div className="mb-4">
                 <label className="block text-sm text-gray-400 mb-2">
-                  Quantity: (Max: {getMaxMintable()})
+                  Quantity: (Max: {Math.min(7, getMaxMintable())})
                 </label>
                 <input
                   type="number"
@@ -364,7 +415,7 @@ const MintFighter = ({ provider, signer, address }) => {
                 </label>
                 <input
                   type="text"
-                  placeholder="Enter code for 7% discount to referrer"
+                  placeholder="Enter referral code"
                   value={referralCode}
                   onChange={(e) => setReferralCode(e.target.value)}
                   className="w-full bg-gray-700 text-white px-4 py-2 rounded-lg"
@@ -390,14 +441,18 @@ const MintFighter = ({ provider, signer, address }) => {
               {/* Mint Button */}
               <button
                 onClick={handleMint}
-                disabled={minting || !signer || getMaxMintable() === 0}
+                disabled={minting || !signer || getMaxMintable() === 0 || !prices[selectedRarity]}
                 className={`w-full py-4 rounded-lg font-bold text-lg transition-all ${
-                  minting || !signer || getMaxMintable() === 0
+                  minting || !signer || getMaxMintable() === 0 || !prices[selectedRarity]
                     ? 'bg-gray-600 cursor-not-allowed'
                     : 'bg-gradient-to-r from-yellow-500 to-red-600 hover:from-yellow-600 hover:to-red-700 transform hover:scale-105'
                 }`}
               >
-                {minting ? 'Minting...' : !signer ? 'Connect Wallet' : getMaxMintable() === 0 ? 'Sold Out' : `Mint ${quantity} Fighter${quantity > 1 ? 's' : ''}`}
+                {minting ? 'Minting...' : 
+                 !signer ? 'Connect Wallet' : 
+                 !prices[selectedRarity] ? 'Loading...' :
+                 getMaxMintable() === 0 ? 'Sold Out' : 
+                 `Mint ${quantity} Fighter${quantity > 1 ? 's' : ''}`}
               </button>
 
               {/* Error Message */}
