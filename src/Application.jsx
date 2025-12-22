@@ -78,77 +78,130 @@ export default function Application() {
     }
   }, []);
 
-  const checkIfWalletConnected = async () => {
-    if (window.ethereum) {
-      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-      if (accounts.length > 0) {
-        setWalletAddress(accounts[0]);
-        setConnected(true);
-        
-        
-        // Set provider and signer
-        const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
-        setProvider(web3Provider);
-        setSigner(web3Provider.getSigner());
-      }
-    }
-  };
-
-  const connectWallet = async () => {
-    if (!window.ethereum) {
-      alert('Please install MetaMask!');
-      return;
-    }
-
-    try {
-      const accounts = await window.ethereum.request({ 
-        method: 'eth_requestAccounts' 
-      });
+const checkIfWalletConnected = async () => {
+  console.log('🔍 checkIfWalletConnected called');
+  
+  if (!window.ethereum) {
+    console.log('❌ No MetaMask detected');
+    return;
+  }
+  
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    console.log('Accounts found:', accounts);
+    
+    if (accounts.length > 0) {
+      const account = accounts[0];
+      console.log('✅ Wallet already connected:', account);
       
-      // Check if on Base network
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      const BASE_CHAIN_ID = '0x2105'; // Base Mainnet
-      
-      if (chainId !== BASE_CHAIN_ID) {
-        // Prompt to switch to Base
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: BASE_CHAIN_ID }],
-          });
-        } catch (switchError) {
-          // If Base not added, add it
-          if (switchError.code === 4902) {
-            await window.ethereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [{
-                chainId: BASE_CHAIN_ID,
-                chainName: 'Base',
-                nativeCurrency: {
-                  name: 'Ethereum',
-                  symbol: 'ETH',
-                  decimals: 18
-                },
-                rpcUrls: ['https://mainnet.base.org'],
-                blockExplorerUrls: ['https://basescan.org']
-              }],
-            });
-          }
-        }
-      }
-      
-      setWalletAddress(accounts[0]);
+      setWalletAddress(account);
       setConnected(true);
       
-      // Set provider and signer
+      // CRITICAL: Create provider and signer
+      console.log('Creating Web3Provider...');
       const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+      console.log('✅ Provider created');
+      
+      console.log('Setting provider state...');
       setProvider(web3Provider);
-      setSigner(web3Provider.getSigner());
-    } catch (error) {
-      console.error('Error connecting wallet:', error);
+      
+      console.log('Getting signer...');
+      const web3Signer = web3Provider.getSigner();
+      console.log('✅ Signer created');
+      
+      console.log('Setting signer state...');
+      setSigner(web3Signer);
+      
+      console.log('✅ Wallet connection complete');
+    } else {
+      console.log('No accounts found - wallet not connected');
     }
-  };
+  } catch (error) {
+    console.error('❌ Error in checkIfWalletConnected:', error);
+  }
+};
 
+const connectWallet = async () => {
+  console.log('🔌 connectWallet called');
+  
+  if (!window.ethereum) {
+    alert('Please install MetaMask!');
+    return;
+  }
+
+  try {
+    console.log('Requesting accounts...');
+    const accounts = await window.ethereum.request({ 
+      method: 'eth_requestAccounts' 
+    });
+    console.log('✅ Accounts received:', accounts);
+    
+    // Check if on Base network
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    console.log('Current chain ID:', chainId);
+    
+    const BASE_CHAIN_ID = '0x2105'; // Base Mainnet
+    
+    if (chainId !== BASE_CHAIN_ID) {
+      console.log('Wrong network, switching to Base...');
+      
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: BASE_CHAIN_ID }],
+        });
+        console.log('✅ Switched to Base');
+      } catch (switchError) {
+        if (switchError.code === 4902) {
+          console.log('Base not added, adding now...');
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: BASE_CHAIN_ID,
+              chainName: 'Base',
+              nativeCurrency: {
+                name: 'Ethereum',
+                symbol: 'ETH',
+                decimals: 18
+              },
+              rpcUrls: ['https://mainnet.base.org'],
+              blockExplorerUrls: ['https://basescan.org']
+            }],
+          });
+          console.log('✅ Base network added');
+        } else {
+          throw switchError;
+        }
+      }
+    }
+    
+    const account = accounts[0];
+    console.log('Setting wallet address:', account);
+    setWalletAddress(account);
+    setConnected(true);
+    
+    // CRITICAL: Create provider and signer
+    console.log('Creating Web3Provider...');
+    const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+    console.log('✅ Provider created');
+    
+    console.log('Setting provider state...');
+    setProvider(web3Provider);
+    
+    console.log('Getting signer...');
+    const web3Signer = web3Provider.getSigner();
+    console.log('✅ Signer created');
+    
+    console.log('Setting signer state...');
+    setSigner(web3Signer);
+    
+    console.log('✅ Wallet connected successfully');
+    
+  } catch (error) {
+    console.error('❌ Error connecting wallet:', error);
+    alert('Failed to connect wallet: ' + error.message);
+  }
+};
   const disconnectWallet = () => {
     setConnected(false);
     setWalletAddress('');
@@ -160,6 +213,52 @@ export default function Application() {
     setCurrentPage(page);
     window.history.pushState({}, '', `/${page === 'home' ? '' : page}`);
   };
+
+  useEffect(() => {
+  if (!window.ethereum) return;
+  
+  console.log('Setting up wallet event listeners...');
+  
+  const handleAccountsChanged = (accounts) => {
+    console.log('👤 Accounts changed:', accounts);
+    
+    if (accounts.length > 0) {
+      const account = accounts[0];
+      setWalletAddress(account);
+      setConnected(true);
+      
+      // Recreate provider and signer
+      const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+      setProvider(web3Provider);
+      setSigner(web3Provider.getSigner());
+      
+      console.log('✅ Wallet reconnected after account change');
+    } else {
+      // Disconnected
+      console.log('❌ Wallet disconnected');
+      setWalletAddress('');
+      setConnected(false);
+      setProvider(null);
+      setSigner(null);
+    }
+  };
+  
+  const handleChainChanged = (chainId) => {
+    console.log('🔗 Chain changed to:', chainId);
+    window.location.reload();
+  };
+  
+  window.ethereum.on('accountsChanged', handleAccountsChanged);
+  window.ethereum.on('chainChanged', handleChainChanged);
+  
+  console.log('✅ Event listeners set up');
+  
+  return () => {
+    console.log('Cleaning up event listeners...');
+    window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+    window.ethereum.removeListener('chainChanged', handleChainChanged);
+  };
+}, []);
 
   // Handle browser back/forward
   useEffect(() => {
