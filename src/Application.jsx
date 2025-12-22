@@ -9,7 +9,7 @@ import FAQPage from './faq.jsx';
 import DashboardPage from './Dashboard.jsx';
 import LeaderboardPage from './Leaderboard.jsx';
 import BattlePage from './Battle.jsx';
-import MintFighter from './components/MintFighter';
+import MintFighter from './components/Mintfighter.jsx';
 
 // Import contract addresses
 import { 
