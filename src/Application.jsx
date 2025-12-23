@@ -78,130 +78,127 @@ export default function Application() {
     }
   }, []);
 
-const checkIfWalletConnected = async () => {
-  console.log('🔍 checkIfWalletConnected called');
-  
-  if (!window.ethereum) {
-    console.log('❌ No MetaMask detected');
-    return;
-  }
-  
-  try {
-    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-    console.log('Accounts found:', accounts);
+  const checkIfWalletConnected = async () => {
+    console.log('🔍 checkIfWalletConnected called');
     
-    if (accounts.length > 0) {
-      const account = accounts[0];
-      console.log('✅ Wallet already connected:', account);
+    if (!window.ethereum) {
+      console.log('❌ No MetaMask detected');
+      return;
+    }
+    
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      console.log('Accounts found:', accounts);
       
+      if (accounts.length > 0) {
+        const account = accounts[0];
+        console.log('✅ Wallet already connected:', account);
+        
+        setWalletAddress(account);
+        setConnected(true);
+        
+        // ETHERS V6 SYNTAX
+        console.log('Creating BrowserProvider...');
+        const web3Provider = new ethers.BrowserProvider(window.ethereum);
+        console.log('✅ Provider created');
+        
+        setProvider(web3Provider);
+        
+        console.log('Getting signer...');
+        const web3Signer = await web3Provider.getSigner();
+        console.log('✅ Signer created');
+        
+        setSigner(web3Signer);
+        
+        console.log('✅ Wallet connection complete');
+      } else {
+        console.log('No accounts found - wallet not connected');
+      }
+    } catch (error) {
+      console.error('❌ Error in checkIfWalletConnected:', error);
+    }
+  };
+
+  const connectWallet = async () => {
+    console.log('🔌 connectWallet called');
+    
+    if (!window.ethereum) {
+      alert('Please install MetaMask!');
+      return;
+    }
+
+    try {
+      console.log('Requesting accounts...');
+      const accounts = await window.ethereum.request({ 
+        method: 'eth_requestAccounts' 
+      });
+      console.log('✅ Accounts received:', accounts);
+      
+      // Check if on Base network
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      console.log('Current chain ID:', chainId);
+      
+      const BASE_CHAIN_ID = '0x2105'; // Base Mainnet
+      
+      if (chainId !== BASE_CHAIN_ID) {
+        console.log('Wrong network, switching to Base...');
+        
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: BASE_CHAIN_ID }],
+          });
+          console.log('✅ Switched to Base');
+        } catch (switchError) {
+          if (switchError.code === 4902) {
+            console.log('Base not added, adding now...');
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: BASE_CHAIN_ID,
+                chainName: 'Base',
+                nativeCurrency: {
+                  name: 'Ethereum',
+                  symbol: 'ETH',
+                  decimals: 18
+                },
+                rpcUrls: ['https://mainnet.base.org'],
+                blockExplorerUrls: ['https://basescan.org']
+              }],
+            });
+            console.log('✅ Base network added');
+          } else {
+            throw switchError;
+          }
+        }
+      }
+      
+      const account = accounts[0];
+      console.log('Setting wallet address:', account);
       setWalletAddress(account);
       setConnected(true);
       
-      // CRITICAL: Create provider and signer
-      console.log('Creating Web3Provider...');
-      const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+      // ETHERS V6 SYNTAX
+      console.log('Creating BrowserProvider...');
+      const web3Provider = new ethers.BrowserProvider(window.ethereum);
       console.log('✅ Provider created');
       
-      console.log('Setting provider state...');
       setProvider(web3Provider);
       
       console.log('Getting signer...');
-      const web3Signer = web3Provider.getSigner();
+      const web3Signer = await web3Provider.getSigner();
       console.log('✅ Signer created');
       
-      console.log('Setting signer state...');
       setSigner(web3Signer);
       
-      console.log('✅ Wallet connection complete');
-    } else {
-      console.log('No accounts found - wallet not connected');
-    }
-  } catch (error) {
-    console.error('❌ Error in checkIfWalletConnected:', error);
-  }
-};
-
-const connectWallet = async () => {
-  console.log('🔌 connectWallet called');
-  
-  if (!window.ethereum) {
-    alert('Please install MetaMask!');
-    return;
-  }
-
-  try {
-    console.log('Requesting accounts...');
-    const accounts = await window.ethereum.request({ 
-      method: 'eth_requestAccounts' 
-    });
-    console.log('✅ Accounts received:', accounts);
-    
-    // Check if on Base network
-    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    console.log('Current chain ID:', chainId);
-    
-    const BASE_CHAIN_ID = '0x2105'; // Base Mainnet
-    
-    if (chainId !== BASE_CHAIN_ID) {
-      console.log('Wrong network, switching to Base...');
+      console.log('✅ Wallet connected successfully');
       
-      try {
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: BASE_CHAIN_ID }],
-        });
-        console.log('✅ Switched to Base');
-      } catch (switchError) {
-        if (switchError.code === 4902) {
-          console.log('Base not added, adding now...');
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: BASE_CHAIN_ID,
-              chainName: 'Base',
-              nativeCurrency: {
-                name: 'Ethereum',
-                symbol: 'ETH',
-                decimals: 18
-              },
-              rpcUrls: ['https://mainnet.base.org'],
-              blockExplorerUrls: ['https://basescan.org']
-            }],
-          });
-          console.log('✅ Base network added');
-        } else {
-          throw switchError;
-        }
-      }
+    } catch (error) {
+      console.error('❌ Error connecting wallet:', error);
+      alert('Failed to connect wallet: ' + error.message);
     }
-    
-    const account = accounts[0];
-    console.log('Setting wallet address:', account);
-    setWalletAddress(account);
-    setConnected(true);
-    
-    // CRITICAL: Create provider and signer
-    console.log('Creating Web3Provider...');
-    const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
-    console.log('✅ Provider created');
-    
-    console.log('Setting provider state...');
-    setProvider(web3Provider);
-    
-    console.log('Getting signer...');
-    const web3Signer = web3Provider.getSigner();
-    console.log('✅ Signer created');
-    
-    console.log('Setting signer state...');
-    setSigner(web3Signer);
-    
-    console.log('✅ Wallet connected successfully');
-    
-  } catch (error) {
-    console.error('❌ Error connecting wallet:', error);
-    alert('Failed to connect wallet: ' + error.message);
-  }
-};
+  };
+
   const disconnectWallet = () => {
     setConnected(false);
     setWalletAddress('');
@@ -214,51 +211,51 @@ const connectWallet = async () => {
     window.history.pushState({}, '', `/${page === 'home' ? '' : page}`);
   };
 
+  // Event listeners for wallet changes
   useEffect(() => {
-  if (!window.ethereum) return;
-  
-  console.log('Setting up wallet event listeners...');
-  
-  const handleAccountsChanged = (accounts) => {
-    console.log('👤 Accounts changed:', accounts);
+    if (!window.ethereum) return;
     
-    if (accounts.length > 0) {
-      const account = accounts[0];
-      setWalletAddress(account);
-      setConnected(true);
+    console.log('Setting up wallet event listeners...');
+    
+    const handleAccountsChanged = async (accounts) => {
+      console.log('👤 Accounts changed:', accounts);
       
-      // Recreate provider and signer
-      const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
-      setProvider(web3Provider);
-      setSigner(web3Provider.getSigner());
-      
-      console.log('✅ Wallet reconnected after account change');
-    } else {
-      // Disconnected
-      console.log('❌ Wallet disconnected');
-      setWalletAddress('');
-      setConnected(false);
-      setProvider(null);
-      setSigner(null);
-    }
-  };
-  
-  const handleChainChanged = (chainId) => {
-    console.log('🔗 Chain changed to:', chainId);
-    window.location.reload();
-  };
-  
-  window.ethereum.on('accountsChanged', handleAccountsChanged);
-  window.ethereum.on('chainChanged', handleChainChanged);
-  
-  console.log('✅ Event listeners set up');
-  
-  return () => {
-    console.log('Cleaning up event listeners...');
-    window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-    window.ethereum.removeListener('chainChanged', handleChainChanged);
-  };
-}, []);
+      if (accounts.length > 0) {
+        const account = accounts[0];
+        setWalletAddress(account);
+        setConnected(true);
+        
+        // ETHERS V6 SYNTAX
+        const web3Provider = new ethers.BrowserProvider(window.ethereum);
+        setProvider(web3Provider);
+        setSigner(await web3Provider.getSigner());
+        
+        console.log('✅ Wallet reconnected after account change');
+      } else {
+        console.log('❌ Wallet disconnected');
+        setWalletAddress('');
+        setConnected(false);
+        setProvider(null);
+        setSigner(null);
+      }
+    };
+    
+    const handleChainChanged = (chainId) => {
+      console.log('🔗 Chain changed to:', chainId);
+      window.location.reload();
+    };
+    
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    window.ethereum.on('chainChanged', handleChainChanged);
+    
+    console.log('✅ Event listeners set up');
+    
+    return () => {
+      console.log('Cleaning up event listeners...');
+      window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+      window.ethereum.removeListener('chainChanged', handleChainChanged);
+    };
+  }, []);
 
   // Handle browser back/forward
   useEffect(() => {
@@ -275,157 +272,129 @@ const connectWallet = async () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Listen for account/network changes
-useEffect(() => {
-  if (window.ethereum) {
-    // Handle account changes
-    window.ethereum.on('accountsChanged', (accounts) => {
-      if (accounts.length > 0) {
-        setWalletAddress(accounts[0]);
-        
-        const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
-        setProvider(web3Provider);
-        setSigner(web3Provider.getSigner());
-        
-        console.log('Account changed:', accounts[0]);
-      } else {
-        setWalletAddress('');
-        setConnected(false);
-        setProvider(null);
-        setSigner(null);
-      }
-    });
-    
-    // Reload on network change
-    window.ethereum.on('chainChanged', () => {
-      window.location.reload();
-    });
-  }
-}, []);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-black text-white">
       {/* Navigation */}
       <nav className="bg-gray-800 p-4">
-  <div className="container mx-auto flex justify-between items-center">
-    <h1 
-      className="text-2xl font-bold text-red-500 cursor-pointer"
-      onClick={() => navigateTo('home')}
-    >
-      Kings of Red
-    </h1>
-    
-    <div className="flex gap-6 items-center flex-wrap">
-      {/* Home */}
-      <button
-        onClick={() => navigateTo('home')}
-        className={`transition ${
-          currentPage === 'home' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        Home
-      </button>
-      
-      {/* Mint Heralds */}
-<button
-  onClick={() => navigateTo('mint')}  // ✅ Changed
-  className={`transition ${
-    currentPage === 'mint' ? 'text-red-500' : 'hover:text-red-400'
-  }`}
->
-  Mint Heralds
-</button>
+        <div className="container mx-auto flex justify-between items-center">
+          <h1 
+            className="text-2xl font-bold text-red-500 cursor-pointer"
+            onClick={() => navigateTo('home')}
+          >
+            Kings of Red
+          </h1>
+          
+          <div className="flex gap-6 items-center flex-wrap">
+            {/* Home */}
+            <button
+              onClick={() => navigateTo('home')}
+              className={`transition ${
+                currentPage === 'home' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              Home
+            </button>
+            
+            {/* Mint Heralds */}
+            <button
+              onClick={() => navigateTo('mint')}
+              className={`transition ${
+                currentPage === 'mint' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              Mint Heralds
+            </button>
 
-{/* Mint Fighters */}
-<button
-  onClick={() => navigateTo('mint-fighter')}  // ✅ Changed
-  className={`transition ${
-    currentPage === 'mint-fighter' ? 'text-red-500' : 'hover:text-red-400'
-  }`}
->
-  Mint Fighters
-</button>
-      
-      {/* Staking */}
-      <button
-        onClick={() => navigateTo('staking')}
-        className={`transition ${
-          currentPage === 'staking' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        Staking
-      </button>
-      
-      {/* Exchange */}
-      <button
-        onClick={() => navigateTo('exchange')}
-        className={`transition ${
-          currentPage === 'exchange' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        Exchange
-      </button>
-      
-      {/* Dashboard */}
-      <button
-        onClick={() => navigateTo('dashboard')}
-        className={`transition ${
-          currentPage === 'dashboard' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        Dashboard
-      </button>
+            {/* Mint Fighters */}
+            <button
+              onClick={() => navigateTo('mint-fighter')}
+              className={`transition ${
+                currentPage === 'mint-fighter' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              Mint Fighters
+            </button>
+            
+            {/* Staking */}
+            <button
+              onClick={() => navigateTo('staking')}
+              className={`transition ${
+                currentPage === 'staking' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              Staking
+            </button>
+            
+            {/* Exchange */}
+            <button
+              onClick={() => navigateTo('exchange')}
+              className={`transition ${
+                currentPage === 'exchange' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+              >
+              Exchange
+            </button>
+            
+            {/* Dashboard */}
+            <button
+              onClick={() => navigateTo('dashboard')}
+              className={`transition ${
+                currentPage === 'dashboard' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              Dashboard
+            </button>
 
- {/* Battle Boosts */}
-      <button
-  onClick={() => navigateTo('boosts')}
-  className={`transition ${
-    currentPage === 'boosts' ? 'text-red-500' : 'hover:text-red-400'
-  }`}
->
-  Battle Boosts
-</button>
-      
-      {/* FAQ */}
-      <button
-        onClick={() => navigateTo('faq')}
-        className={`transition ${
-          currentPage === 'faq' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        FAQ
-      </button>
-      
-      {/* About */}
-      <button
-        onClick={() => navigateTo('about')}
-        className={`transition ${
-          currentPage === 'about' ? 'text-red-500' : 'hover:text-red-400'
-        }`}
-      >
-        About
-      </button>
+            {/* Battle Boosts */}
+            <button
+              onClick={() => navigateTo('boosts')}
+              className={`transition ${
+                currentPage === 'boosts' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              Battle Boosts
+            </button>
+            
+            {/* FAQ */}
+            <button
+              onClick={() => navigateTo('faq')}
+              className={`transition ${
+                currentPage === 'faq' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              FAQ
+            </button>
+            
+            {/* About */}
+            <button
+              onClick={() => navigateTo('about')}
+              className={`transition ${
+                currentPage === 'about' ? 'text-red-500' : 'hover:text-red-400'
+              }`}
+            >
+              About
+            </button>
 
-      {/* Wallet Connection */}
-      {!connected ? (
-        <button
-          onClick={connectWallet}
-          className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-bold transition"
-        >
-          Connect Wallet
-        </button>
-      ) : (
-        <button
-          onClick={disconnectWallet}
-          className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-mono text-sm transition"
-          title="Click to disconnect"
-        >
-          {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-        </button>
-      )}
-    </div>
-  </div>
-</nav>
+            {/* Wallet Connection */}
+            {!connected ? (
+              <button
+                onClick={connectWallet}
+                className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-bold transition"
+              >
+                Connect Wallet
+              </button>
+            ) : (
+              <button
+                onClick={disconnectWallet}
+                className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-mono text-sm transition"
+                title="Click to disconnect"
+              >
+                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+              </button>
+            )}
+          </div>
+        </div>
+      </nav>
 
       {/* Page Content */}
       <div className="container mx-auto px-4 py-8">
@@ -440,9 +409,10 @@ useEffect(() => {
         )}
         {currentPage === 'mint-fighter' && (
           <MintFighter 
-            provider={provider}
-            signer={signer}
-            address={walletAddress}
+            onNavigate={navigateTo}
+            connected={connected}
+            walletAddress={walletAddress}
+            connectWallet={connectWallet}
           />
         )}
         {currentPage === 'dashboard' && (
@@ -467,12 +437,12 @@ useEffect(() => {
           />
         )}
         {currentPage === 'boosts' && (
-  <BattleBoosts 
-    provider={provider}
-    signer={signer}
-    address={walletAddress}
-  />
-)}
+          <BattleBoosts 
+            provider={provider}
+            signer={signer}
+            address={walletAddress}
+          />
+        )}
         {currentPage === 'about' && (
           <AboutPage onNavigate={navigateTo} />
         )}
