@@ -1,6 +1,5 @@
 // Fighter Metadata API Endpoint
 // File: api/fighter/[tokenId].js
-// This generates dynamic metadata for Fighter NFTs
 
 const FIGHTER_CONTRACT = '0x8b2c136B30537Be53BBe1bb7511C4c43A64d6D0d';
 const BASE_RPC = 'https://mainnet.base.org';
@@ -21,12 +20,12 @@ const RARITIES = ['bronze', 'silver', 'gold'];
 const RARITY_NAMES = ['Bronze', 'Silver', 'Gold'];
 const RARITY_POINTS = [20, 50, 120];
 
-// Minimal ABI for Fighter contract
-const FIGHTER_ABI = [
-  "function getFighter(uint256 tokenId) external view returns (uint8 rarity, uint8 clan, uint8 energy, uint32 wins, uint32 losses, bool isStaked)"
-];
-
 export default async function handler(req, res) {
+  // Enable CORS for OpenSea
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET');
+  res.setHeader('Content-Type', 'application/json');
+  
   const { tokenId } = req.query;
   
   // Validate tokenId
@@ -40,43 +39,58 @@ export default async function handler(req, res) {
   }
   
   try {
-    // Import ethers v6 dynamically
-    const { ethers } = await import('ethers');
+    // Dynamic import for ethers
+    const ethers = await import('ethers');
     
-    // Connect to contract using ethers v6
+    // Minimal ABI
+    const FIGHTER_ABI = [
+      "function getFighter(uint256) view returns (uint8, uint8, uint8, uint32, uint32, bool)"
+    ];
+    
+    // Connect to Base
     const provider = new ethers.JsonRpcProvider(BASE_RPC);
     const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, provider);
     
-    // Fetch Fighter data from contract
-    const fighter = await contract.getFighter(id);
+    // Fetch data with timeout
+    const result = await Promise.race([
+      contract.getFighter(id),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 10000)
+      )
+    ]);
     
-    // Extract data (ethers v6 returns values directly)
-    const rarity = Number(fighter[0]);  // rarity
-    const clan = Number(fighter[1]);    // clan
-    const energy = Number(fighter[2]);  // energy
-    const wins = Number(fighter[3]);    // wins
-    const losses = Number(fighter[4]);  // losses
-    const isStaked = fighter[5];        // isStaked
+    // Parse result
+    const rarity = Number(result[0]);
+    const clan = Number(result[1]);
+    const energy = Number(result[2]);
+    const wins = Number(result[3]);
+    const losses = Number(result[4]);
+    const isStaked = Boolean(result[5]);
     
-    // Get clan and rarity info
+    // Validate data
+    if (rarity > 2 || clan > 6) {
+      throw new Error('Invalid contract data');
+    }
+    
     const clanInfo = CLANS[clan];
     const rarityName = RARITY_NAMES[rarity];
     const rarityKey = RARITIES[rarity];
     const points = RARITY_POINTS[rarity];
     
-    // Build image filename: bronze_smizfume.jpg
+    // Build image URL
     const imageFilename = `${rarityKey}_${clanInfo.name.toLowerCase()}.jpg`;
     const imageUrl = `${IMAGE_BASE_URL}/${imageFilename}`;
     
-    // Calculate stats
+    // Calculate win rate
     const totalBattles = wins + losses;
     const winRate = totalBattles > 0 ? Math.round((wins / totalBattles) * 100) : 0;
     
-    // Build metadata JSON
+    // Build metadata
     const metadata = {
       name: `${rarityName} ${clanInfo.fighter} #${id}`,
-      description: `A ${rarityName} Fighter from the ${clanInfo.name} Clan. This ${clanInfo.fighter} is ready for battle with ${wins} wins and ${losses} losses.`,
+      description: `A ${rarityName} Fighter from the ${clanInfo.name} Clan. This ${clanInfo.fighter} is ready for battle!`,
       image: imageUrl,
+      external_url: `https://kingsofred.com`,
       attributes: [
         {
           trait_type: "Rarity",
@@ -126,16 +140,27 @@ export default async function handler(req, res) {
       ]
     };
     
-    // Return JSON with proper headers
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
-    res.status(200).json(metadata);
+    // Cache for 5 minutes
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    
+    return res.status(200).json(metadata);
     
   } catch (error) {
-    console.error('Error fetching Fighter metadata:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch metadata',
-      details: error.message 
-    });
+    console.error('API Error:', error.message);
+    
+    // Return fallback metadata if contract fails
+    const fallbackMetadata = {
+      name: `Fighter #${id}`,
+      description: `Fighter NFT #${id} from Kings of Red`,
+      image: `${IMAGE_BASE_URL}/bronze_smizfume.jpg`,
+      attributes: [
+        {
+          trait_type: "Status",
+          value: "Loading..."
+        }
+      ]
+    };
+    
+    return res.status(200).json(fallbackMetadata);
   }
 }
