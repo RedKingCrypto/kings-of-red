@@ -1,560 +1,515 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Swords, Crown, Users, Zap, CheckCircle, AlertCircle } from 'lucide-react';
-import * as ethers from 'ethers';
+import { Shield, Swords, Crown, Sparkles, Users, Trophy, Gift, Plus, Minus, Zap } from 'lucide-react';
+import { ethers } from 'ethers';
 
 const FIGHTER_CONTRACT = '0x8b2c136B30537Be53BBe1bb7511C4c43A64d6D0d';
+const BASE_MAINNET_RPC = 'https://mainnet.base.org';
 
 const FIGHTER_ABI = [
-  "function MintFighter(uint8 rarity, string calldata referralCode) external payable",
+  "function mintFighter(uint8 rarity, string calldata referralCode) external payable",
   "function bronzePrice() external view returns (uint256)",
   "function silverPrice() external view returns (uint256)",
   "function goldPrice() external view returns (uint256)",
   "function getSupply() external view returns (uint256, uint256, uint256)",
   "function genesisSaleActive() external view returns (bool)",
-  "function balanceOf(address owner) external view returns (uint256)",
-  "function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256)",
-  "function getFighter(uint256 tokenId) external view returns (uint8 rarity, uint8 clan, uint8 energy, uint32 wins, uint32 losses, bool isStaked)"
+  "function bronzeMinted() external view returns (uint256)",
+  "function silverMinted() external view returns (uint256)",
+  "function goldMinted() external view returns (uint256)"
 ];
 
 const CLANS = [
-  { id: 0, name: 'Smizfume', color: 'from-purple-600 to-pink-600', description: 'Masters of poison and alchemy' },
-  { id: 1, name: 'Coalheart', color: 'from-red-600 to-orange-600', description: 'Fire and forge warriors' },
-  { id: 2, name: 'Warmdice', color: 'from-yellow-600 to-amber-600', description: 'Luck and fortune seekers' },
-  { id: 3, name: 'Bervation', color: 'from-blue-600 to-cyan-600', description: 'Healers and holy warriors' },
-  { id: 4, name: 'Konfisof', color: 'from-green-600 to-emerald-600', description: 'Strategic tacticians' },
-  { id: 5, name: 'Witkastle', color: 'from-indigo-600 to-violet-600', description: 'Morale and inspiration' },
-  { id: 6, name: 'Bowkin', color: 'from-teal-600 to-cyan-600', description: 'Trappers and hunters' }
+  { id: 0, name: 'Smizfume', fighter: 'Kenshi Champion', color: 'from-purple-600 to-pink-600' },
+  { id: 1, name: 'Coalheart', fighter: 'Shinobi', color: 'from-red-600 to-orange-600' },
+  { id: 2, name: 'Warmdice', fighter: 'Boarding Bruiser', color: 'from-yellow-600 to-amber-600' },
+  { id: 3, name: 'Bervation', fighter: 'Templar Guard', color: 'from-blue-600 to-cyan-600' },
+  { id: 4, name: 'Konfisof', fighter: 'Enforcer', color: 'from-green-600 to-emerald-600' },
+  { id: 5, name: 'Witkastle', fighter: 'Knight', color: 'from-indigo-600 to-violet-600' },
+  { id: 6, name: 'Bowkin', fighter: 'Oakwood Guardian', color: 'from-teal-600 to-cyan-600' }
 ];
 
-const RARITIES = [
-  {
-    id: 0,
-    name: 'Bronze',
-    icon: Shield,
-    color: 'from-orange-700 to-yellow-800',
-    borderColor: 'border-orange-600',
-    bgColor: 'bg-orange-900/20',
-    baseHit: '20%',
-    total: 777,
-    genesis: 98,
-    price: null,
-    perks: ['Entry-level warrior', 'Hardest difficulty', 'Great for learning']
-  },
-  {
-    id: 1,
-    name: 'Silver',
-    icon: Swords,
-    color: 'from-gray-400 to-gray-600',
-    borderColor: 'border-gray-400',
-    bgColor: 'bg-gray-700/20',
-    baseHit: '30%',
-    total: 560,
-    genesis: 77,
-    price: null,
-    perks: ['Balanced warrior', 'Moderate difficulty', 'Best value']
-  },
-  {
-    id: 2,
-    name: 'Gold',
-    icon: Crown,
-    color: 'from-yellow-400 to-yellow-600',
-    borderColor: 'border-yellow-500',
-    bgColor: 'bg-yellow-600/20',
-    baseHit: '40%',
-    total: 343,
-    genesis: 49,
-    price: null,
-    perks: ['Elite warrior', 'Easiest difficulty', 'Premium experience']
-  }
-];
-
-const MintFighter = ({ provider, signer, address }) => {
-  const [selectedRarity, setSelectedRarity] = useState(1); // Default Silver
-  const [quantity, setQuantity] = useState(1);
-  const [referralCode, setReferralCode] = useState('');
-  const [prices, setPrices] = useState([null, null, null]);
-  const [supply, setSupply] = useState([0, 0, 0]);
-  const [genesisSale, setGenesisSale] = useState(false);
+export default function FighterMintingPage({ onNavigate, connected, walletAddress, connectWallet }) {
   const [minting, setMinting] = useState(false);
-  const [txHash, setTxHash] = useState('');
-  const [error, setError] = useState('');
-  const [myFighters, setMyFighters] = useState([]);
-  const [showMyFighters, setShowMyFighters] = useState(false);
+  const [mintSuccess, setMintSuccess] = useState(null);
+  const [referralCode, setReferralCode] = useState('');
+  const [quantities, setQuantities] = useState({
+    bronze: 1,
+    silver: 1,
+    gold: 1
+  });
+  
+  // Contract data
+  const [supply, setSupply] = useState({
+    bronze: { total: 777, minted: 0, price: '0.00638' },
+    silver: { total: 560, minted: 0, price: '0.00974' },
+    gold: { total: 343, minted: 0, price: '0.01310' }
+  });
+  const [loading, setLoading] = useState(false);
+  const [genesisSale, setGenesisSale] = useState(false);
 
-  // Debug logging
+  // Check URL for referral code on mount AND load stored code
   useEffect(() => {
-    console.log('MintFighter Props:', { 
-      hasProvider: !!provider, 
-      hasSigner: !!signer, 
-      address: address,
-      prices: prices.map(p => p ? ethers.utils.formatEther(p) : 'null')
-    });
-  }, [provider, signer, address, prices]);
-
-  // Load contract data
-  useEffect(() => {
-    if (provider) {
-      loadContractData();
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref');
+    if (refCode) {
+      setReferralCode(refCode);
+    } else {
+      const storedCode = localStorage.getItem('referralCode');
+      const expiry = localStorage.getItem('referralExpiry');
+      
+      if (storedCode && expiry) {
+        const expiryTime = parseInt(expiry);
+        if (Date.now() < expiryTime) {
+          setReferralCode(storedCode);
+          console.log(`✅ Using stored referral: ${storedCode}`);
+        } else {
+          localStorage.removeItem('referralCode');
+          localStorage.removeItem('referralExpiry');
+          console.log('⏰ Referral code expired');
+        }
+      }
     }
-  }, [provider]);
+  }, []);
 
-  // Load user's fighters
+  // Load contract data on mount
   useEffect(() => {
-    if (provider && address) {
-      loadMyFighters();
-    }
-  }, [provider, address, txHash]); // Reload after successful mint
+    loadContractData();
+  }, [connected, walletAddress]);
 
   const loadContractData = async () => {
     try {
-      const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, provider);
+      setLoading(true);
       
-      console.log('Loading contract data...');
-      
-      const [bronze, silver, gold] = await Promise.all([
-        contract.bronzePrice(),
-        contract.silverPrice(),
-        contract.goldPrice()
-      ]);
-      
-      console.log('Prices loaded:', { 
-        bronze: ethers.utils.formatEther(bronze), 
-        silver: ethers.utils.formatEther(silver), 
-        gold: ethers.utils.formatEther(gold) 
-      });
-      
-      setPrices([bronze, silver, gold]);
-      
-      const [bronzeMinted, silverMinted, goldMinted] = await contract.getSupply();
-      setSupply([
-        bronzeMinted.toNumber(),
-        silverMinted.toNumber(),
-        goldMinted.toNumber()
-      ]);
-      
-      console.log('Supply:', { bronze: bronzeMinted.toNumber(), silver: silverMinted.toNumber(), gold: goldMinted.toNumber() });
-      
-      const isGenesis = await contract.genesisSaleActive();
-      setGenesisSale(isGenesis);
-      
-      console.log('Genesis sale active:', isGenesis);
-    } catch (err) {
-      console.error('Error loading contract data:', err);
-      setError('Failed to load contract data. Make sure you\'re on Base network.');
-    }
-  };
-
-  const loadMyFighters = async () => {
-    try {
-      const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, provider);
-      const balance = await contract.balanceOf(address);
-      
-      const fighters = [];
-      for (let i = 0; i < balance; i++) {
-        const tokenId = await contract.tokenOfOwnerByIndex(address, i);
-        const details = await contract.getFighter(tokenId);
-        fighters.push({
-          tokenId: tokenId.toNumber(),
-          rarity: details.rarity,
-          clan: details.clan,
-          energy: details.energy,
-          wins: details.wins.toNumber(),
-          losses: details.losses.toNumber(),
-          isStaked: details.isStaked
-        });
+      let provider;
+      if (window.ethereum && connected) {
+        provider = new ethers.BrowserProvider(window.ethereum);
+      } else {
+        provider = new ethers.JsonRpcProvider(BASE_MAINNET_RPC);
       }
       
-      setMyFighters(fighters);
-    } catch (err) {
-      console.error('Error loading fighters:', err);
+      const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, provider);
+      
+      const [bronzeMinted, silverMinted, goldMinted, bronzePrice, silverPrice, goldPrice, isGenesis] = await Promise.all([
+        contract.bronzeMinted(),
+        contract.silverMinted(),
+        contract.goldMinted(),
+        contract.bronzePrice(),
+        contract.silverPrice(),
+        contract.goldPrice(),
+        contract.genesisSaleActive()
+      ]);
+      
+      console.log('Fighter contract data loaded:', {
+        bronze: Number(bronzeMinted),
+        silver: Number(silverMinted),
+        gold: Number(goldMinted),
+        genesisSale: isGenesis
+      });
+      
+      setSupply({
+        bronze: { 
+          total: 777, 
+          minted: Number(bronzeMinted), 
+          price: ethers.formatEther(bronzePrice) 
+        },
+        silver: { 
+          total: 560, 
+          minted: Number(silverMinted), 
+          price: ethers.formatEther(silverPrice) 
+        },
+        gold: { 
+          total: 343, 
+          minted: Number(goldMinted), 
+          price: ethers.formatEther(goldPrice) 
+        }
+      });
+      
+      setGenesisSale(isGenesis);
+    } catch (error) {
+      console.error('Error loading contract data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleMint = async () => {
-    if (!signer) {
-      setError('Please connect your wallet');
+  const updateQuantity = (rarity, change) => {
+    setQuantities(prev => {
+      const newQty = prev[rarity] + change;
+      const remaining = supply[rarity].total - supply[rarity].minted;
+      return {
+        ...prev,
+        [rarity]: Math.max(1, Math.min(7, Math.min(newQty, remaining)))
+      };
+    });
+  };
+
+  const mintFighter = async (rarity) => {
+    if (!connected) {
+      alert('Please connect your wallet first!');
       return;
     }
 
     setMinting(true);
-    setError('');
-    setTxHash('');
 
     try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
       const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, signer);
-      const price = prices[selectedRarity];
       
-      if (!price) {
-        setError('Price not loaded yet. Please refresh.');
+      let pricePerNFT;
+      let rarityNum;
+      let rarityName;
+      const quantity = quantities[rarity];
+      
+      if (rarity === 'bronze') {
+        pricePerNFT = await contract.bronzePrice();
+        rarityNum = 0;
+        rarityName = 'Bronze';
+      } else if (rarity === 'silver') {
+        pricePerNFT = await contract.silverPrice();
+        rarityNum = 1;
+        rarityName = 'Silver';
+      } else {
+        pricePerNFT = await contract.goldPrice();
+        rarityNum = 2;
+        rarityName = 'Gold';
+      }
+      
+      const totalPrice = pricePerNFT * BigInt(quantity);
+      
+      const remaining = supply[rarity].total - supply[rarity].minted;
+      if (remaining <= 0) {
+        alert(`${rarityName} Fighters are sold out!`);
         setMinting(false);
         return;
       }
       
-      const totalCost = price.mul(quantity);
-
-      console.log('Minting:', { rarity: selectedRarity, quantity, totalCost: ethers.utils.formatEther(totalCost) });
-
-      const tx = await contract.MintFighter(selectedRarity, referralCode || '', {
-        value: totalCost
+      if (quantity > remaining) {
+        alert(`Only ${remaining} ${rarityName} Fighter${remaining > 1 ? 's' : ''} remaining!`);
+        setMinting(false);
+        return;
+      }
+      
+      const refCode = referralCode || '';
+      const tx = await contract.mintFighter(rarityNum, refCode, { value: totalPrice });
+      
+      alert(`Transaction sent! Minting ${quantity} Fighter${quantity > 1 ? 's' : ''}...\n\nThis may take 10-30 seconds.`);
+      
+      const receipt = await tx.wait();
+      
+      setMintSuccess({
+        rarity: rarityName,
+        quantity: quantity,
+        totalPrice: ethers.formatEther(totalPrice),
+        pricePerNFT: ethers.formatEther(pricePerNFT),
+        txHash: receipt.hash
       });
-
-      setTxHash(tx.hash);
-      console.log('Transaction sent:', tx.hash);
       
-      await tx.wait();
-      console.log('Transaction confirmed!');
-
-      // Reload data
       await loadContractData();
-      await loadMyFighters();
-
-      alert(`🎉 Success! Minted ${quantity} ${RARITIES[selectedRarity].name} Fighter(s)!`);
-    } catch (err) {
-      console.error('Minting error:', err);
       
-      if (err.code === 'INSUFFICIENT_FUNDS') {
-        setError('Insufficient ETH balance');
-      } else if (err.message.includes('user rejected')) {
-        setError('Transaction cancelled');
+    } catch (error) {
+      console.error('Minting failed:', error);
+      
+      if (error.code === 'ACTION_REJECTED') {
+        alert('Transaction cancelled by user.');
+      } else if (error.message.includes('insufficient funds')) {
+        alert('Insufficient funds. Please add more ETH to your wallet on Base network.');
       } else {
-        setError(err.message || 'Minting failed');
+        alert('Minting failed: ' + (error.reason || error.message || 'Unknown error'));
       }
     } finally {
       setMinting(false);
     }
   };
 
-  const getRarityInfo = (rarity) => RARITIES[rarity];
-  const getClanInfo = (clan) => CLANS[clan];
-
-  const getMaxMintable = () => {
-    if (!genesisSale) return RARITIES[selectedRarity].total - supply[selectedRarity];
-    return RARITIES[selectedRarity].genesis - supply[selectedRarity];
+  const getRarityColor = (rarity) => {
+    const r = rarity.toLowerCase();
+    switch(r) {
+      case 'gold': return 'from-yellow-600 to-amber-500';
+      case 'silver': return 'from-gray-400 to-slate-300';
+      case 'bronze': return 'from-orange-600 to-amber-700';
+      default: return 'from-gray-600 to-gray-500';
+    }
   };
 
-  const totalPrice = prices[selectedRarity] && prices[selectedRarity].gt(0) ? 
-    ethers.utils.formatEther(prices[selectedRarity].mul(quantity)) : '0';
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900 to-gray-900 text-white">
-      <div className="container mx-auto px-4 py-12">
-        
-        {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-black text-white">
+      <div className="container mx-auto px-4 py-8">
+        {/* Hero Section */}
         <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-red-500 via-yellow-500 to-purple-600 bg-clip-text text-transparent">
-            Mint Fighter NFTs
-          </h1>
-          <p className="text-xl text-gray-300 mb-2">
-            Choose your Fighter's rarity and join the battle for glory!
+          {referralCode && (
+            <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/50 rounded-lg p-4 mb-8 max-w-2xl mx-auto">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-2xl">🤝</span>
+                <span className="font-bold text-green-400">Referral Active</span>
+              </div>
+              <p className="text-sm text-gray-300 text-center">
+                Code: <strong className="text-white">{referralCode}</strong>
+              </p>
+              <p className="text-xs text-gray-400 text-center mt-1">
+                Your mint will support this referrer (they earn 7% commission)
+              </p>
+            </div>
+          )}
+          
+          <div className="inline-block mb-4">
+            <Sparkles className="w-16 h-16 mx-auto text-yellow-400 animate-pulse" />
+          </div>
+          <h2 className="text-5xl font-bold mb-4">Mint Your Fighter NFT</h2>
+          <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-6">
+            Choose your warrior! Fighters battle monsters for rewards. Higher rarity = better hit chance = easier victories!
           </p>
-          {genesisSale && (
-            <p className="text-yellow-400 font-bold text-lg">
-              🔥 Genesis Sale Active - Limited Supply!
-            </p>
+          
+          {loading && (
+            <p className="text-yellow-400 animate-pulse">Loading contract data...</p>
           )}
         </div>
 
-        {/* Rarity Selection */}
-        <div className="mb-12">
-          <h2 className="text-3xl font-bold text-center mb-8">Select Your Fighter Rarity</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {RARITIES.map((rarity) => {
-              const IconComponent = rarity.icon;
-              const isSelected = selectedRarity === rarity.id;
-              const currentSupply = supply[rarity.id];
-              const maxSupply = genesisSale ? rarity.genesis : rarity.total;
-              const percentage = (currentSupply / maxSupply) * 100;
-              const price = prices[rarity.id];
-              
-              return (
-                <div
-                  key={rarity.id}
-                  onClick={() => setSelectedRarity(rarity.id)}
-                  className={`cursor-pointer rounded-lg p-6 transition-all transform ${
-                    isSelected
-                      ? `border-4 ${rarity.borderColor} ${rarity.bgColor} scale-105 shadow-2xl`
-                      : 'border-2 border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:scale-102'
-                  }`}
-                >
-                  {/* Icon & Name */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={`p-4 rounded-lg bg-gradient-to-br ${rarity.color}`}>
-                      <IconComponent className="w-12 h-12 text-white" />
-                    </div>
-                    {isSelected && (
-                      <CheckCircle className="w-8 h-8 text-green-400" />
-                    )}
+        {/* Genesis Sale Perks */}
+        {genesisSale && (
+          <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-lg p-6 mb-8 max-w-4xl mx-auto">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <Gift className="w-6 h-6" />
+              Genesis Sale Exclusive
+            </h3>
+            <ul className="space-y-2">
+              <li className="flex items-start gap-2">
+                <Trophy className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-300">Limited supply - Only 1,680 Fighters total</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Trophy className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-300">Guaranteed lowest price for First Generation Fighters</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Trophy className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-300">Mint up to 7 at once to save gas fees</span>
+              </li>
+            </ul>
+          </div>
+        )}
+
+        {/* Minting Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 max-w-6xl mx-auto">
+          {['bronze', 'silver', 'gold'].map(rarity => {
+            const rarityData = supply[rarity];
+            const remaining = rarityData.total - rarityData.minted;
+            const percentMinted = (rarityData.minted / rarityData.total) * 100;
+            const quantity = quantities[rarity];
+            const pricePerNFT = parseFloat(rarityData.price);
+            const totalPrice = (pricePerNFT * quantity).toFixed(5);
+            const totalPriceUSD = (pricePerNFT * quantity * 2977).toFixed(2);
+
+            return (
+              <div
+                key={rarity}
+                className={`bg-gradient-to-br ${getRarityColor(rarity)} p-0.5 rounded-xl`}
+              >
+                <div className="bg-gray-900 rounded-xl p-6">
+                  <div className="text-center mb-4">
+                    <h3 className="text-2xl font-bold capitalize mb-1">{rarity} Fighter</h3>
+                    <p className="text-2xl font-bold">{rarityData.price} ETH</p>
+                    <p className="text-sm text-gray-400">≈ ${(pricePerNFT * 2977).toFixed(2)}</p>
                   </div>
 
-                  <h3 className="text-2xl font-bold mb-2">{rarity.name} Fighter</h3>
-                  
-                  {/* Price */}
-                  <div className="mb-4">
-                    <p className="text-sm text-gray-400">Price:</p>
-                    <p className="text-2xl font-bold text-yellow-400">
-                      {price ? `${ethers.utils.formatEther(price)} ETH` : 'Loading...'}
-                    </p>
-                  </div>
-
-                  {/* Base Hit Rate */}
-                  <div className="mb-4 p-3 bg-purple-900/30 border border-purple-500 rounded-lg">
-                    <p className="text-sm text-gray-400">Base Hit Rate:</p>
-                    <p className="text-xl font-bold text-purple-400">{rarity.baseHit}</p>
-                  </div>
-
-                  {/* Supply Progress */}
                   <div className="mb-4">
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-gray-400">
-                        {genesisSale ? 'Genesis Supply' : 'Total Supply'}:
-                      </span>
-                      <span className="font-bold">
-                        {currentSupply} / {maxSupply}
-                      </span>
+                      <span className="text-gray-400">Supply</span>
+                      <span className="font-bold">{remaining}/{rarityData.total}</span>
                     </div>
-                    <div className="w-full bg-gray-700 rounded-full h-3">
+                    <div className="w-full bg-gray-800 rounded-full h-2">
                       <div
-                        className={`h-3 rounded-full bg-gradient-to-r ${rarity.color}`}
-                        style={{ width: `${percentage}%` }}
-                      ></div>
+                        className={`bg-gradient-to-r ${getRarityColor(rarity)} h-2 rounded-full transition-all`}
+                        style={{ width: `${percentMinted}%` }}
+                      />
                     </div>
                   </div>
 
-                  {/* Perks */}
-                  <div>
-                    <p className="text-sm text-gray-400 mb-2">Perks:</p>
-                    <ul className="space-y-1">
-                      {rarity.perks.map((perk, idx) => (
-                        <li key={idx} className="text-xs text-gray-300">
-                          • {perk}
-                        </li>
-                      ))}
-                    </ul>
+                  <div className="bg-black/50 rounded-lg p-4 mb-4">
+                    <div className="text-sm text-gray-400 mb-2">Base Hit Chance:</div>
+                    <div className="text-xl font-bold">
+                      {rarity === 'bronze' ? '20%' : rarity === 'silver' ? '30%' : '40%'}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Info Panel */}
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* Clan Info */}
-            <div className="bg-gray-800/50 rounded-lg p-6">
-              <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
-                <Users className="w-6 h-6 text-red-500" />
-                The Seven Clans
-              </h3>
-              <p className="text-gray-300 mb-4">
-                Each Fighter belongs to one of seven clans. Your Fighter's clan is randomly assigned at mint, with equal distribution across all rarities.
-              </p>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {CLANS.map((clan) => (
-                  <div
-                    key={clan.id}
-                    className={`rounded-lg p-4 bg-gradient-to-br ${clan.color} bg-opacity-10 border border-gray-700`}
-                  >
-                    <h4 className="font-bold mb-1">{clan.name}</h4>
-                    <p className="text-xs text-gray-400">{clan.description}</p>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="mt-4 p-4 bg-purple-900/20 border border-purple-500 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <Zap className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold text-yellow-400 mb-1">Home Arena Bonus</p>
-                    <p className="text-sm text-gray-300">
-                      When your Fighter battles in their clan's arena, they receive +4% hit chance!
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Mint Panel */}
-          <div className="lg:col-span-1">
-            <div className="bg-gray-800 rounded-lg p-6 sticky top-4">
-              <h2 className="text-2xl font-bold mb-4">Mint Details</h2>
-              
-              {/* Selected Rarity */}
-              <div className="mb-4">
-                <label className="block text-sm text-gray-400 mb-2">Selected Rarity:</label>
-                <div className={`p-3 rounded-lg bg-gradient-to-r ${getRarityInfo(selectedRarity).color}`}>
-                  <span className="font-bold text-white">{getRarityInfo(selectedRarity).name} Fighter</span>
-                </div>
-              </div>
-
-              {/* Quantity */}
-              <div className="mb-4">
-                <label className="block text-sm text-gray-400 mb-2">
-                  Quantity: (Max: {Math.min(7, getMaxMintable())})
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max={Math.min(7, getMaxMintable())}
-                  value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, Math.min(7, parseInt(e.target.value) || 1)))}
-                  className="w-full bg-gray-700 text-white px-4 py-2 rounded-lg"
-                />
-              </div>
-
-              {/* Referral Code */}
-              <div className="mb-6">
-                <label className="block text-sm text-gray-400 mb-2">
-                  Referral Code (Optional):
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter referral code"
-                  value={referralCode}
-                  onChange={(e) => setReferralCode(e.target.value)}
-                  className="w-full bg-gray-700 text-white px-4 py-2 rounded-lg"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Referrer gets 7% commission
-                </p>
-              </div>
-
-              {/* Total Cost */}
-              <div className="mb-6 p-4 bg-purple-900/30 border border-purple-500 rounded-lg">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Total Cost:</span>
-                  <span className="text-2xl font-bold text-yellow-400">{totalPrice} ETH</span>
-                </div>
-                {referralCode && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    Includes 7% referral commission
-                  </p>
-                )}
-              </div>
-
-              {/* Mint Button */}
-              <button
-                onClick={handleMint}
-                disabled={minting || !signer || getMaxMintable() === 0 || !prices[selectedRarity]}
-                className={`w-full py-4 rounded-lg font-bold text-lg transition-all ${
-                  minting || !signer || getMaxMintable() === 0 || !prices[selectedRarity]
-                    ? 'bg-gray-600 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-yellow-500 to-red-600 hover:from-yellow-600 hover:to-red-700 transform hover:scale-105'
-                }`}
-              >
-                {minting ? 'Minting...' : 
-                 !signer ? 'Connect Wallet' : 
-                 !prices[selectedRarity] ? 'Loading...' :
-                 getMaxMintable() === 0 ? 'Sold Out' : 
-                 `Mint ${quantity} Fighter${quantity > 1 ? 's' : ''}`}
-              </button>
-
-              {/* Error Message */}
-              {error && (
-                <div className="mt-4 p-3 bg-red-900/30 border border-red-500 rounded-lg flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-400">{error}</p>
-                </div>
-              )}
-
-              {/* Success Message */}
-              {txHash && (
-                <div className="mt-4 p-3 bg-green-900/30 border border-green-500 rounded-lg">
-                  <p className="text-sm text-green-400 mb-2">✅ Transaction successful!</p>
-                  <a
-                    href={`https://basescan.org/tx/${txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-400 hover:underline break-all"
-                  >
-                    View on BaseScan
-                  </a>
-                </div>
-              )}
-
-              {/* My Fighters */}
-              {address && myFighters.length > 0 && (
-                <div className="mt-6">
-                  <button
-                    onClick={() => setShowMyFighters(!showMyFighters)}
-                    className="w-full bg-gray-700 hover:bg-gray-600 py-2 rounded-lg font-bold transition"
-                  >
-                    My Fighters ({myFighters.length}) {showMyFighters ? '▲' : '▼'}
-                  </button>
-                  
-                  {showMyFighters && (
-                    <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
-                      {myFighters.map((fighter) => {
-                        const rarityInfo = getRarityInfo(fighter.rarity);
-                        const clanInfo = getClanInfo(fighter.clan);
-                        
-                        return (
-                          <div
-                            key={fighter.tokenId}
-                            className={`p-3 rounded-lg border ${rarityInfo.borderColor} ${rarityInfo.bgColor}`}
-                          >
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <h4 className="font-bold">Fighter #{fighter.tokenId}</h4>
-                                <p className="text-xs text-gray-400">{rarityInfo.name} • {clanInfo.name}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-xs text-gray-400">Energy</p>
-                                <p className="font-bold text-green-400">{fighter.energy}/100</p>
-                              </div>
-                            </div>
-                            <div className="flex gap-4 text-xs">
-                              <span className="text-green-400">{fighter.wins}W</span>
-                              <span className="text-red-400">{fighter.losses}L</span>
-                              {fighter.isStaked && <span className="text-yellow-400">⚡ Staked</span>}
-                            </div>
-                          </div>
-                        );
-                      })}
+                  {/* Quantity Selector */}
+                  {remaining > 0 && connected && (
+                    <div className="bg-black/30 rounded-lg p-4 mb-4">
+                      <div className="text-sm text-gray-400 mb-2 text-center">Quantity</div>
+                      <div className="flex items-center justify-center gap-4">
+                        <button
+                          onClick={() => updateQuantity(rarity, -1)}
+                          disabled={quantity <= 1}
+                          className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed p-2 rounded-lg transition"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <span className="text-2xl font-bold w-8 text-center">{quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(rarity, 1)}
+                          disabled={quantity >= 7 || quantity >= remaining}
+                          className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed p-2 rounded-lg transition"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {quantity > 1 && (
+                        <div className="mt-3 text-center">
+                          <div className="text-sm text-gray-400">Total Cost</div>
+                          <div className="text-xl font-bold">{totalPrice} ETH</div>
+                          <div className="text-xs text-gray-400">≈ ${totalPriceUSD}</div>
+                        </div>
+                      )}
                     </div>
                   )}
+
+                  <button
+                    onClick={() => mintFighter(rarity)}
+                    disabled={minting || remaining === 0 || !connected}
+                    className={`w-full py-3 rounded-lg font-bold transition ${
+                      remaining === 0
+                        ? 'bg-gray-700 cursor-not-allowed text-gray-500'
+                        : minting
+                        ? 'bg-gray-700 cursor-wait text-gray-300'
+                        : !connected
+                        ? 'bg-gray-700 cursor-not-allowed text-gray-400'
+                        : 'bg-gradient-to-r from-purple-600 to-red-600 hover:from-purple-700 hover:to-red-700'
+                    }`}
+                  >
+                    {remaining === 0
+                      ? 'SOLD OUT'
+                      : minting
+                      ? 'Minting...'
+                      : !connected
+                      ? 'Connect Wallet to Mint'
+                      : `Mint ${quantity} Fighter${quantity > 1 ? 's' : ''}`}
+                  </button>
                 </div>
-              )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Success Modal */}
+        {mintSuccess && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-900 rounded-xl p-8 max-w-2xl w-full border border-green-500/50">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Sparkles className="w-8 h-8 text-green-400" />
+                </div>
+                <h3 className="text-2xl font-bold mb-2">
+                  {mintSuccess.quantity} Fighter{mintSuccess.quantity > 1 ? 's' : ''} Minted!
+                </h3>
+                <p className="text-gray-400 mb-6">
+                  Your {mintSuccess.rarity} Fighter{mintSuccess.quantity > 1 ? 's' : ''} are ready for battle
+                </p>
+
+                <div className="space-y-2 mb-6 bg-black/30 rounded-lg p-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Quantity:</span>
+                    <span className="font-bold">{mintSuccess.quantity}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Price Per NFT:</span>
+                    <span className="font-bold">{mintSuccess.pricePerNFT} ETH</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Total Paid:</span>
+                    <span className="font-bold">{mintSuccess.totalPrice} ETH</span>
+                  </div>
+                </div>
+
+                <a
+                  href={`https://basescan.org/tx/${mintSuccess.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-lg font-semibold transition mb-3 text-center"
+                >
+                  View on BaseScan
+                </a>
+
+                <button
+                  onClick={() => {
+                    setMintSuccess(null);
+                    loadContractData();
+                  }}
+                  className="w-full bg-purple-600 hover:bg-purple-700 py-3 rounded-lg font-semibold transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Home Arena Bonus */}
+        <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-lg p-6 mb-8 max-w-4xl mx-auto">
+          <div className="flex items-start gap-3">
+            <Zap className="w-6 h-6 text-yellow-400 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="text-xl font-bold mb-2">Home Arena Bonus</h3>
+              <p className="text-gray-300">
+                When your Fighter battles in their clan's arena, they receive <strong className="text-yellow-400">+4% hit chance!</strong> Each Fighter is randomly assigned to one of seven clans during minting.
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Info Section */}
-        <div className="mt-12 bg-gray-800/50 rounded-lg p-8">
-          <h2 className="text-2xl font-bold mb-6">About Fighters</h2>
+        {/* Seven Clans */}
+        <div className="bg-gradient-to-r from-red-900/30 to-orange-900/30 border border-red-500/30 rounded-lg p-6 mb-8 max-w-4xl mx-auto">
+          <h3 className="text-xl font-bold mb-4">Seven Legendary Fighter Clans</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {CLANS.map(clan => (
+              <div key={clan.id} className={`bg-gradient-to-br ${clan.color} p-0.5 rounded-lg`}>
+                <div className="bg-gray-900 rounded-lg p-3 text-center">
+                  <Swords className="w-6 h-6 mx-auto mb-2 opacity-70" />
+                  <div className="text-sm font-bold">{clan.name}</div>
+                  <div className="text-xs text-gray-400">{clan.fighter}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* About Fighters */}
+        <div className="max-w-4xl mx-auto space-y-4">
+          <h3 className="text-2xl font-bold text-center mb-6">About Fighters</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-lg font-bold mb-3 text-yellow-400">⚔️ Battle System</h3>
-              <ul className="space-y-2 text-gray-300">
-                <li>• Stake your Fighter to enable battles</li>
-                <li>• Each Fighter starts with 100 energy</li>
-                <li>• Each battle costs 20 energy</li>
-                <li>• Refuel with FOOD tokens + 3 hours wait</li>
-                <li>• Win battles to earn FOOD, GOLD, WOOD, and RKT tokens!</li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-bold mb-3 text-yellow-400">🔨 Forging</h3>
-              <ul className="space-y-2 text-gray-300">
-                <li>• Forge 2 Bronze → 1 Silver</li>
-                <li>• Forge 2 Silver → 1 Gold</li>
-                <li>• Forged Fighters keep the clan from the first Fighter</li>
-                <li>• Increase your Fighter's power through forging!</li>
-              </ul>
-            </div>
+          <div className="bg-gray-800/50 rounded-lg p-6">
+            <h4 className="font-bold mb-3 text-yellow-400 flex items-center gap-2">
+              <Swords className="w-5 h-5" />
+              Battle System
+            </h4>
+            <ul className="space-y-2 text-gray-300 text-sm">
+              <li>• Stake your Fighter to enable battles</li>
+              <li>• Each Fighter starts with 100 energy</li>
+              <li>• Each battle costs 20 energy</li>
+              <li>• Refuel with FOOD tokens + 3 hours wait</li>
+              <li>• Win battles to earn FOOD, GOLD, WOOD, and RKT tokens!</li>
+            </ul>
+          </div>
+          
+          <div className="bg-gray-800/50 rounded-lg p-6">
+            <h4 className="font-bold mb-3 text-yellow-400 flex items-center gap-2">
+              <Shield className="w-5 h-5" />
+              Forging
+            </h4>
+            <ul className="space-y-2 text-gray-300 text-sm">
+              <li>• Forge 2 Bronze → 1 Silver</li>
+              <li>• Forge 2 Silver → 1 Gold</li>
+              <li>• Forged Fighters keep the clan from the first Fighter</li>
+              <li>• Increase your Fighter's power through forging!</li>
+            </ul>
+          </div>
+
+          <div className="bg-gray-800/50 rounded-lg p-6">
+            <h4 className="font-bold mb-2">Why mint multiple at once?</h4>
+            <p className="text-gray-300 text-sm">
+              Minting up to 7 Fighters in one transaction saves you gas fees and gives you more warriors for battle!
+            </p>
           </div>
         </div>
       </div>
     </div>
   );
-};
-
-export default MintFighter;
+}
