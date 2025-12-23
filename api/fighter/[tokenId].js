@@ -23,8 +23,7 @@ const RARITY_POINTS = [20, 50, 120];
 
 // Minimal ABI for Fighter contract
 const FIGHTER_ABI = [
-  "function getFighter(uint256 tokenId) external view returns (uint8 rarity, uint8 clan, uint8 energy, uint32 wins, uint32 losses, bool isStaked)",
-  "function getPvPStats(uint256 tokenId) external view returns (uint32 pvpWins, uint32 pvpLosses)"
+  "function getFighter(uint256 tokenId) external view returns (uint8 rarity, uint8 clan, uint8 energy, uint32 wins, uint32 losses, bool isStaked)"
 ];
 
 export default async function handler(req, res) {
@@ -41,35 +40,23 @@ export default async function handler(req, res) {
   }
   
   try {
-    // Import ethers dynamically (Vercel serverless)
+    // Import ethers v6 dynamically
     const { ethers } = await import('ethers');
     
-    // Connect to contract
-    const provider = new ethers.providers.JsonRpcProvider(BASE_RPC);
+    // Connect to contract using ethers v6
+    const provider = new ethers.JsonRpcProvider(BASE_RPC);
     const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, provider);
     
     // Fetch Fighter data from contract
     const fighter = await contract.getFighter(id);
     
-    // Try to get PvP stats (might not exist yet if not implemented)
-    let pvpWins = 0;
-    let pvpLosses = 0;
-    try {
-      const pvpStats = await contract.getPvPStats(id);
-      pvpWins = pvpStats.pvpWins.toNumber();
-      pvpLosses = pvpStats.pvpLosses.toNumber();
-    } catch (e) {
-      // PvP stats not available yet, use 0
-      console.log('PvP stats not available');
-    }
-    
-    // Extract data
-    const rarity = fighter.rarity; // 0, 1, or 2
-    const clan = fighter.clan;     // 0-6
-    const energy = fighter.energy;
-    const wins = fighter.wins.toNumber();
-    const losses = fighter.losses.toNumber();
-    const isStaked = fighter.isStaked;
+    // Extract data (ethers v6 returns values directly)
+    const rarity = Number(fighter[0]);  // rarity
+    const clan = Number(fighter[1]);    // clan
+    const energy = Number(fighter[2]);  // energy
+    const wins = Number(fighter[3]);    // wins
+    const losses = Number(fighter[4]);  // losses
+    const isStaked = fighter[5];        // isStaked
     
     // Get clan and rarity info
     const clanInfo = CLANS[clan];
@@ -85,13 +72,10 @@ export default async function handler(req, res) {
     const totalBattles = wins + losses;
     const winRate = totalBattles > 0 ? Math.round((wins / totalBattles) * 100) : 0;
     
-    const totalPvP = pvpWins + pvpLosses;
-    const pvpWinRate = totalPvP > 0 ? Math.round((pvpWins / totalPvP) * 100) : 0;
-    
     // Build metadata JSON
     const metadata = {
       name: `${rarityName} ${clanInfo.fighter} #${id}`,
-      description: `A ${rarityName} Fighter from the ${clanInfo.name} Clan. This ${clanInfo.fighter} has ${wins} wins and ${losses} losses in battle.`,
+      description: `A ${rarityName} Fighter from the ${clanInfo.name} Clan. This ${clanInfo.fighter} is ready for battle with ${wins} wins and ${losses} losses.`,
       image: imageUrl,
       attributes: [
         {
@@ -131,20 +115,6 @@ export default async function handler(req, res) {
           display_type: "number"
         },
         {
-          trait_type: "PvP Wins",
-          value: pvpWins,
-          display_type: "number"
-        },
-        {
-          trait_type: "PvP Losses",
-          value: pvpLosses,
-          display_type: "number"
-        },
-        {
-          trait_type: "PvP Win Rate",
-          value: `${pvpWinRate}%`
-        },
-        {
           trait_type: "Points",
           value: points,
           display_type: "number"
@@ -156,7 +126,9 @@ export default async function handler(req, res) {
       ]
     };
     
-    // Return JSON
+    // Return JSON with proper headers
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
     res.status(200).json(metadata);
     
   } catch (error) {
