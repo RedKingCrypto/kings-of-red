@@ -39,9 +39,9 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
   
   // Contract data
   const [supply, setSupply] = useState({
-    bronze: { total: 777, minted: 0, price: '0.00638' },
-    silver: { total: 560, minted: 0, price: '0.00974' },
-    gold: { total: 343, minted: 0, price: '0.01310' }
+    bronze: { total: 777, genesis: 98, minted: 0, price: '0.00638' },
+    silver: { total: 560, genesis: 77, minted: 0, price: '0.00974' },
+    gold: { total: 343, genesis: 49, minted: 0, price: '0.01310' }
   });
   const [loading, setLoading] = useState(false);
   const [genesisSale, setGenesisSale] = useState(false);
@@ -107,17 +107,20 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
       
       setSupply({
         bronze: { 
-          total: 777, 
+          total: 777,
+          genesis: 98,
           minted: Number(bronzeMinted), 
           price: ethers.formatEther(bronzePrice) 
         },
         silver: { 
-          total: 560, 
+          total: 560,
+          genesis: 77,
           minted: Number(silverMinted), 
           price: ethers.formatEther(silverPrice) 
         },
         gold: { 
-          total: 343, 
+          total: 343,
+          genesis: 49,
           minted: Number(goldMinted), 
           price: ethers.formatEther(goldPrice) 
         }
@@ -134,7 +137,8 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
   const updateQuantity = (rarity, change) => {
     setQuantities(prev => {
       const newQty = prev[rarity] + change;
-      const remaining = supply[rarity].total - supply[rarity].minted;
+      const maxSupply = genesisSale ? supply[rarity].genesis : supply[rarity].total;
+      const remaining = maxSupply - supply[rarity].minted;
       return {
         ...prev,
         [rarity]: Math.max(1, Math.min(7, Math.min(newQty, remaining)))
@@ -176,7 +180,9 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
       
       const totalPrice = pricePerNFT * BigInt(quantity);
       
-      const remaining = supply[rarity].total - supply[rarity].minted;
+      const maxSupply = genesisSale ? supply[rarity].genesis : supply[rarity].total;
+      const remaining = maxSupply - supply[rarity].minted;
+      
       if (remaining <= 0) {
         alert(`${rarityName} Fighters are sold out!`);
         setMinting(false);
@@ -292,8 +298,9 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 max-w-6xl mx-auto">
           {['bronze', 'silver', 'gold'].map(rarity => {
             const rarityData = supply[rarity];
-            const remaining = rarityData.total - rarityData.minted;
-            const percentMinted = (rarityData.minted / rarityData.total) * 100;
+            const maxSupply = genesisSale ? rarityData.genesis : rarityData.total;
+            const remaining = maxSupply - rarityData.minted;
+            const percentMinted = (rarityData.minted / maxSupply) * 100;
             const quantity = quantities[rarity];
             const pricePerNFT = parseFloat(rarityData.price);
             const totalPrice = (pricePerNFT * quantity).toFixed(5);
@@ -313,8 +320,10 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
 
                   <div className="mb-4">
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-gray-400">Supply</span>
-                      <span className="font-bold">{remaining}/{rarityData.total}</span>
+                      <span className="text-gray-400">
+                        {genesisSale ? 'Genesis Supply' : 'Supply'}
+                      </span>
+                      <span className="font-bold">{remaining}/{maxSupply}</span>
                     </div>
                     <div className="w-full bg-gray-800 rounded-full h-2">
                       <div
@@ -322,6 +331,11 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
                         style={{ width: `${percentMinted}%` }}
                       />
                     </div>
+                    {genesisSale && (
+                      <p className="text-xs text-yellow-400 mt-1">
+                        Genesis: {maxSupply} | Total: {rarityData.total}
+                      </p>
+                    )}
                   </div>
 
                   <div className="bg-black/50 rounded-lg p-4 mb-4">
