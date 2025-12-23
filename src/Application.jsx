@@ -312,7 +312,7 @@ export default function Application() {
                 currentPage === 'mint-fighter' ? 'text-red-500' : 'hover:text-red-400'
               }`}
             >
-              Mint Fighters
+              {/* Mint Fighters */}
             </button>
             
             {/* Staking */}
