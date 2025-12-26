@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Swords, Crown, Sparkles, Users, Trophy, Gift, Plus, Minus, Zap } from 'lucide-react';
 import { ethers } from 'ethers';
+import { FIGHTER_CONTRACT, FIGHTER_ABI } from '../config/contractconfig';
 
-const FIGHTER_CONTRACT = '0x8b2c136B30537Be53BBe1bb7511C4c43A64d6D0d';
+
+const FIGHTER_CONTRACT = '0xA94bd2542C5f7a3774717f067b1e2cdc4A588df6';
 const BASE_MAINNET_RPC = 'https://mainnet.base.org';
 
 const FIGHTER_ABI = [

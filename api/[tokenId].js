@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       "function getFighter(uint256) view returns (uint8, uint8, uint8, uint32, uint32, bool)"
     ];
     const contract = new ethers.Contract(
-      '0x8b2c136B30537Be53BBe1bb7511C4c43A64d6D0d',
+      '0xA94bd2542C5f7a3774717f067b1e2cdc4A588df6',
       FIGHTER_ABI,
       provider
     );

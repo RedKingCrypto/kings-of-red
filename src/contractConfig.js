@@ -4,6 +4,7 @@
 export const HERALD_CONTRACT_ADDRESS = "0xb282DC4c005C88A3E81D513D09a78f48CA404311";
 export const FOOD_TOKEN_ADDRESS = "0x61921e291b88045ee2bc006c5d0a3baddd8a2d22";
 export const GOLD_TOKEN_ADDRESS = "0xb7a2c42655074736988864f4851d8cf831629f22";
+export const FIGHTER_CONTRACT = "0xA94bd2542C5f7a3774717f067b1e2cdc4A588df6";
 export const WOOD_TOKEN_ADDRESS = "0x6BACc6CF837983B49cf645bC287981388FD210E2"; // KORWOOD
 export const GAME_BALANCE_ADDRESS = "0xebd49A32d6Ba59D1de20f71ea996287fd007DC80"; // v3
 export const HERALD_STAKING_ADDRESS = "0x2cd116Ba4f7710a8fCFd32974e82369d88929C91"; // v2
@@ -825,6 +826,789 @@ export const HERALD_ABI = [
   {
     "inputs": [],
     "name": "withdraw",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+];
+// ============ FIGHTER NFT ABI ============
+// Add this after your HERALD_ABI in contractconfig.js
+
+export const FIGHTER_ABI = [
+  {
+    "inputs": [
+      {"internalType": "string", "name": "_name", "type": "string"},
+      {"internalType": "string", "name": "_symbol", "type": "string"},
+      {"internalType": "address", "name": "_treasury", "type": "address"},
+      {"internalType": "address", "name": "_refuelToken", "type": "address"}
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "ReentrancyGuardReentrantCall",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
+      {"indexed": true, "internalType": "address", "name": "approved", "type": "address"},
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
+    ],
+    "name": "Approval",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
+      {"indexed": true, "internalType": "address", "name": "operator", "type": "address"},
+      {"indexed": false, "internalType": "bool", "name": "approved", "type": "bool"}
+    ],
+    "name": "ApprovalForAll",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
+    ],
+    "name": "BattleEnded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
+    ],
+    "name": "BattleStarted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "to", "type": "address"},
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
+      {"indexed": false, "internalType": "uint8", "name": "rarity", "type": "uint8"},
+      {"indexed": false, "internalType": "uint8", "name": "clan", "type": "uint8"}
+    ],
+    "name": "FighterMinted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
+    ],
+    "name": "FighterStaked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
+    ],
+    "name": "FighterUnstaked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "previousOwner", "type": "address"},
+      {"indexed": true, "internalType": "address", "name": "newOwner", "type": "address"}
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": false, "internalType": "address", "name": "account", "type": "address"}
+    ],
+    "name": "Paused",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
+    ],
+    "name": "RefuelCompleted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
+    ],
+    "name": "RefuelStarted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "from", "type": "address"},
+      {"indexed": true, "internalType": "address", "name": "to", "type": "address"},
+      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
+    ],
+    "name": "Transfer",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": false, "internalType": "address", "name": "account", "type": "address"}
+    ],
+    "name": "Unpaused",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "GENESIS_BRONZE",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "GENESIS_GOLD",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "GENESIS_SILVER",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_BRONZE",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_GOLD",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_SILVER",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_SUPPLY",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "to", "type": "address"},
+      {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
+    ],
+    "name": "approve",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
+    "name": "balanceOf",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "baseTokenURI",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "battleContract",
+    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "name": "bronzeClans",
+    "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "bronzeMinted",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "bronzePrice",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "name": "canRefuel",
+    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "name": "clanNames",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "name": "completeRefuel",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "emergencyWithdraw",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "token", "type": "address"}],
+    "name": "emergencyWithdrawTokens",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
+      {"internalType": "bool", "name": "won", "type": "bool"},
+      {"internalType": "uint8", "name": "energyUsed", "type": "uint8"},
+      {"internalType": "bool", "name": "isPvP", "type": "bool"}
+    ],
+    "name": "endBattle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "", "type": "uint256"}
+    ],
+    "name": "fighters",
+    "outputs": [
+      {"internalType": "uint8", "name": "rarity", "type": "uint8"},
+      {"internalType": "uint8", "name": "clan", "type": "uint8"},
+      {"internalType": "uint8", "name": "energy", "type": "uint8"},
+      {"internalType": "uint32", "name": "wins", "type": "uint32"},
+      {"internalType": "uint32", "name": "losses", "type": "uint32"},
+      {"internalType": "uint32", "name": "pvpWins", "type": "uint32"},
+      {"internalType": "uint32", "name": "pvpLosses", "type": "uint32"},
+      {"internalType": "bool", "name": "isStaked", "type": "bool"},
+      {"internalType": "bool", "name": "inBattle", "type": "bool"},
+      {"internalType": "uint256", "name": "refuelStartTime", "type": "uint256"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "genesisSaleActive",
+    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "name": "getApproved",
+    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "name": "goldClans",
+    "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "goldMinted",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "goldPrice",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "heraldContract",
+    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "owner", "type": "address"},
+      {"internalType": "address", "name": "operator", "type": "address"}
+    ],
+    "name": "isApprovedForAll",
+    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "mintBronze",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "mintGold",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "mintSilver",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "name",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "name": "ownerOf",
+    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "pause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "paused",
+    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "publicBronzeActive",
+    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "publicGoldActive",
+    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "publicSilverActive",
+    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "name": "rarityNames",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "refuelBurnPercent",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "refuelCost",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "refuelOwnerPercent",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "refuelTime",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "refuelToken",
+    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "refuelTreasuryPercent",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "from", "type": "address"},
+      {"internalType": "address", "name": "to", "type": "address"},
+      {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
+    ],
+    "name": "safeTransferFrom",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "from", "type": "address"},
+      {"internalType": "address", "name": "to", "type": "address"},
+      {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
+      {"internalType": "bytes", "name": "data", "type": "bytes"}
+    ],
+    "name": "safeTransferFrom",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "operator", "type": "address"},
+      {"internalType": "bool", "name": "approved", "type": "bool"}
+    ],
+    "name": "setApprovalForAll",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "string", "name": "newBaseURI", "type": "string"}],
+    "name": "setBaseURI",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "_battle", "type": "address"}],
+    "name": "setBattleContract",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint8[]", "name": "clans", "type": "uint8[]"}],
+    "name": "setBronzeClans",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "newPrice", "type": "uint256"}],
+    "name": "setBronzePrice",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "bool", "name": "active", "type": "bool"}],
+    "name": "setGenesisSale",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint8[]", "name": "clans", "type": "uint8[]"}],
+    "name": "setGoldClans",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "newPrice", "type": "uint256"}],
+    "name": "setGoldPrice",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "_herald", "type": "address"}],
+    "name": "setHeraldContract",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "bool", "name": "active", "type": "bool"}],
+    "name": "setPublicBronzeSale",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "bool", "name": "active", "type": "bool"}],
+    "name": "setPublicGoldSale",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "bool", "name": "active", "type": "bool"}],
+    "name": "setPublicSilverSale",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "newCost", "type": "uint256"}],
+    "name": "setRefuelCost",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "burnPercent", "type": "uint256"},
+      {"internalType": "uint256", "name": "ownerPercent", "type": "uint256"},
+      {"internalType": "uint256", "name": "treasuryPercent", "type": "uint256"}
+    ],
+    "name": "setRefuelDistribution",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "newTime", "type": "uint256"}],
+    "name": "setRefuelTime",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "newToken", "type": "address"}],
+    "name": "setRefuelToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint8[]", "name": "clans", "type": "uint8[]"}],
+    "name": "setSilverClans",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "newPrice", "type": "uint256"}],
+    "name": "setSilverPrice",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "_treasury", "type": "address"}],
+    "name": "setTreasury",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "name": "silverClans",
+    "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "silverMinted",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "silverPrice",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "name": "stake",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "name": "startBattle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "name": "startRefuel",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "bytes4", "name": "interfaceId", "type": "bytes4"}],
+    "name": "supportsInterface",
+    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "symbol",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "index", "type": "uint256"}],
+    "name": "tokenByIndex",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "owner", "type": "address"},
+      {"internalType": "uint256", "name": "index", "type": "uint256"}
+    ],
+    "name": "tokenOfOwnerByIndex",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "name": "tokenURI",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalMinted",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalSupply",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "from", "type": "address"},
+      {"internalType": "address", "name": "to", "type": "address"},
+      {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
+    ],
+    "name": "transferFrom",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "newOwner", "type": "address"}],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "treasury",
+    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "unpause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
+    "name": "unstake",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
