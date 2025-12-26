@@ -3,22 +3,6 @@ import { Shield, Swords, Crown, Sparkles, Users, Trophy, Gift, Plus, Minus, Zap 
 import { ethers } from 'ethers';
 import { FIGHTER_CONTRACT, FIGHTER_ABI } from '../config/contractconfig';
 
-
-const FIGHTER_CONTRACT = '0xA94bd2542C5f7a3774717f067b1e2cdc4A588df6';
-const BASE_MAINNET_RPC = 'https://mainnet.base.org';
-
-const FIGHTER_ABI = [
-  "function mintFighter(uint8 rarity, string calldata referralCode) external payable",
-  "function bronzePrice() external view returns (uint256)",
-  "function silverPrice() external view returns (uint256)",
-  "function goldPrice() external view returns (uint256)",
-  "function getSupply() external view returns (uint256, uint256, uint256)",
-  "function genesisSaleActive() external view returns (bool)",
-  "function bronzeMinted() external view returns (uint256)",
-  "function silverMinted() external view returns (uint256)",
-  "function goldMinted() external view returns (uint256)"
-];
-
 const CLANS = [
   { id: 0, name: 'Smizfume', fighter: 'Kenshi Champion', color: 'from-purple-600 to-pink-600' },
   { id: 1, name: 'Coalheart', fighter: 'Shinobi', color: 'from-red-600 to-orange-600' },
