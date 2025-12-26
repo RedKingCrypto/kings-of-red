@@ -408,13 +408,15 @@ export default function Application() {
           />
         )}
         {currentPage === 'mint-fighter' && (
-          <MintFighter 
-            onNavigate={navigateTo}
-            connected={connected}
-            walletAddress={walletAddress}
-            connectWallet={connectWallet}
-          />
-        )}
+  <MintFighter 
+    onNavigate={navigateTo}
+    connected={connected}
+    walletAddress={walletAddress}
+    connectWallet={connectWallet}
+    provider={provider}
+    signer={signer}
+  />
+)}
         {currentPage === 'dashboard' && (
           <DashboardPage 
             onNavigate={navigateTo}
