@@ -130,7 +130,7 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
     });
   };
 
-  const mintFighter = async (rarity) => {
+  const MintFighter = async (rarity) => {
   if (!connected) {
     alert('Please connect your wallet first!');
     return;
@@ -382,7 +382,7 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
                   )}
 
                   <button
-                    onClick={() => mintFighter(rarity)}
+                    onClick={() => MintFighter(rarity)}
                     disabled={minting || remaining === 0 || !connected}
                     className={`w-full py-3 rounded-lg font-bold transition ${
                       remaining === 0
