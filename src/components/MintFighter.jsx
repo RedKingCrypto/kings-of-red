@@ -14,11 +14,7 @@ const CLANS = [
 ];
 
 export default function FighterMintingPage({ onNavigate, connected, walletAddress, connectWallet, provider, signer }) {
-  // DEBUG: Log the contract address being used
-  console.log('🎯 FIGHTER_CONTRACT from import:', FIGHTER_CONTRACT);
-  console.log('🎯 Expected:', '0xA94bd2542C5f7a3774717f067b1e2cdc4A588df6');
-  console.log('🎯 Match:', FIGHTER_CONTRACT === '0xA94bd2542C5f7a3774717f067b1e2cdc4A588df6');
-  
+ 
   const [minting, setMinting] = useState(false);
   const [mintSuccess, setMintSuccess] = useState(null);
   const [referralCode, setReferralCode] = useState('');
@@ -61,7 +57,14 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
     }
   }, []);
 
-  const loadContractData = async () => {
+  }, []);
+
+  // Load contract data on mount
+  useEffect(() => {
+    loadContractData();
+  }, [connected, walletAddress]);
+
+    const loadContractData = async () => {
   try {
     setLoading(true);
     
