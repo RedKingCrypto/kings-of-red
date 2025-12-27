@@ -33,7 +33,7 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
   const [loading, setLoading] = useState(false);
   const [genesisSale, setGenesisSale] = useState(false);
 
-  // Check URL for referral code on mount AND load stored code
+ // Check URL for referral code on mount AND load stored code
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
@@ -57,14 +57,12 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
     }
   }, []);
 
-  }, []);
-
   // Load contract data on mount
   useEffect(() => {
     loadContractData();
   }, [connected, walletAddress]);
 
-    const loadContractData = async () => {
+  const loadContractData = async () => {
   try {
     setLoading(true);
     
