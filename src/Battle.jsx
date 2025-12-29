@@ -1,7 +1,76 @@
 import React, { useState, useEffect } from 'react';
 import { Swords, Heart, Trophy, Skull, ArrowLeft, Zap, Shield, Crown, Target } from 'lucide-react';
+import { ethers } from 'ethers';
+import { 
+  FIGHTER_V3_ADDRESS, 
+  BATTLE_ADDRESS, 
+  GAME_BALANCE_V4_ADDRESS,
+  HERALD_STAKING_ADDRESS,
+  FIGHTER_V3_ABI, 
+  BATTLE_ABI, 
+  GAME_BALANCE_V4_ABI,
+  HERALD_STAKING_ABI,
+  TOKEN_IDS,
+  formatTokenAmount
+} from './contractConfig';
 
-export default function BattlePage({ connected, walletAddress, onNavigate }) {
+useEffect(() => {
+  if (connected && walletAddress && provider) {
+    loadUserData();
+  }
+}, [connected, walletAddress, provider]);
+
+const loadUserData = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+
+    const signer = await provider.getSigner();
+    const fighterContract = new ethers.Contract(FIGHTER_V3_ADDRESS, FIGHTER_V3_ABI, signer);
+    const gameBalanceContract = new ethers.Contract(GAME_BALANCE_V4_ADDRESS, GAME_BALANCE_V4_ABI, signer);
+    const heraldStakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, signer);
+
+    // Get staked Fighters
+    const stakedFighters = await fighterContract.getUserStakedFighters(walletAddress);
+    
+    // Load Fighter data
+    const fightersData = await Promise.all(
+      stakedFighters.map(async (tokenId) => {
+        const fighterData = await fighterContract.fighters(tokenId);
+        return {
+          tokenId: tokenId.toString(),
+          rarity: fighterData.rarity,
+          clan: fighterData.clan,
+          energy: fighterData.energy,
+          wins: fighterData.wins,
+          losses: fighterData.losses,
+          isStaked: fighterData.isStaked,
+          inBattle: fighterData.inBattle,
+          refuelStartTime: fighterData.refuelStartTime
+        };
+      })
+    );
+
+    setUserFighters(fightersData);
+
+    // Get FOOD balance
+    const foodBal = await gameBalanceContract.getBalance(walletAddress, TOKEN_IDS.FOOD);
+    setFoodBalance(ethers.formatEther(foodBal));
+
+    // Check Herald
+    const stakedHeralds = await heraldStakingContract.getUserStakedHeralds(walletAddress);
+    setHasStakedHerald(stakedHeralds.length > 0);
+
+    setLoading(false);
+    setGameState('arena-intro');
+  } catch (err) {
+    console.error('Error loading user data:', err);
+    setError(err.message);
+    setLoading(false);
+  }
+};
+
+export default function BattlePage({ connected, walletAddress, provider, onNavigate }) {
   // Battle State
   const [gameState, setGameState] = useState('arena-intro'); // arena-intro, enemy-select, pre-battle, fighting, victory, defeat, complete
   const [currentEnemy, setCurrentEnemy] = useState(null); // 1, 2, or 3
@@ -24,6 +93,17 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
   const [activeBoosts, setActiveBoosts] = useState([]);
   const [poisonedAttacksRemaining, setPoisonedAttacksRemaining] = useState(0);
   const [enemyFrozen, setEnemyFrozen] = useState(false);
+
+  // Add these to your existing state:
+const [userFighters, setUserFighters] = useState([]);
+const [selectedFighter, setSelectedFighter] = useState(null);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState(null);
+const [txPending, setTxPending] = useState(false);
+const [foodBalance, setFoodBalance] = useState('0');
+const [hasStakedHerald, setHasStakedHerald] = useState(false);
+const [activeBattleId, setActiveBattleId] = useState(null);
+const ARENA_ID = 5; // Witkastle
 
   // Arena Configuration
   const arena = {
@@ -67,6 +147,28 @@ export default function BattlePage({ connected, walletAddress, onNavigate }) {
       hp: 3
     }
   };
+
+  const selectFighterForBattle = (fighterData) => {
+  setSelectedFighter(fighterData);
+  
+  const rarityNames = ['Bronze', 'Silver', 'Gold'];
+  const clanNames = ['Smizfume', 'Coalheart', 'Warmdice', 'Bervation', 'Konfisof', 'Witkastle', 'Bowkin'];
+  
+  setFighter({
+    name: `Fighter #${fighterData.tokenId}`,
+    clan: clanNames[fighterData.clan],
+    rarity: rarityNames[fighterData.rarity],
+    rarityId: fighterData.rarity,
+    weapon: "Sailor's Dirk",
+    weaponVideo: "/videos/sailors_dirk.mp4",
+    characterVideo: "/videos/pirate_fighter.mp4",
+    staticImage: "/images/pirate_fighter.png",
+    hp: 3,
+    tokenId: fighterData.tokenId
+  });
+  
+  setGameState('enemy-select');
+};
 
   // Calculate Fighter's Hit Chance based on rarity and enemy
   const calculateFighterAccuracy = (fighterRarity, enemyNum) => {
@@ -283,16 +385,57 @@ ${goldAmount} GOLD + ${woodAmount} WOOD`);
     setGameState('arena-intro');
   };
 
-  // Proceed to enemy selection
-  const selectEnemyPhase = () => {
-    setGameState('enemy-select');
-  };
+  // REPLACE your selectEnemy function with this:
+const selectEnemy = async (enemyNum) => {
+  if (enemiesDefeated.includes(enemyNum)) return;
+  
+  const isAvailable = enemyNum === 1 || enemiesDefeated.includes(enemyNum - 1);
+  if (!isAvailable) return;
+  
+  setCurrentEnemy(enemyNum);
+  setGameState('pre-battle'); // Show pre-battle screen first
+};
 
-  // Select enemy and start battle
-  const selectEnemy = (enemyNum) => {
-    if (enemiesDefeated.includes(enemyNum)) {
-      return; // Already defeated
-    }
+// ADD this new function:
+const enterArena = async (enemyNum) => {
+  if (!selectedFighter) {
+    setError('No Fighter selected');
+    return;
+  }
+
+  try {
+    setTxPending(true);
+    setError(null);
+
+    const signer = await provider.getSigner();
+    const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
+
+    // Enter arena
+    console.log('Entering arena:', selectedFighter.tokenId, ARENA_ID, enemyNum);
+    const tx = await battleContract.enterArena(selectedFighter.tokenId, ARENA_ID, enemyNum);
+    
+    addLog('⏳ Entering arena...');
+    await tx.wait();
+    
+    addLog('✅ Entered arena! Battle begins!');
+    
+    setCurrentEnemy(enemyNum);
+    setActiveBattleId(selectedFighter.tokenId);
+    setEnemyHP(3);
+    setFighterHP(3);
+    setGameState('fighting');
+    setCurrentTurn('player');
+    setRound(1);
+    setTxPending(false);
+    
+  } catch (err) {
+    console.error('Error entering arena:', err);
+    setError(err.message || 'Failed to enter arena');
+    setTxPending(false);
+  }
+};
+
+  
     
     // Check if this enemy is available (sequential progression)
     const isAvailable = enemyNum === 1 || enemiesDefeated.includes(enemyNum - 1);
@@ -548,9 +691,63 @@ ${goldAmount} GOLD + ${woodAmount} WOOD`);
     }, 2000);
   };
 
-  // Enemy Defeated
-  const enemyDefeated = () => {
-    const enemy = enemies[currentEnemy];
+// REPLACE your enemyDefeated function with:
+const enemyDefeated = () => {
+  const enemy = enemies[currentEnemy];
+  setGameState('claiming-victory');
+  addLog(`${enemy.name} has been defeated!`);
+  claimVictoryOnChain(); // Call blockchain function
+};
+
+// ADD this new function:
+const claimVictoryOnChain = async () => {
+  try {
+    setTxPending(true);
+    setError(null);
+
+    const signer = await provider.getSigner();
+    const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
+
+    addLog('⏳ Claiming victory...');
+    
+    const tx = await battleContract.claimVictory(selectedFighter.tokenId, currentEnemy);
+    const receipt = await tx.wait();
+    
+    // Parse reward events
+    const rewards = {};
+    receipt.logs.forEach(log => {
+      try {
+        const parsed = battleContract.interface.parseLog(log);
+        if (parsed.name === 'RewardDistributed') {
+          const tokenId = Number(parsed.args.tokenId);
+          const amount = ethers.formatEther(parsed.args.amount);
+          
+          const tokenNames = { 1: 'FOOD', 2: 'GOLD', 3: 'WOOD', 4: 'RKT' };
+          const tokenName = tokenNames[tokenId];
+          
+          if (tokenName) {
+            rewards[tokenName] = parseFloat(amount).toFixed(2);
+          }
+        }
+      } catch (e) {}
+    });
+
+    setEarnedRewards(rewards);
+    addLog('✅ Victory claimed! Rewards distributed!');
+    
+    setEnemiesDefeated(prev => [...prev, currentEnemy]);
+    setActiveBattleId(null);
+    setGameState('victory');
+    setTxPending(false);
+    
+    await loadUserData(); // Refresh
+    
+  } catch (err) {
+    console.error('Error claiming victory:', err);
+    setError(err.message || 'Failed to claim victory');
+    setTxPending(false);
+  }
+};
     
     // Calculate random rewards!
     const rewards = calculateReward(currentEnemy);
@@ -563,11 +760,41 @@ ${goldAmount} GOLD + ${woodAmount} WOOD`);
     // Don't auto-redirect - let player see victory screen and choose when to exit
   };
 
-  // Player Defeated
-  const playerDefeated = () => {
+  // REPLACE your playerDefeated function with:
+const playerDefeated = () => {
+  setGameState('claiming-defeat');
+  addLog(`${fighter.name} has fallen...`);
+  claimDefeatOnChain(); // Call blockchain function
+};
+
+// ADD this new function:
+const claimDefeatOnChain = async () => {
+  try {
+    setTxPending(true);
+    setError(null);
+
+    const signer = await provider.getSigner();
+    const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
+
+    addLog('⏳ Recording defeat...');
+    
+    const tx = await battleContract.claimDefeat(selectedFighter.tokenId);
+    await tx.wait();
+    
+    addLog('Defeat recorded');
+    
+    setActiveBattleId(null);
     setGameState('defeat');
-    addLog(`${fighter.name} has fallen...`);
-  };
+    setTxPending(false);
+    
+    await loadUserData(); // Refresh
+    
+  } catch (err) {
+    console.error('Error claiming defeat:', err);
+    setError(err.message || 'Failed to record defeat');
+    setTxPending(false);
+  }
+};
 
   // Continue to next enemy
   const continueToNextEnemy = () => {
@@ -637,16 +864,74 @@ ${goldAmount} GOLD + ${woodAmount} WOOD`);
             
             <div className="absolute bottom-8 left-0 right-0 text-center">
               <h2 className="text-3xl font-bold text-white mb-4">Three Enemies Await</h2>
-              <button
-                onClick={selectEnemyPhase}
-                className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-bold text-xl transition"
-              >
-                Enter Battle ({battleConfig.entryCost.amount} {battleConfig.entryCost.token})
-              </button>
+              // In arena-intro, replace the "Enter Battle" button with:
+{userFighters.length > 0 ? (
+  <button
+    onClick={() => setGameState('fighter-select')}
+    className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-bold text-xl"
+  >
+    Select Fighter (50 FOOD Entry)
+  </button>
+) : (
+  <div className="bg-gray-900/80 border border-gray-700 rounded-lg p-4 max-w-md mx-auto">
+    <p className="text-yellow-400 font-bold mb-2">⚠️ No Fighters Available</p>
+    <p className="text-sm text-gray-400">Stake a Fighter to enter battle</p>
+  </div>
+)}
             </div>
           </div>
         </div>
       )}
+
+{gameState === 'fighter-select' && (
+  <div>
+    <h2 className="text-4xl font-bold mb-8 text-center">Choose Your Fighter</h2>
+
+    <div className="grid md:grid-cols-3 gap-6 mb-8">
+      {userFighters.map(f => {
+        const rarityNames = ['Bronze', 'Silver', 'Gold'];
+        const rarityColors = ['#CD7F32', '#C0C0C0', '#FFD700'];
+        const canFight = f.energy >= 20 && !f.inBattle && f.refuelStartTime.toString() === '0';
+        
+        return (
+          <div
+            key={f.tokenId}
+            className={`bg-gray-800/50 border-2 rounded-lg p-6 ${
+              canFight ? 'cursor-pointer hover:border-red-600' : 'opacity-50 cursor-not-allowed'
+            }`}
+            style={{ borderColor: canFight ? rarityColors[f.rarity] : '#1f2937' }}
+            onClick={() => canFight && selectFighterForBattle(f)}
+          >
+            <h3 className="text-xl font-bold mb-2">Fighter #{f.tokenId}</h3>
+            <p className="text-sm mb-2" style={{ color: rarityColors[f.rarity] }}>
+              {rarityNames[f.rarity]}
+            </p>
+            <div className="space-y-1 text-sm">
+              <div>Energy: {f.energy.toString()}/100</div>
+              <div>Record: {f.wins.toString()}W - {f.losses.toString()}L</div>
+            </div>
+            
+            {canFight ? (
+              <button className="w-full mt-4 bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-bold">
+                Select Fighter
+              </button>
+            ) : (
+              <div className="mt-4 text-center text-sm text-gray-500">
+                {f.inBattle ? 'In Battle' : f.energy < 20 ? 'Low Energy' : 'Refueling'}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+    
+    <div className="text-center">
+      <button onClick={() => setGameState('arena-intro')} className="bg-gray-700 px-6 py-3 rounded-lg">
+        Back
+      </button>
+    </div>
+  </div>
+)}
 
       {/* Enemy Selection */}
       {gameState === 'enemy-select' && (
@@ -807,8 +1092,8 @@ ${goldAmount} GOLD + ${woodAmount} WOOD`);
             </div>
           </div>
 
-          <button
-            onClick={startBattle}
+          <button onClick={() => enterArena(currentEnemy)}
+  disabled={txPending}
             className="bg-red-600 hover:bg-red-700 px-12 py-4 rounded-lg font-bold text-xl transition"
           >
             <Swords className="w-6 h-6 inline mr-2" />

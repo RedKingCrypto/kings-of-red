@@ -1,1616 +1,264 @@
-// Contract configuration for Kings of Red on Base Mainnet
+// Contract Configuration - Updated for Fighter V3 & Battle System
+// Last Updated: December 29, 2025
 
 // ============ CONTRACT ADDRESSES ============
-export const HERALD_CONTRACT_ADDRESS = "0xb282DC4c005C88A3E81D513D09a78f48CA404311";
-export const FOOD_TOKEN_ADDRESS = "0x61921e291b88045ee2bc006c5d0a3baddd8a2d22";
-export const GOLD_TOKEN_ADDRESS = "0xb7a2c42655074736988864f4851d8cf831629f22";
-export const FIGHTER_CONTRACT = "0xA94bd2542C5f7a3774717f067b1e2cdc4A588df6";
-export const WOOD_TOKEN_ADDRESS = "0x6BACc6CF837983B49cf645bC287981388FD210E2"; // KORWOOD
-export const GAME_BALANCE_ADDRESS = "0xebd49A32d6Ba59D1de20f71ea996287fd007DC80"; // v3
-export const HERALD_STAKING_ADDRESS = "0x2cd116Ba4f7710a8fCFd32974e82369d88929C91"; // v2
 
-// ============ IPFS IMAGE CONFIG ============
-export const IPFS_IMAGE_BASE = "https://emerald-adequate-eagle-845.mypinata.cloud/ipfs/bafybeigvh7vjqgpj3jguhdbwktfdntvgqypmuu456usxpgsnrxxlh6pln4";
+// Core Contracts
+export const FIGHTER_V3_ADDRESS = '0x7b41eb57fdD400208AE7AC8A7d1b79ba86091Eb2';
+export const BATTLE_ADDRESS = '0xc7a1CD1f71719c282B323Dd10D71aE3541cf2dbF';
+export const GAME_BALANCE_V4_ADDRESS = '0x3332c61Ced87a85C09ef2Cb55aE07Bd169dB0aA6';
+export const HERALD_ADDRESS = '0xb282DC4c005C88A3E81D513D09a78f48CA404311';
+export const HERALD_STAKING_ADDRESS = '0x2cd116Ba4f7710a8fCFd32974e82369d88929C91';
 
-export const CLAN_NAMES = ['Smizfume', 'Coalheart', 'Warmdice', 'Bervation', 'Konfisof', 'Witkastle', 'Bowkin'];
-export const RARITY_NAMES = ['Bronze', 'Silver', 'Gold'];
+// Legacy Contracts (kept for reference)
+export const FIGHTER_V2_ADDRESS = '0xA94bd2542C5f7a3774717f067b1e2cdc4A588df6';
+export const GAME_BALANCE_V3_ADDRESS = '0xebd49A32d6Ba59D1de20f71ea996287fd007DC80';
 
-// Helper function to get Herald image URL
-export const getHeraldImageUrl = (clan, rarity) => {
-  const clanName = CLAN_NAMES[clan].toLowerCase();
-  const rarityName = RARITY_NAMES[rarity].toLowerCase();
-  return `${IPFS_IMAGE_BASE}/${clanName}_${rarityName}.png`;
-};
+// Token Contracts
+export const FOOD_TOKEN_ADDRESS = '0x61921e291b88045ee2bc006c5d0a3baddd8a2d22';
+export const GOLD_TOKEN_ADDRESS = '0xB7A2C42655074736988864f4851d8Cf831629f22';
+export const WOOD_TOKEN_ADDRESS = '0x6BACc6CF837983B49cf645bC287981388FD210E2';
+export const REDKING_TOKEN_ADDRESS = '0xd6F65D10CE2062d6dC330DA61ADd3c0693895fFf';
 
-// ============ NETWORK CONFIG ============
-export const BASE_MAINNET_CONFIG = {
-  chainId: '0x2105', // 8453 in hex
-  chainName: 'Base',
-  nativeCurrency: {
-    name: 'Ethereum',
-    symbol: 'ETH',
-    decimals: 18
-  },
-  rpcUrls: ['https://mainnet.base.org'],
-  blockExplorerUrls: ['https://basescan.org']
-};
+// Wallets
+export const TREASURY_ADDRESS = '0xef0f1f34c7687eb31a6b4ada2af45ce7360c04e9';
+export const BATTLE_REWARDS_ADDRESS = '0x1c4c352561df1d61338bc729b60036e56efcd25d';
 
-// ============ TOKEN ABIs ============
-export const FOOD_TOKEN_ABI = [
-  "function balanceOf(address) view returns (uint256)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function transfer(address to, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)",
+// ============ FIGHTER V3 ABI ============
+
+export const FIGHTER_V3_ABI = [
+  // Read Functions
+  "function fighters(uint256) view returns (uint8 rarity, uint8 clan, uint8 energy, uint32 wins, uint32 losses, uint32 pvpWins, uint32 pvpLosses, bool isStaked, bool inBattle, uint256 refuelStartTime, uint256 lastBattleReward)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
+  "function getUserStakedFighters(address user) view returns (uint256[])",
+  "function getRefuelTimeRemaining(uint256 tokenId) view returns (uint256)",
+  "function getMintPrice(uint8 rarity) view returns (uint256)",
+  "function getRemainingSupply(uint8 rarity) view returns (uint256)",
   "function totalSupply() view returns (uint256)",
-  "function name() view returns (string)",
-  "function symbol() view returns (string)",
-  "function decimals() view returns (uint8)"
+  "function nextTokenId() view returns (uint256)",
+  "function battleContract() view returns (address)",
+  
+  // Write Functions
+  "function mint(uint8 rarity, uint8 clan, address referrer) payable",
+  "function stake(uint256 tokenId)",
+  "function unstake(uint256 tokenId)",
+  "function startRefuel(uint256 tokenId)",
+  "function completeRefuel(uint256 tokenId)",
+  "function approve(address to, uint256 tokenId)",
+  "function setApprovalForAll(address operator, bool approved)",
+  
+  // Events
+  "event FighterMinted(address indexed owner, uint256 indexed tokenId, uint8 rarity, uint8 clan)",
+  "event FighterStaked(address indexed owner, uint256 indexed tokenId)",
+  "event FighterUnstaked(address indexed owner, uint256 indexed tokenId)",
+  "event RefuelStarted(uint256 indexed tokenId, uint256 endTime)",
+  "event RefuelCompleted(uint256 indexed tokenId)",
+  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
 ];
 
-export const GOLD_TOKEN_ABI = [
-  "function balanceOf(address) view returns (uint256)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function transfer(address to, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)",
-  "function totalSupply() view returns (uint256)",
-  "function name() view returns (string)",
-  "function symbol() view returns (string)",
-  "function decimals() view returns (uint8)"
+// ============ BATTLE CONTRACT ABI ============
+
+export const BATTLE_ABI = [
+  // Read Functions
+  "function arenas(uint8) view returns (uint8 arenaId, string name, uint8 clan, bool active, uint256 totalBattles)",
+  "function arenaEnemies(uint8 arenaId, uint8 enemyId) view returns (uint8 enemyId, string name, string title, uint8 hp, uint256[3] hitChances)",
+  "function activeBattles(uint256 fighterId) view returns (uint256 fighterId, address player, uint8 arenaId, uint8 currentEnemy, uint256 startTime, bool active, uint8 battleType)",
+  "function canEnterBattle(uint256 fighterId, uint8 arenaId) view returns (bool)",
+  "function canFightEnemy(uint256 fighterId, uint8 arenaId, uint8 enemyId) view returns (bool)",
+  "function hasDefeatedEnemy(uint256 fighterId, uint8 arenaId, uint8 enemyId) view returns (bool)",
+  "function getDefeatedEnemies(uint256 fighterId, uint8 arenaId) view returns (uint8[])",
+  "function getFighterAccuracy(uint256 fighterId, uint8 enemyId) view returns (uint256)",
+  "function getEnemyAccuracy(uint256 fighterId, uint8 enemyId) view returns (uint256)",
+  "function hasGoldHeraldStaked(address player) view returns (bool)",
+  "function entryConfig() view returns (uint8 tokenId, uint256 cost, uint256 burnPercent, uint256 ownerPercent, uint256 treasuryPercent)",
+  "function goldHeraldBonus() view returns (uint256)",
+  "function fighterHitChances(uint8 rarity, uint8 enemyNum) view returns (uint256)",
+  "function getEnemy1Rewards(uint8 arenaId) view returns (tuple(uint8 tokenId, uint256 minAmount, uint256 maxAmount)[])",
+  "function getEnemy2Rewards(uint8 arenaId) view returns (tuple(uint8 tokenId, uint256 minAmount, uint256 maxAmount)[])",
+  "function getEnemy3Rewards(uint8 arenaId) view returns (tuple(uint8 tokenId, uint256 minAmount, uint256 maxAmount)[])",
+  
+  // Write Functions  
+  "function enterArena(uint256 fighterId, uint8 arenaId, uint8 enemyId)",
+  "function claimVictory(uint256 fighterId, uint8 enemyId)",
+  "function claimDefeat(uint256 fighterId)",
+  "function timeoutBattle(uint256 fighterId)",
+  
+  // Events
+  "event BattleStarted(uint256 indexed fighterId, uint8 arenaId, uint8 enemyId, address player)",
+  "event BattleWon(uint256 indexed fighterId, uint8 arenaId, uint8 enemyId, address player)",
+  "event BattleLost(uint256 indexed fighterId, uint8 arenaId, uint8 enemyId, address player)",
+  "event RewardDistributed(uint256 indexed fighterId, uint8 tokenId, uint256 amount)",
+  "event EntryFeePaid(address indexed player, uint8 tokenId, uint256 amount)"
 ];
 
-export const WOOD_TOKEN_ABI = [
-  "function balanceOf(address) view returns (uint256)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function transfer(address to, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)",
-  "function totalSupply() view returns (uint256)",
-  "function name() view returns (string)",
-  "function symbol() view returns (string)",
-  "function decimals() view returns (uint8)"
-];
+// ============ GAMEBALANCE V4 ABI ============
 
-// ============ GAME BALANCE MANAGER ABI ============
-export const GAME_BALANCE_ABI = [
-  "function inGameFood(address) view returns (uint256)",
-  "function inGameGold(address) view returns (uint256)",
-  "function inGameWood(address) view returns (uint256)",
-  "function getBalances(address user) view returns (uint256 food, uint256 gold, uint256 wood)",
+export const GAME_BALANCE_V4_ABI = [
+  // Read Functions
+  "function inGameBalances(address user, uint8 tokenId) view returns (uint256)",
+  "function getBalance(address user, uint8 tokenId) view returns (uint256)",
+  "function getBalances(address user) view returns (uint256 food, uint256 gold, uint256 wood, uint256 redking)",
+  "function canWithdrawToken(address user, uint8 tokenId) view returns (bool)",
+  "function supportedTokens(uint8 tokenId) view returns (address tokenAddress, bool active, string symbol, bool withdrawalEnabled)",
+  "function lastWithdrawal(address user, uint8 tokenId) view returns (uint256)",
+  "function withdrawnToday(address user, uint8 tokenId) view returns (uint256)",
+  "function dailyWithdrawalLimits(uint8 tokenId) view returns (uint256)",
+  
+  // Backward compatibility
+  "function inGameFood(address user) view returns (uint256)",
+  "function inGameGold(address user) view returns (uint256)",
+  "function inGameWood(address user) view returns (uint256)",
+  "function canWithdrawFood(address user) view returns (bool)",
+  "function canWithdrawGold(address user) view returns (bool)",
+  "function canWithdrawWood(address user) view returns (bool)",
+  
+  // Write Functions
+  "function depositToken(uint8 tokenId, uint256 amount)",
+  "function withdrawToken(uint8 tokenId, uint256 amount)",
   "function depositFood(uint256 amount)",
   "function depositGold(uint256 amount)",
   "function depositWood(uint256 amount)",
-  "function withdrawFood(uint256 amount)",
-  "function withdrawGold(uint256 amount)",
-  "function withdrawWood(uint256 amount)",
-  "function swapFoodForGold(uint256 foodAmount)",
-  "function swapGoldForFood(uint256 goldAmount)",
-  "function swapFoodForWood(uint256 foodAmount)",
-  "function swapWoodForFood(uint256 woodAmount)",
-  "function swapGoldForWood(uint256 goldAmount)",
-  "function swapWoodForGold(uint256 woodAmount)",
-  "function canWithdrawFood(address) view returns (bool)",
-  "function canWithdrawGold(address) view returns (bool)",
-  "function canWithdrawWood(address) view returns (bool)",
-  "function lastFoodWithdrawal(address) view returns (uint256)",
-  "function lastGoldWithdrawal(address) view returns (uint256)",
-  "function lastWoodWithdrawal(address) view returns (uint256)",
-  "function foodGoldRatio() view returns (uint256)",
-  "function foodWoodRatio() view returns (uint256)",
-  "function goldWoodRatio() view returns (uint256)",
-  "event Deposited(address indexed user, string tokenType, uint256 amount)",
-  "event Withdrawn(address indexed user, string tokenType, uint256 amount, uint256 tax)",
-  "event Swapped(address indexed user, string fromToken, string toToken, uint256 amountIn, uint256 amountOut, uint256 fee)"
+  "function depositRedking(uint256 amount)",
+  
+  // Events
+  "event Deposited(address indexed user, uint8 tokenId, uint256 amount)",
+  "event Withdrawn(address indexed user, uint8 tokenId, uint256 amount, uint256 tax)",
+  "event TokensSpent(address indexed user, uint8 tokenId, uint256 amount)",
+  "event TokensDeposited(address indexed user, uint8 tokenId, uint256 amount)"
 ];
 
 // ============ HERALD STAKING ABI ============
+
 export const HERALD_STAKING_ABI = [
-  "function stakeHerald(uint256 tokenId)",
-  "function unstakeHerald(uint256 tokenId)",
-  "function claimRewards()",
+  "function stake(uint256 tokenId)",
+  "function unstake(uint256 tokenId)",
   "function getUserStakedHeralds(address user) view returns (uint256[])",
-  "function getPendingRewards(address user) view returns (uint256 totalRewards, uint256 readyCount)",
-  "function getTimeUntilClaim(uint256 tokenId) view returns (uint256)",
-  "function getStakeInfo(uint256 tokenId) view returns (address owner, uint256 stakedAt, uint256 lastClaim, uint8 clan, uint8 rarity, bool canClaim)",
   "function hasClanStaked(address user, uint8 clan) view returns (bool)",
-  "function totalStaked() view returns (uint256)",
-  "function bronzeProduction() view returns (uint256)",
-  "function silverProduction() view returns (uint256)",
-  "function goldProduction() view returns (uint256)",
-  "function claimCost() view returns (uint256)",
-  "function claimCooldown() view returns (uint256)",
-  "event HeraldStaked(address indexed user, uint256 indexed tokenId, uint8 clan, uint8 rarity)",
-  "event HeraldUnstaked(address indexed user, uint256 indexed tokenId)",
-  "event RewardsClaimed(address indexed user, uint256 amount, uint256 goldBurned)"
+  "function stakedHeralds(uint256) view returns (address owner, uint256 stakedAt)",
+  "event Staked(address indexed user, uint256 indexed tokenId)",
+  "event Unstaked(address indexed user, uint256 indexed tokenId)"
 ];
 
 // ============ HERALD NFT ABI ============
-export const HERALD_ABI = [
-  {
-    "inputs": [],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "numerator", "type": "uint256" },
-      { "internalType": "uint256", "name": "denominator", "type": "uint256" }
-    ],
-    "name": "ERC2981InvalidDefaultRoyalty",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "receiver", "type": "address" }
-    ],
-    "name": "ERC2981InvalidDefaultRoyaltyReceiver",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" },
-      { "internalType": "uint256", "name": "numerator", "type": "uint256" },
-      { "internalType": "uint256", "name": "denominator", "type": "uint256" }
-    ],
-    "name": "ERC2981InvalidTokenRoyalty",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" },
-      { "internalType": "address", "name": "receiver", "type": "address" }
-    ],
-    "name": "ERC2981InvalidTokenRoyaltyReceiver",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "sender", "type": "address" },
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" },
-      { "internalType": "address", "name": "owner", "type": "address" }
-    ],
-    "name": "ERC721IncorrectOwner",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "operator", "type": "address" },
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-    ],
-    "name": "ERC721InsufficientApproval",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "approver", "type": "address" }
-    ],
-    "name": "ERC721InvalidApprover",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "operator", "type": "address" }
-    ],
-    "name": "ERC721InvalidOperator",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "owner", "type": "address" }
-    ],
-    "name": "ERC721InvalidOwner",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "receiver", "type": "address" }
-    ],
-    "name": "ERC721InvalidReceiver",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "sender", "type": "address" }
-    ],
-    "name": "ERC721InvalidSender",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-    ],
-    "name": "ERC721NonexistentToken",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "owner", "type": "address" }
-    ],
-    "name": "OwnableInvalidOwner",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "account", "type": "address" }
-    ],
-    "name": "OwnableUnauthorizedAccount",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ReentrancyGuardReentrantCall",
-    "type": "error"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "holder", "type": "address" },
-      { "indexed": false, "internalType": "string", "name": "code", "type": "string" }
-    ],
-    "name": "AffiliateCodeGenerated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "owner", "type": "address" },
-      { "indexed": true, "internalType": "address", "name": "approved", "type": "address" },
-      { "indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-    ],
-    "name": "Approval",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "owner", "type": "address" },
-      { "indexed": true, "internalType": "address", "name": "operator", "type": "address" },
-      { "indexed": false, "internalType": "bool", "name": "approved", "type": "bool" }
-    ],
-    "name": "ApprovalForAll",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "referrer", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
-    ],
-    "name": "CommissionPaid",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256" },
-      { "indexed": true, "internalType": "address", "name": "minter", "type": "address" },
-      { "indexed": false, "internalType": "enum HeraldNFT.Rarity", "name": "rarity", "type": "uint8" },
-      { "indexed": false, "internalType": "enum HeraldNFT.Clan", "name": "clan", "type": "uint8" }
-    ],
-    "name": "HeraldMinted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "previousOwner", "type": "address" },
-      { "indexed": true, "internalType": "address", "name": "newOwner", "type": "address" }
-    ],
-    "name": "OwnershipTransferred",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": false, "internalType": "enum HeraldNFT.SalePhase", "name": "newPhase", "type": "uint8" }
-    ],
-    "name": "PhaseChanged",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": false, "internalType": "uint256", "name": "bronze", "type": "uint256" },
-      { "indexed": false, "internalType": "uint256", "name": "silver", "type": "uint256" },
-      { "indexed": false, "internalType": "uint256", "name": "gold", "type": "uint256" }
-    ],
-    "name": "PricesUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "from", "type": "address" },
-      { "indexed": true, "internalType": "address", "name": "to", "type": "address" },
-      { "indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-    ],
-    "name": "Transfer",
-    "type": "event"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_BRONZE",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_GOLD",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_SILVER",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_SUPPLY",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "activateMinting",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "", "type": "address" }
-    ],
-    "name": "affiliateCode",
-    "outputs": [
-      { "internalType": "string", "name": "", "type": "string" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "to", "type": "address" },
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-    ],
-    "name": "approve",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "owner", "type": "address" }
-    ],
-    "name": "balanceOf",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "baseTokenURI",
-    "outputs": [
-      { "internalType": "string", "name": "", "type": "string" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "bronzeMinted",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "bronzePrice",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "string", "name": "", "type": "string" }
-    ],
-    "name": "codeToWallet",
-    "outputs": [
-      { "internalType": "address", "name": "", "type": "address" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "currentPhase",
-    "outputs": [
-      { "internalType": "enum HeraldNFT.SalePhase", "name": "", "type": "uint8" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "deactivateMinting",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "genesisLaunchTime",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-    ],
-    "name": "getApproved",
-    "outputs": [
-      { "internalType": "address", "name": "", "type": "address" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-    ],
-    "name": "getHerald",
-    "outputs": [
-      { "internalType": "enum HeraldNFT.Rarity", "name": "rarity", "type": "uint8" },
-      { "internalType": "enum HeraldNFT.Clan", "name": "clan", "type": "uint8" },
-      { "internalType": "uint256", "name": "mintedAt", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "enum HeraldNFT.Rarity", "name": "rarity", "type": "uint8" }
-    ],
-    "name": "getMintPrice",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "enum HeraldNFT.SalePhase", "name": "phase", "type": "uint8" }
-    ],
-    "name": "getPhaseSupply",
-    "outputs": [
-      { "internalType": "uint256", "name": "bronzeLimit", "type": "uint256" },
-      { "internalType": "uint256", "name": "silverLimit", "type": "uint256" },
-      { "internalType": "uint256", "name": "goldLimit", "type": "uint256" },
-      { "internalType": "uint256", "name": "bronzeMintedInPhase", "type": "uint256" },
-      { "internalType": "uint256", "name": "silverMintedInPhase", "type": "uint256" },
-      { "internalType": "uint256", "name": "goldMintedInPhase", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "goldMinted",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "goldPrice",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "", "type": "address" }
-    ],
-    "name": "hasGeneratedCode",
-    "outputs": [
-      { "internalType": "bool", "name": "", "type": "bool" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "", "type": "address" }
-    ],
-    "name": "hasGenesisBadge",
-    "outputs": [
-      { "internalType": "bool", "name": "", "type": "bool" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "name": "heralds",
-    "outputs": [
-      { "internalType": "enum HeraldNFT.Rarity", "name": "rarity", "type": "uint8" },
-      { "internalType": "enum HeraldNFT.Clan", "name": "clan", "type": "uint8" },
-      { "internalType": "uint256", "name": "mintedAt", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "owner", "type": "address" },
-      { "internalType": "address", "name": "operator", "type": "address" }
-    ],
-    "name": "isApprovedForAll",
-    "outputs": [
-      { "internalType": "bool", "name": "", "type": "bool" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint8", "name": "rarity", "type": "uint8" },
-      { "internalType": "uint256", "name": "quantity", "type": "uint256" },
-      { "internalType": "string", "name": "refCode", "type": "string" }
-    ],
-    "name": "mintHerald",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "mintingActive",
-    "outputs": [
-      { "internalType": "bool", "name": "", "type": "bool" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "name",
-    "outputs": [
-      { "internalType": "string", "name": "", "type": "string" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "owner",
-    "outputs": [
-      { "internalType": "address", "name": "", "type": "address" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-    ],
-    "name": "ownerOf",
-    "outputs": [
-      { "internalType": "address", "name": "", "type": "address" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "enum HeraldNFT.SalePhase", "name": "", "type": "uint8" }
-    ],
-    "name": "phaseLimits",
-    "outputs": [
-      { "internalType": "uint256", "name": "bronze", "type": "uint256" },
-      { "internalType": "uint256", "name": "silver", "type": "uint256" },
-      { "internalType": "uint256", "name": "gold", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "enum HeraldNFT.SalePhase", "name": "", "type": "uint8" }
-    ],
-    "name": "phaseMinted",
-    "outputs": [
-      { "internalType": "uint256", "name": "bronze", "type": "uint256" },
-      { "internalType": "uint256", "name": "silver", "type": "uint256" },
-      { "internalType": "uint256", "name": "gold", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "renounceOwnership",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" },
-      { "internalType": "uint256", "name": "salePrice", "type": "uint256" }
-    ],
-    "name": "royaltyInfo",
-    "outputs": [
-      { "internalType": "address", "name": "receiver", "type": "address" },
-      { "internalType": "uint256", "name": "amount", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "from", "type": "address" },
-      { "internalType": "address", "name": "to", "type": "address" },
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-    ],
-    "name": "safeTransferFrom",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "from", "type": "address" },
-      { "internalType": "address", "name": "to", "type": "address" },
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" },
-      { "internalType": "bytes", "name": "data", "type": "bytes" }
-    ],
-    "name": "safeTransferFrom",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "operator", "type": "address" },
-      { "internalType": "bool", "name": "approved", "type": "bool" }
-    ],
-    "name": "setApprovalForAll",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "string", "name": "newBaseURI", "type": "string" }
-    ],
-    "name": "setBaseURI",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "_timestamp", "type": "uint256" }
-    ],
-    "name": "setLaunchTime",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "enum HeraldNFT.SalePhase", "name": "newPhase", "type": "uint8" }
-    ],
-    "name": "setPhase",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "_bronze", "type": "uint256" },
-      { "internalType": "uint256", "name": "_silver", "type": "uint256" },
-      { "internalType": "uint256", "name": "_gold", "type": "uint256" }
-    ],
-    "name": "setPrices",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "silverMinted",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "silverPrice",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "bytes4", "name": "interfaceId", "type": "bytes4" }
-    ],
-    "name": "supportsInterface",
-    "outputs": [
-      { "internalType": "bool", "name": "", "type": "bool" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "symbol",
-    "outputs": [
-      { "internalType": "string", "name": "", "type": "string" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-    ],
-    "name": "tokenURI",
-    "outputs": [
-      { "internalType": "string", "name": "", "type": "string" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "totalSupply",
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "from", "type": "address" },
-      { "internalType": "address", "name": "to", "type": "address" },
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-    ],
-    "name": "transferFrom",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "address", "name": "newOwner", "type": "address" }
-    ],
-    "name": "transferOwnership",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "withdraw",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
-];
-// ============ FIGHTER NFT ABI ============
-// Add this after your HERALD_ABI in contractconfig.js
 
-export const FIGHTER_ABI = [
-  {
-    "inputs": [
-      {"internalType": "string", "name": "_name", "type": "string"},
-      {"internalType": "string", "name": "_symbol", "type": "string"},
-      {"internalType": "address", "name": "_treasury", "type": "address"},
-      {"internalType": "address", "name": "_refuelToken", "type": "address"}
-    ],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
-  },
-  {
-    "inputs": [],
-    "name": "ReentrancyGuardReentrantCall",
-    "type": "error"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
-      {"indexed": true, "internalType": "address", "name": "approved", "type": "address"},
-      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
-    ],
-    "name": "Approval",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
-      {"indexed": true, "internalType": "address", "name": "operator", "type": "address"},
-      {"indexed": false, "internalType": "bool", "name": "approved", "type": "bool"}
-    ],
-    "name": "ApprovalForAll",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
-    ],
-    "name": "BattleEnded",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
-    ],
-    "name": "BattleStarted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "address", "name": "to", "type": "address"},
-      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"},
-      {"indexed": false, "internalType": "uint8", "name": "rarity", "type": "uint8"},
-      {"indexed": false, "internalType": "uint8", "name": "clan", "type": "uint8"}
-    ],
-    "name": "FighterMinted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
-    ],
-    "name": "FighterStaked",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
-    ],
-    "name": "FighterUnstaked",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "address", "name": "previousOwner", "type": "address"},
-      {"indexed": true, "internalType": "address", "name": "newOwner", "type": "address"}
-    ],
-    "name": "OwnershipTransferred",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": false, "internalType": "address", "name": "account", "type": "address"}
-    ],
-    "name": "Paused",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
-    ],
-    "name": "RefuelCompleted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
-    ],
-    "name": "RefuelStarted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "address", "name": "from", "type": "address"},
-      {"indexed": true, "internalType": "address", "name": "to", "type": "address"},
-      {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
-    ],
-    "name": "Transfer",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": false, "internalType": "address", "name": "account", "type": "address"}
-    ],
-    "name": "Unpaused",
-    "type": "event"
-  },
-  {
-    "inputs": [],
-    "name": "GENESIS_BRONZE",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "GENESIS_GOLD",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "GENESIS_SILVER",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_BRONZE",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_GOLD",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_SILVER",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_SUPPLY",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "address", "name": "to", "type": "address"},
-      {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
-    ],
-    "name": "approve",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
-    "name": "balanceOf",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "baseTokenURI",
-    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "battleContract",
-    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "name": "bronzeClans",
-    "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "bronzeMinted",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "bronzePrice",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-    "name": "canRefuel",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "name": "clanNames",
-    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-    "name": "completeRefuel",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "emergencyWithdraw",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "address", "name": "token", "type": "address"}],
-    "name": "emergencyWithdrawTokens",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
-      {"internalType": "bool", "name": "won", "type": "bool"},
-      {"internalType": "uint8", "name": "energyUsed", "type": "uint8"},
-      {"internalType": "bool", "name": "isPvP", "type": "bool"}
-    ],
-    "name": "endBattle",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "uint256", "name": "", "type": "uint256"}
-    ],
-    "name": "fighters",
-    "outputs": [
-      {"internalType": "uint8", "name": "rarity", "type": "uint8"},
-      {"internalType": "uint8", "name": "clan", "type": "uint8"},
-      {"internalType": "uint8", "name": "energy", "type": "uint8"},
-      {"internalType": "uint32", "name": "wins", "type": "uint32"},
-      {"internalType": "uint32", "name": "losses", "type": "uint32"},
-      {"internalType": "uint32", "name": "pvpWins", "type": "uint32"},
-      {"internalType": "uint32", "name": "pvpLosses", "type": "uint32"},
-      {"internalType": "bool", "name": "isStaked", "type": "bool"},
-      {"internalType": "bool", "name": "inBattle", "type": "bool"},
-      {"internalType": "uint256", "name": "refuelStartTime", "type": "uint256"}
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "genesisSaleActive",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-    "name": "getApproved",
-    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "name": "goldClans",
-    "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "goldMinted",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "goldPrice",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "heraldContract",
-    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "address", "name": "owner", "type": "address"},
-      {"internalType": "address", "name": "operator", "type": "address"}
-    ],
-    "name": "isApprovedForAll",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "mintBronze",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "mintGold",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "mintSilver",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "name",
-    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "owner",
-    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-    "name": "ownerOf",
-    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "pause",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "paused",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "publicBronzeActive",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "publicGoldActive",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "publicSilverActive",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "name": "rarityNames",
-    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "refuelBurnPercent",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "refuelCost",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "refuelOwnerPercent",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "refuelTime",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "refuelToken",
-    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "refuelTreasuryPercent",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "renounceOwnership",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "address", "name": "from", "type": "address"},
-      {"internalType": "address", "name": "to", "type": "address"},
-      {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
-    ],
-    "name": "safeTransferFrom",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "address", "name": "from", "type": "address"},
-      {"internalType": "address", "name": "to", "type": "address"},
-      {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
-      {"internalType": "bytes", "name": "data", "type": "bytes"}
-    ],
-    "name": "safeTransferFrom",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "address", "name": "operator", "type": "address"},
-      {"internalType": "bool", "name": "approved", "type": "bool"}
-    ],
-    "name": "setApprovalForAll",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "string", "name": "newBaseURI", "type": "string"}],
-    "name": "setBaseURI",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "address", "name": "_battle", "type": "address"}],
-    "name": "setBattleContract",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint8[]", "name": "clans", "type": "uint8[]"}],
-    "name": "setBronzeClans",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "newPrice", "type": "uint256"}],
-    "name": "setBronzePrice",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "bool", "name": "active", "type": "bool"}],
-    "name": "setGenesisSale",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint8[]", "name": "clans", "type": "uint8[]"}],
-    "name": "setGoldClans",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "newPrice", "type": "uint256"}],
-    "name": "setGoldPrice",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "address", "name": "_herald", "type": "address"}],
-    "name": "setHeraldContract",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "bool", "name": "active", "type": "bool"}],
-    "name": "setPublicBronzeSale",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "bool", "name": "active", "type": "bool"}],
-    "name": "setPublicGoldSale",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "bool", "name": "active", "type": "bool"}],
-    "name": "setPublicSilverSale",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "newCost", "type": "uint256"}],
-    "name": "setRefuelCost",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "uint256", "name": "burnPercent", "type": "uint256"},
-      {"internalType": "uint256", "name": "ownerPercent", "type": "uint256"},
-      {"internalType": "uint256", "name": "treasuryPercent", "type": "uint256"}
-    ],
-    "name": "setRefuelDistribution",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "newTime", "type": "uint256"}],
-    "name": "setRefuelTime",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "address", "name": "newToken", "type": "address"}],
-    "name": "setRefuelToken",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint8[]", "name": "clans", "type": "uint8[]"}],
-    "name": "setSilverClans",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "newPrice", "type": "uint256"}],
-    "name": "setSilverPrice",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "address", "name": "_treasury", "type": "address"}],
-    "name": "setTreasury",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "name": "silverClans",
-    "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "silverMinted",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "silverPrice",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-    "name": "stake",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-    "name": "startBattle",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-    "name": "startRefuel",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "bytes4", "name": "interfaceId", "type": "bytes4"}],
-    "name": "supportsInterface",
-    "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "symbol",
-    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "index", "type": "uint256"}],
-    "name": "tokenByIndex",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "address", "name": "owner", "type": "address"},
-      {"internalType": "uint256", "name": "index", "type": "uint256"}
-    ],
-    "name": "tokenOfOwnerByIndex",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-    "name": "tokenURI",
-    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "totalMinted",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "totalSupply",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {"internalType": "address", "name": "from", "type": "address"},
-      {"internalType": "address", "name": "to", "type": "address"},
-      {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
-    ],
-    "name": "transferFrom",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "address", "name": "newOwner", "type": "address"}],
-    "name": "transferOwnership",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "treasury",
-    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "unpause",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "tokenId", "type": "uint256"}],
-    "name": "unstake",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
+export const HERALD_ABI = [
+  "function getHerald(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint256 mintedAt)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
+  "function approve(address to, uint256 tokenId)",
+  "function setApprovalForAll(address operator, bool approved)"
 ];
+
+// ============ ERC20 TOKEN ABI ============
+
+export const ERC20_ABI = [
+  "function balanceOf(address account) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function transferFrom(address from, address to, uint256 amount) returns (bool)",
+  "function decimals() view returns (uint8)",
+  "function symbol() view returns (string)",
+  "function name() view returns (string)",
+  "event Transfer(address indexed from, address indexed to, uint256 value)",
+  "event Approval(address indexed owner, address indexed spender, uint256 value)"
+];
+
+// ============ CONSTANTS ============
+
+export const CLAN_NAMES = [
+  'Smizfume',
+  'Coalheart', 
+  'Warmdice',
+  'Bervation',
+  'Konfisof',
+  'Witkastle',
+  'Bowkin'
+];
+
+export const RARITY_NAMES = [
+  'Bronze',
+  'Silver',
+  'Gold'
+];
+
+export const RARITY_COLORS = {
+  0: '#CD7F32', // Bronze
+  1: '#C0C0C0', // Silver
+  2: '#FFD700'  // Gold
+};
+
+export const TOKEN_IDS = {
+  FOOD: 1,
+  GOLD: 2,
+  WOOD: 3,
+  REDKING: 4
+};
+
+export const ARENA_IDS = {
+  SMIZFUME: 0,
+  COALHEART: 1,
+  WARMDICE: 2,
+  BERVATION: 3,
+  KONFISOF: 4,
+  WITKASTLE: 5, // Currently active
+  BOWKIN: 6
+};
+
+export const ENERGY_PER_BATTLE = 20;
+export const REFUEL_COST = 50; // FOOD tokens
+export const REFUEL_DURATION = 3 * 60 * 60; // 3 hours in seconds
+export const BATTLE_ENTRY_FEE = 50; // FOOD tokens
+export const BATTLE_TIMEOUT = 60 * 60; // 1 hour in seconds
+
+// ============ HELPER FUNCTIONS ============
+
+export const getClanName = (clanId) => CLAN_NAMES[clanId] || 'Unknown';
+export const getRarityName = (rarityId) => RARITY_NAMES[rarityId] || 'Unknown';
+export const getRarityColor = (rarityId) => RARITY_COLORS[rarityId] || '#FFFFFF';
+
+export const formatTokenAmount = (amount, decimals = 18) => {
+  return (Number(amount) / Math.pow(10, decimals)).toFixed(2);
+};
+
+export const parseTokenAmount = (amount, decimals = 18) => {
+  return BigInt(Math.floor(amount * Math.pow(10, decimals)));
+};
+
+export default {
+  // Addresses
+  FIGHTER_V3_ADDRESS,
+  BATTLE_ADDRESS,
+  GAME_BALANCE_V4_ADDRESS,
+  HERALD_ADDRESS,
+  HERALD_STAKING_ADDRESS,
+  FOOD_TOKEN_ADDRESS,
+  GOLD_TOKEN_ADDRESS,
+  WOOD_TOKEN_ADDRESS,
+  REDKING_TOKEN_ADDRESS,
+  
+  // ABIs
+  FIGHTER_V3_ABI,
+  BATTLE_ABI,
+  GAME_BALANCE_V4_ABI,
+  HERALD_STAKING_ABI,
+  HERALD_ABI,
+  ERC20_ABI,
+  
+  // Constants
+  CLAN_NAMES,
+  RARITY_NAMES,
+  RARITY_COLORS,
+  TOKEN_IDS,
+  ARENA_IDS,
+  
+  // Helpers
+  getClanName,
+  getRarityName,
+  getRarityColor,
+  formatTokenAmount,
+  parseTokenAmount
+};
