@@ -228,6 +228,14 @@ export const parseTokenAmount = (amount, decimals = 18) => {
   return BigInt(Math.floor(amount * Math.pow(10, decimals)));
 };
 
+// Herald Image URL Generator - Pattern: {rarity}_{clan}.png
+export const getHeraldImageUrl = (clan, rarity) => {
+  const baseUrl = 'https://emerald-adequate-eagle-845.mypinata.cloud/ipfs/bafybeigvh7vjqgpj3jguhdbwktfdntvgqypmuu456usxpgsnrxxlh6pln4';
+  const rarityName = RARITY_NAMES[rarity].toLowerCase(); // bronze, silver, gold
+  const clanName = CLAN_NAMES[clan].toLowerCase(); // smizfume, coalheart, etc.
+  return `${baseUrl}/${rarityName}_${clanName}.png`;
+};
+
 export default {
   // Addresses
   FIGHTER_V3_ADDRESS,
@@ -260,5 +268,6 @@ export default {
   getRarityName,
   getRarityColor,
   formatTokenAmount,
-  parseTokenAmount
+  parseTokenAmount,
+  getHeraldImageUrl
 };
