@@ -3,7 +3,7 @@ import { Crown, Coins, Clock, Flame, Shield, Swords, ChevronDown } from 'lucide-
 import { ethers } from 'ethers';
 import MintPage from './mint.jsx';
 import StakingPage from './Staking.jsx';
-import FighterStaking from './components/FighterStaking.jsx';
+import FighterStaking from './components/Fighterstaking.jsx';
 import ExchangePage from './Exchange.jsx';
 import AboutPage from './About.jsx';
 import FAQPage from './faq.jsx';
