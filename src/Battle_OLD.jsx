@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Swords, Heart, Trophy, Skull, ArrowLeft, Zap, Shield, Crown, Target } from 'lucide-react';
+import { Swords, Heart, Trophy, Skull, ArrowLeft, Zap, Shield, Crown, Target, Loader } from 'lucide-react';
 import { ethers } from 'ethers';
 import { 
   FIGHTER_V3_ADDRESS, 
@@ -14,66 +14,12 @@ import {
   formatTokenAmount
 } from './contractConfig';
 
-useEffect(() => {
-  if (connected && walletAddress && provider) {
-    loadUserData();
-  }
-}, [connected, walletAddress, provider]);
-
-const loadUserData = async () => {
-  try {
-    setLoading(true);
-    setError(null);
-
-    const signer = await provider.getSigner();
-    const fighterContract = new ethers.Contract(FIGHTER_V3_ADDRESS, FIGHTER_V3_ABI, signer);
-    const gameBalanceContract = new ethers.Contract(GAME_BALANCE_V4_ADDRESS, GAME_BALANCE_V4_ABI, signer);
-    const heraldStakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, signer);
-
-    // Get staked Fighters
-    const stakedFighters = await fighterContract.getUserStakedFighters(walletAddress);
-    
-    // Load Fighter data
-    const fightersData = await Promise.all(
-      stakedFighters.map(async (tokenId) => {
-        const fighterData = await fighterContract.fighters(tokenId);
-        return {
-          tokenId: tokenId.toString(),
-          rarity: fighterData.rarity,
-          clan: fighterData.clan,
-          energy: fighterData.energy,
-          wins: fighterData.wins,
-          losses: fighterData.losses,
-          isStaked: fighterData.isStaked,
-          inBattle: fighterData.inBattle,
-          refuelStartTime: fighterData.refuelStartTime
-        };
-      })
-    );
-
-    setUserFighters(fightersData);
-
-    // Get FOOD balance
-    const foodBal = await gameBalanceContract.getBalance(walletAddress, TOKEN_IDS.FOOD);
-    setFoodBalance(ethers.formatEther(foodBal));
-
-    // Check Herald
-    const stakedHeralds = await heraldStakingContract.getUserStakedHeralds(walletAddress);
-    setHasStakedHerald(stakedHeralds.length > 0);
-
-    setLoading(false);
-    setGameState('arena-intro');
-  } catch (err) {
-    console.error('Error loading user data:', err);
-    setError(err.message);
-    setLoading(false);
-  }
-};
-
 export default function BattlePage({ connected, walletAddress, provider, onNavigate }) {
+  // ============ STATE VARIABLES ============
+  
   // Battle State
-  const [gameState, setGameState] = useState('arena-intro'); // arena-intro, enemy-select, pre-battle, fighting, victory, defeat, complete
-  const [currentEnemy, setCurrentEnemy] = useState(null); // 1, 2, or 3
+  const [gameState, setGameState] = useState('loading');
+  const [currentEnemy, setCurrentEnemy] = useState(null);
   const [enemiesDefeated, setEnemiesDefeated] = useState([]);
   
   // HP Tracking
@@ -83,27 +29,32 @@ export default function BattlePage({ connected, walletAddress, provider, onNavig
   // Combat Flow
   const [currentTurn, setCurrentTurn] = useState('player');
   const [isAnimating, setIsAnimating] = useState(false);
-  const [weaponAnimation, setWeaponAnimation] = useState(null); // video playing
-  const [outcomeText, setOutcomeText] = useState(''); // "Fighter Hits", "Enemy Misses", etc.
+  const [weaponAnimation, setWeaponAnimation] = useState(null);
+  const [outcomeText, setOutcomeText] = useState('');
   const [battleLog, setBattleLog] = useState([]);
   const [round, setRound] = useState(1);
-  const [earnedRewards, setEarnedRewards] = useState(null); // Calculated rewards
+  const [earnedRewards, setEarnedRewards] = useState(null);
 
   // Battle Boosts State
   const [activeBoosts, setActiveBoosts] = useState([]);
   const [poisonedAttacksRemaining, setPoisonedAttacksRemaining] = useState(0);
   const [enemyFrozen, setEnemyFrozen] = useState(false);
 
-  // Add these to your existing state:
-const [userFighters, setUserFighters] = useState([]);
-const [selectedFighter, setSelectedFighter] = useState(null);
-const [loading, setLoading] = useState(true);
-const [error, setError] = useState(null);
-const [txPending, setTxPending] = useState(false);
-const [foodBalance, setFoodBalance] = useState('0');
-const [hasStakedHerald, setHasStakedHerald] = useState(false);
-const [activeBattleId, setActiveBattleId] = useState(null);
-const ARENA_ID = 5; // Witkastle
+  // Blockchain State
+  const [userFighters, setUserFighters] = useState([]);
+  const [selectedFighter, setSelectedFighter] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [txPending, setTxPending] = useState(false);
+  const [foodBalance, setFoodBalance] = useState('0');
+  const [hasStakedHerald, setHasStakedHerald] = useState(false);
+  const [activeBattleId, setActiveBattleId] = useState(null);
+  
+  // Fighter Configuration
+  const [fighter, setFighter] = useState(null);
+  
+  // Constants
+  const ARENA_ID = 5;
 
   // Arena Configuration
   const arena = {
@@ -111,7 +62,7 @@ const ARENA_ID = 5; // Witkastle
     clan: "Witkastle",
     description: "Ancient battleground where honor meets treachery",
     backgroundVideo: "/videos/castle_grounds_arena.mp4",
-    staticImage: "/images/castle_grounds_arena.png" // Fallback image
+    staticImage: "/images/castle_grounds_arena.png"
   };
 
   // Enemy Configurations
@@ -148,133 +99,273 @@ const ARENA_ID = 5; // Witkastle
     }
   };
 
-  const selectFighterForBattle = (fighterData) => {
-  setSelectedFighter(fighterData);
+  // ============ USEEFFECT ============
   
-  const rarityNames = ['Bronze', 'Silver', 'Gold'];
-  const clanNames = ['Smizfume', 'Coalheart', 'Warmdice', 'Bervation', 'Konfisof', 'Witkastle', 'Bowkin'];
-  
-  setFighter({
-    name: `Fighter #${fighterData.tokenId}`,
-    clan: clanNames[fighterData.clan],
-    rarity: rarityNames[fighterData.rarity],
-    rarityId: fighterData.rarity,
-    weapon: "Sailor's Dirk",
-    weaponVideo: "/videos/sailors_dirk.mp4",
-    characterVideo: "/videos/pirate_fighter.mp4",
-    staticImage: "/images/pirate_fighter.png",
-    hp: 3,
-    tokenId: fighterData.tokenId
-  });
-  
-  setGameState('enemy-select');
-};
+  useEffect(() => {
+    if (connected && walletAddress && provider) {
+      loadUserData();
+    }
+  }, [connected, walletAddress, provider]);
 
-  // Calculate Fighter's Hit Chance based on rarity and enemy
+  // ============ BLOCKCHAIN FUNCTIONS ============
+  
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const signer = await provider.getSigner();
+      const fighterContract = new ethers.Contract(FIGHTER_V3_ADDRESS, FIGHTER_V3_ABI, signer);
+      const gameBalanceContract = new ethers.Contract(GAME_BALANCE_V4_ADDRESS, GAME_BALANCE_V4_ABI, signer);
+      const heraldStakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, signer);
+
+      const stakedFighters = await fighterContract.getUserStakedFighters(walletAddress);
+      
+      const fightersData = await Promise.all(
+        stakedFighters.map(async (tokenId) => {
+          const fighterData = await fighterContract.fighters(tokenId);
+          return {
+            tokenId: tokenId.toString(),
+            rarity: fighterData.rarity,
+            clan: fighterData.clan,
+            energy: fighterData.energy,
+            wins: fighterData.wins,
+            losses: fighterData.losses,
+            isStaked: fighterData.isStaked,
+            inBattle: fighterData.inBattle,
+            refuelStartTime: fighterData.refuelStartTime
+          };
+        })
+      );
+
+      setUserFighters(fightersData);
+
+      const foodBal = await gameBalanceContract.getBalance(walletAddress, TOKEN_IDS.FOOD);
+      setFoodBalance(ethers.formatEther(foodBal));
+
+      const stakedHeralds = await heraldStakingContract.getUserStakedHeralds(walletAddress);
+      setHasStakedHerald(stakedHeralds.length > 0);
+
+      setLoading(false);
+      setGameState('arena-intro');
+    } catch (err) {
+      console.error('Error loading user data:', err);
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  const selectFighterForBattle = (fighterData) => {
+    setSelectedFighter(fighterData);
+    
+    const rarityNames = ['Bronze', 'Silver', 'Gold'];
+    const clanNames = ['Smizfume', 'Coalheart', 'Warmdice', 'Bervation', 'Konfisof', 'Witkastle', 'Bowkin'];
+    
+    setFighter({
+      name: `Fighter #${fighterData.tokenId}`,
+      clan: clanNames[fighterData.clan],
+      rarity: rarityNames[fighterData.rarity],
+      rarityId: fighterData.rarity,
+      weapon: "Sailor's Dirk",
+      weaponVideo: "/videos/sailors_dirk.mp4",
+      characterVideo: "/videos/pirate_fighter.mp4",
+      staticImage: "/images/pirate_fighter.png",
+      hp: 3,
+      tokenId: fighterData.tokenId
+    });
+    
+    setGameState('enemy-select');
+  };
+
+  const selectEnemy = async (enemyNum) => {
+    if (enemiesDefeated.includes(enemyNum)) return;
+    
+    const isAvailable = enemyNum === 1 || enemiesDefeated.includes(enemyNum - 1);
+    if (!isAvailable) return;
+    
+    setCurrentEnemy(enemyNum);
+    setEnemyHP(3);
+    setFighterHP(3);
+    setGameState('pre-battle');
+  };
+
+  const enterArena = async (enemyNum) => {
+    if (!selectedFighter) {
+      setError('No Fighter selected');
+      return;
+    }
+
+    try {
+      setTxPending(true);
+      setError(null);
+
+      const signer = await provider.getSigner();
+      const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
+
+      console.log('Entering arena:', selectedFighter.tokenId, ARENA_ID, enemyNum);
+      const tx = await battleContract.enterArena(selectedFighter.tokenId, ARENA_ID, enemyNum);
+      
+      addLog('⏳ Entering arena...');
+      await tx.wait();
+      
+      addLog('✅ Entered arena! Battle begins!');
+      
+      setCurrentEnemy(enemyNum);
+      setActiveBattleId(selectedFighter.tokenId);
+      setEnemyHP(3);
+      setFighterHP(3);
+      setGameState('fighting');
+      setCurrentTurn('player');
+      setRound(1);
+      setBattleLog([]);
+      setTxPending(false);
+      
+      if (enemyNum === 1 && activeBoosts.length === 0) {
+        setActiveBoosts([
+          { id: 'konfisof_minor', name: 'Battle Boost (+15%)', emoji: '🎯', clan: 'Konfisof', effect: '+15% hit', animation: '/animations/battle_boost_minor.gif' },
+          { id: 'konfisof_major', name: 'Battle Boost (+40%)', emoji: '🎯', clan: 'Konfisof', effect: '+40% hit', animation: '/animations/battle_boost_major.gif' },
+          { id: 'bervation_prayer', name: 'Holy Prayer', emoji: '🙏', clan: 'Bervation', effect: 'Restore 1 HP', animation: '/animations/holy_prayer.gif' },
+          { id: 'witkastle_morale', name: 'Morale Boost', emoji: '💪', clan: 'Witkastle', effect: '+10% hit, -10% enemy', animation: '/animations/morale_boost.gif' },
+          { id: 'smizfume_poison', name: 'Poison Potion', emoji: '🧪', clan: 'Smizfume', effect: 'Enemy -20% (2 attacks)', animation: '/animations/poison_potion.gif' },
+          { id: 'coalheart_freeze', name: 'Freeze', emoji: '❄️', clan: 'Coalheart', effect: 'Enemy skips turn', animation: '/animations/freeze.gif' },
+          { id: 'warmdice_treasure', name: 'Treasure Chest', emoji: '💰', clan: 'Warmdice', effect: 'Random reward', animation: '/animations/treasure_chest.gif' },
+          { id: 'bowkin_trap', name: 'Trap', emoji: '🪤', clan: 'Bowkin', effect: 'Enemy -1 HP', animation: '/animations/trap.gif' }
+        ]);
+      }
+      
+    } catch (err) {
+      console.error('Error entering arena:', err);
+      setError(err.message || 'Failed to enter arena');
+      setTxPending(false);
+    }
+  };
+
+  const enemyDefeated = () => {
+    const enemy = enemies[currentEnemy];
+    setGameState('claiming-victory');
+    addLog(`${enemy.name} has been defeated!`);
+    claimVictoryOnChain();
+  };
+
+  const claimVictoryOnChain = async () => {
+    try {
+      setTxPending(true);
+      setError(null);
+
+      const signer = await provider.getSigner();
+      const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
+
+      addLog('⏳ Claiming victory...');
+      
+      const tx = await battleContract.claimVictory(selectedFighter.tokenId, currentEnemy);
+      const receipt = await tx.wait();
+      
+      const rewards = {};
+      receipt.logs.forEach(log => {
+        try {
+          const parsed = battleContract.interface.parseLog(log);
+          if (parsed.name === 'RewardDistributed') {
+            const tokenId = Number(parsed.args.tokenId);
+            const amount = ethers.formatEther(parsed.args.amount);
+            
+            const tokenNames = { 1: 'FOOD', 2: 'GOLD', 3: 'WOOD', 4: 'RKT' };
+            const tokenName = tokenNames[tokenId];
+            
+            if (tokenName) {
+              rewards[tokenName] = parseFloat(amount).toFixed(2);
+            }
+          }
+        } catch (e) {}
+      });
+
+      setEarnedRewards(rewards);
+      addLog('✅ Victory claimed! Rewards distributed!');
+      
+      setEnemiesDefeated(prev => [...prev, currentEnemy]);
+      setActiveBattleId(null);
+      setGameState('victory');
+      setTxPending(false);
+      
+      await loadUserData();
+      
+    } catch (err) {
+      console.error('Error claiming victory:', err);
+      setError(err.message || 'Failed to claim victory');
+      setTxPending(false);
+    }
+  };
+
+  const playerDefeated = () => {
+    setGameState('claiming-defeat');
+    addLog(`${fighter.name} has fallen...`);
+    claimDefeatOnChain();
+  };
+
+  const claimDefeatOnChain = async () => {
+    try {
+      setTxPending(true);
+      setError(null);
+
+      const signer = await provider.getSigner();
+      const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
+
+      addLog('⏳ Recording defeat...');
+      
+      const tx = await battleContract.claimDefeat(selectedFighter.tokenId);
+      await tx.wait();
+      
+      addLog('Defeat recorded');
+      
+      setActiveBattleId(null);
+      setGameState('defeat');
+      setTxPending(false);
+      
+      await loadUserData();
+      
+    } catch (err) {
+      console.error('Error claiming defeat:', err);
+      setError(err.message || 'Failed to record defeat');
+      setTxPending(false);
+    }
+  };
+
+  // ============ GAME FUNCTIONS ============
+  
   const calculateFighterAccuracy = (fighterRarity, enemyNum) => {
-    // Fighter's chance to hit enemy
     const hitChances = {
-      Bronze: [20, 10, 3],   // vs Enemy 1, 2, 3
+      Bronze: [20, 10, 3],
       Silver: [30, 20, 10],
       Gold: [40, 30, 20]
     };
-    
     return hitChances[fighterRarity][enemyNum - 1];
   };
   
-  // Calculate Enemy's Hit Chance based on enemy number and fighter rarity
   const calculateEnemyAccuracy = (enemyNum, fighterRarity) => {
-    // Enemy's chance to hit fighter
     const hitChances = {
-      1: { Gold: 70, Silver: 75, Bronze: 85 },  // First Enemy
-      2: { Gold: 72, Silver: 80, Bronze: 90 },  // Second Enemy
-      3: { Gold: 75, Silver: 85, Bronze: 95 }   // Third Enemy
+      1: { Gold: 70, Silver: 75, Bronze: 85 },
+      2: { Gold: 72, Silver: 80, Bronze: 90 },
+      3: { Gold: 75, Silver: 85, Bronze: 95 }
     };
-    
     return hitChances[enemyNum][fighterRarity];
   };
 
-  // Fighter Configuration (will come from selected NFT later)
-  const [fighter, setFighter] = useState({
-    name: "Pirate Fighter",
-    clan: "Witkastle",
-    rarity: "Gold", // Bronze, Silver, or Gold
-    weapon: "Sailor's Dirk",
-    weaponVideo: "/videos/sailors_dirk.mp4",
-    characterVideo: "/videos/pirate_fighter.mp4",
-    staticImage: "/images/pirate_fighter.png",
-    hp: 3
-  });
-
-  // Battle Configuration (Flexible - can be changed)
-  const [battleConfig, setBattleConfig] = useState({
-    entryCost: {
-      token: 'FOOD', // FOOD, GOLD, WOOD, or REDKING
-      amount: 50
-    },
-    // Reward ranges (min-max)
-    rewardRanges: {
-      enemy1: { 
-        FOOD: [25, 49], 
-        WOOD: [5, 14] 
-      },
-      enemy2: { 
-        FOOD: [84, 119], 
-        GOLD: [14, 21] 
-      },
-      enemy3: { 
-        FOOD: [133, 182], 
-        WOOD: [21, 35],
-        RKT: [0.5, 0.9] // RedKing Token
-      },
-      completion: { 
-        FOOD: [20, 30], 
-        GOLD: [5, 10], 
-        WOOD: [5, 8] 
-      } // Bonus for clearing all 3
-    }
-  });
-
-  // Calculate random reward within range
-  const calculateReward = (enemyNum) => {
-    const range = battleConfig.rewardRanges[`enemy${enemyNum}`];
-    const rewards = {};
-    
-    for (const [token, [min, max]] of Object.entries(range)) {
-      if (token === 'RKT') {
-        // RedKing has decimals
-        rewards[token] = (Math.random() * (max - min) + min).toFixed(2);
-      } else {
-        // FOOD, GOLD, WOOD are integers
-        rewards[token] = Math.floor(Math.random() * (max - min + 1)) + min;
-      }
-    }
-    
-    return rewards;
-  };
-
-  // Boost Usage Functions
   const useBoost = (boostId) => {
     const boost = activeBoosts.find(b => b.id === boostId);
     if (!boost) return;
     
     switch(boostId) {
       case 'konfisof_minor':
-        // Battle Boost Minor: +15% hit for THIS battle only
         addLog('🎯 Battle Boost (+15%): Fighter accuracy increased!');
-        // Show animation if available
         if (boost.animation) {
           setWeaponAnimation(boost.animation);
           setTimeout(() => setWeaponAnimation(null), 2000);
         }
-        // Mark as used for this battle
         setActiveBoosts(boosts => boosts.map(b => 
           b.id === boostId ? {...b, usedThisBattle: true} : b
         ));
         break;
         
       case 'konfisof_major':
-        // Battle Boost Major: +40% hit for THIS battle only
         addLog('🎯 Battle Boost (+40%): Fighter accuracy greatly increased!');
         if (boost.animation) {
           setWeaponAnimation(boost.animation);
@@ -286,19 +377,16 @@ const ARENA_ID = 5; // Witkastle
         break;
         
       case 'bervation_prayer':
-        // Holy Prayer: Restore 1 HP immediately
         setFighterHP(hp => Math.min(hp + 1, 3));
         addLog('🙏 Holy Prayer: Restored 1 HP!');
         if (boost.animation) {
           setWeaponAnimation(boost.animation);
           setTimeout(() => setWeaponAnimation(null), 2000);
         }
-        // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
         
       case 'witkastle_morale':
-        // Morale Boost: +10% hit, -10% enemy for THIS battle
         addLog('💪 Morale Boost: Team morale increased!');
         if (boost.animation) {
           setWeaponAnimation(boost.animation);
@@ -310,41 +398,32 @@ const ARENA_ID = 5; // Witkastle
         break;
         
       case 'smizfume_poison':
-        // Poison Potion: Enemy -20% for next 2 attacks
         setPoisonedAttacksRemaining(2);
         addLog('🧪 Poison Potion: Enemy weakened for 2 attacks!');
         if (boost.animation) {
           setWeaponAnimation(boost.animation);
           setTimeout(() => setWeaponAnimation(null), 2000);
         }
-        // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
         
       case 'coalheart_freeze':
-        // Freeze: Enemy skips next attack
         setEnemyFrozen(true);
         addLog('❄️ Freeze: Enemy will skip next attack!');
         if (boost.animation) {
           setWeaponAnimation(boost.animation);
           setTimeout(() => setWeaponAnimation(null), 2000);
         }
-        // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
         
       case 'warmdice_treasure':
-        // Treasure Chest: Random reward - 10-17 GOLD + 5-10 WOOD
-        const goldAmount = Math.floor(Math.random() * 8) + 10; // 10-17 GOLD
-        const woodAmount = Math.floor(Math.random() * 6) + 5; // 5-10 WOOD
+        const goldAmount = Math.floor(Math.random() * 8) + 10;
+        const woodAmount = Math.floor(Math.random() * 6) + 5;
         
-        // Show in weapon area
-        setOutcomeText(`💰 TREASURE!
-${goldAmount} GOLD + ${woodAmount} WOOD`);
-        
+        setOutcomeText(`💰 TREASURE!\n${goldAmount} GOLD + ${woodAmount} WOOD`);
         addLog(`💰 Treasure Chest: Found ${goldAmount} GOLD + ${woodAmount} WOOD!`);
         
-        // Show animation if available, otherwise just show text
         if (boost.animation) {
           setWeaponAnimation(boost.animation);
           setTimeout(() => {
@@ -352,216 +431,43 @@ ${goldAmount} GOLD + ${woodAmount} WOOD`);
             setOutcomeText('');
           }, 3000);
         } else {
-          setTimeout(() => {
-            setOutcomeText('');
-          }, 3000);
+          setTimeout(() => setOutcomeText(''), 3000);
         }
         
-        // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
         
       case 'bowkin_trap':
-        // Trap: Enemy loses 1 HP immediately
         setEnemyHP(hp => Math.max(hp - 1, 0));
         addLog('🪤 Trap: Enemy stepped in trap! Lost 1 HP!');
         if (boost.animation) {
           setWeaponAnimation(boost.animation);
           setTimeout(() => setWeaponAnimation(null), 2000);
         }
-        // Remove from inventory (consumed)
         setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
         break;
     }
   };
 
-  // Add to battle log
   const addLog = (message) => {
     setBattleLog(prev => [message, ...prev].slice(0, 8));
   };
 
-  // Start arena (show intro)
-  const startArena = () => {
-    setGameState('arena-intro');
-  };
-
-  // REPLACE your selectEnemy function with this:
-const selectEnemy = async (enemyNum) => {
-  if (enemiesDefeated.includes(enemyNum)) return;
-  
-  const isAvailable = enemyNum === 1 || enemiesDefeated.includes(enemyNum - 1);
-  if (!isAvailable) return;
-  
-  setCurrentEnemy(enemyNum);
-  setGameState('pre-battle'); // Show pre-battle screen first
-};
-
-// ADD this new function:
-const enterArena = async (enemyNum) => {
-  if (!selectedFighter) {
-    setError('No Fighter selected');
-    return;
-  }
-
-  try {
-    setTxPending(true);
-    setError(null);
-
-    const signer = await provider.getSigner();
-    const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
-
-    // Enter arena
-    console.log('Entering arena:', selectedFighter.tokenId, ARENA_ID, enemyNum);
-    const tx = await battleContract.enterArena(selectedFighter.tokenId, ARENA_ID, enemyNum);
-    
-    addLog('⏳ Entering arena...');
-    await tx.wait();
-    
-    addLog('✅ Entered arena! Battle begins!');
-    
-    setCurrentEnemy(enemyNum);
-    setActiveBattleId(selectedFighter.tokenId);
-    setEnemyHP(3);
-    setFighterHP(3);
-    setGameState('fighting');
-    setCurrentTurn('player');
-    setRound(1);
-    setTxPending(false);
-    
-  } catch (err) {
-    console.error('Error entering arena:', err);
-    setError(err.message || 'Failed to enter arena');
-    setTxPending(false);
-  }
-};
-
-  
-    
-    // Check if this enemy is available (sequential progression)
-    const isAvailable = enemyNum === 1 || enemiesDefeated.includes(enemyNum - 1);
-    if (!isAvailable) {
-      return; // Not available yet
-    }
-    
-    setCurrentEnemy(enemyNum);
-    setEnemyHP(enemies[enemyNum].hp);
-    setFighterHP(3); // Reset fighter HP for each battle
-    setBattleLog([]);
-    setOutcomeText(''); // Clear outcome text
-    setWeaponAnimation(null); // Clear weapon animation
-    setRound(1);
-    setGameState('pre-battle');
-  };
-
-  // Start fighting
-  const startBattle = () => {
-    setGameState('fighting');
-    setCurrentTurn('player');
-    setOutcomeText('');
-    setWeaponAnimation(null);
-    setBattleLog([]);
-    setRound(1);
-    
-    // TESTING: Give player one of each boost for first battle ONLY if they don't have any yet
-    if (currentEnemy === 1 && activeBoosts.length === 0) {
-      setActiveBoosts([
-        { 
-          id: 'konfisof_minor', 
-          name: 'Battle Boost (+15%)', 
-          emoji: '🎯', 
-          clan: 'Konfisof', 
-          effect: '+15% hit',
-          animation: '/animations/battle_boost_minor.gif' // Your GIF path
-        },
-        { 
-          id: 'konfisof_major', 
-          name: 'Battle Boost (+40%)', 
-          emoji: '🎯', 
-          clan: 'Konfisof', 
-          effect: '+40% hit',
-          animation: '/animations/battle_boost_major.gif'
-        },
-        { 
-          id: 'bervation_prayer', 
-          name: 'Holy Prayer', 
-          emoji: '🙏', 
-          clan: 'Bervation', 
-          effect: 'Restore 1 HP',
-          animation: '/animations/holy_prayer.gif'
-        },
-        { 
-          id: 'witkastle_morale', 
-          name: 'Morale Boost', 
-          emoji: '💪', 
-          clan: 'Witkastle', 
-          effect: '+10% hit, -10% enemy',
-          animation: '/animations/morale_boost.gif'
-        },
-        { 
-          id: 'smizfume_poison', 
-          name: 'Poison Potion', 
-          emoji: '🧪', 
-          clan: 'Smizfume', 
-          effect: 'Enemy -20% (2 attacks)',
-          animation: '/animations/poison_potion.gif'
-        },
-        { 
-          id: 'coalheart_freeze', 
-          name: 'Freeze', 
-          emoji: '❄️', 
-          clan: 'Coalheart', 
-          effect: 'Enemy skips turn',
-          animation: '/animations/freeze.gif'
-        },
-        { 
-          id: 'warmdice_treasure', 
-          name: 'Treasure Chest', 
-          emoji: '💰', 
-          clan: 'Warmdice', 
-          effect: 'Random reward',
-          animation: '/animations/treasure_chest.gif'
-        },
-        { 
-          id: 'bowkin_trap', 
-          name: 'Trap', 
-          emoji: '🪤', 
-          clan: 'Bowkin', 
-          effect: 'Enemy -1 HP',
-          animation: '/animations/trap.gif'
-        }
-      ]);
-    }
-    
-    addLog(`Battle begins! Round ${round}`);
-  };
-
-  // Player Attack
   const playerAttack = () => {
     if (isAnimating || gameState !== 'fighting' || currentTurn !== 'player') return;
     
     setIsAnimating(true);
     setOutcomeText('');
     
-    // Calculate fighter's accuracy for this enemy
     let accuracy = calculateFighterAccuracy(fighter.rarity, currentEnemy);
     
-    // Apply boost effects ONLY if they've been used this battle
     const usedBoosts = activeBoosts.filter(b => b.usedThisBattle);
+    if (usedBoosts.some(b => b.id === 'konfisof_minor')) accuracy += 15;
+    if (usedBoosts.some(b => b.id === 'konfisof_major')) accuracy += 40;
+    if (usedBoosts.some(b => b.id === 'witkastle_morale')) accuracy += 10;
     
-    if (usedBoosts.some(b => b.id === 'konfisof_minor')) {
-      accuracy += 15;
-    }
-    if (usedBoosts.some(b => b.id === 'konfisof_major')) {
-      accuracy += 40;
-    }
-    if (usedBoosts.some(b => b.id === 'witkastle_morale')) {
-      accuracy += 10;
-    }
-    
-    // Show fighter weapon animation
     setWeaponAnimation(fighter.weaponVideo);
     
-    // Roll for hit
     const hitRoll = Math.random() * 100;
     const didHit = hitRoll <= accuracy;
     
@@ -575,15 +481,12 @@ const enterArena = async (enemyNum) => {
         addLog(`${fighter.name} strikes with ${fighter.weapon}! Hit! (${newHP} HP remaining)`);
         
         if (newHP <= 0) {
-          setTimeout(() => {
-            enemyDefeated();
-          }, 2000);
+          setTimeout(() => enemyDefeated(), 2000);
         } else {
           setTimeout(() => {
             setCurrentTurn('enemy');
             setOutcomeText('');
             
-            // Check if enemy is frozen
             if (enemyFrozen) {
               setEnemyFrozen(false);
               setRound(r => r + 1);
@@ -602,7 +505,6 @@ const enterArena = async (enemyNum) => {
           setCurrentTurn('enemy');
           setOutcomeText('');
           
-          // Check if enemy is frozen
           if (enemyFrozen) {
             setEnemyFrozen(false);
             setRound(r => r + 1);
@@ -618,41 +520,25 @@ const enterArena = async (enemyNum) => {
     }, 2000);
   };
 
-  // Enemy Attack (automated)
   const enemyAttack = () => {
     setIsAnimating(true);
     
     const enemy = enemies[currentEnemy];
-    
-    // Calculate enemy's accuracy against this fighter
     let accuracy = calculateEnemyAccuracy(currentEnemy, fighter.rarity);
     
-    // Apply boost effects ONLY if they've been used this battle
     const usedBoosts = activeBoosts.filter(b => b.usedThisBattle);
-    
-    if (usedBoosts.some(b => b.id === 'witkastle_morale')) {
-      accuracy -= 10; // Morale reduces enemy hit chance
-    }
+    if (usedBoosts.some(b => b.id === 'witkastle_morale')) accuracy -= 10;
     
     if (poisonedAttacksRemaining > 0) {
-      accuracy -= 20; // Poison reduces enemy hit chance
+      accuracy -= 20;
       setPoisonedAttacksRemaining(p => p - 1);
-      addLog(`🧪 Enemy is poisoned! (${poisonedAttacksRemaining - 1} attacks remaining)`);
+      addLog(`🧪 Enemy is poisoned! (${poisonedAttacksRemaining - 1} remaining)`);
     }
     
-    // Show enemy weapon animation
     setWeaponAnimation(enemy.weaponVideo);
     
-    // Roll for hit
     const hitRoll = Math.random() * 100;
     const didHit = hitRoll <= accuracy;
-    
-    // DEBUG: Log the calculation
-    console.log(`Enemy ${currentEnemy} attacking ${fighter.rarity} Fighter:`);
-    console.log(`- Base Accuracy: ${calculateEnemyAccuracy(currentEnemy, fighter.rarity)}%`);
-    console.log(`- Modified Accuracy: ${accuracy}%`);
-    console.log(`- Roll: ${hitRoll.toFixed(2)}`);
-    console.log(`- Result: ${didHit ? 'HIT' : 'MISS'}`);
     
     setTimeout(() => {
       setWeaponAnimation(null);
@@ -664,9 +550,7 @@ const enterArena = async (enemyNum) => {
         addLog(`${enemy.name} attacks with ${enemy.weapon}! Hit! (${newHP} HP remaining)`);
         
         if (newHP <= 0) {
-          setTimeout(() => {
-            playerDefeated();
-          }, 2000);
+          setTimeout(() => playerDefeated(), 2000);
         } else {
           setTimeout(() => {
             setRound(r => r + 1);
@@ -691,138 +575,32 @@ const enterArena = async (enemyNum) => {
     }, 2000);
   };
 
-// REPLACE your enemyDefeated function with:
-const enemyDefeated = () => {
-  const enemy = enemies[currentEnemy];
-  setGameState('claiming-victory');
-  addLog(`${enemy.name} has been defeated!`);
-  claimVictoryOnChain(); // Call blockchain function
-};
-
-// ADD this new function:
-const claimVictoryOnChain = async () => {
-  try {
-    setTxPending(true);
-    setError(null);
-
-    const signer = await provider.getSigner();
-    const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
-
-    addLog('⏳ Claiming victory...');
-    
-    const tx = await battleContract.claimVictory(selectedFighter.tokenId, currentEnemy);
-    const receipt = await tx.wait();
-    
-    // Parse reward events
-    const rewards = {};
-    receipt.logs.forEach(log => {
-      try {
-        const parsed = battleContract.interface.parseLog(log);
-        if (parsed.name === 'RewardDistributed') {
-          const tokenId = Number(parsed.args.tokenId);
-          const amount = ethers.formatEther(parsed.args.amount);
-          
-          const tokenNames = { 1: 'FOOD', 2: 'GOLD', 3: 'WOOD', 4: 'RKT' };
-          const tokenName = tokenNames[tokenId];
-          
-          if (tokenName) {
-            rewards[tokenName] = parseFloat(amount).toFixed(2);
-          }
-        }
-      } catch (e) {}
-    });
-
-    setEarnedRewards(rewards);
-    addLog('✅ Victory claimed! Rewards distributed!');
-    
-    setEnemiesDefeated(prev => [...prev, currentEnemy]);
-    setActiveBattleId(null);
-    setGameState('victory');
-    setTxPending(false);
-    
-    await loadUserData(); // Refresh
-    
-  } catch (err) {
-    console.error('Error claiming victory:', err);
-    setError(err.message || 'Failed to claim victory');
-    setTxPending(false);
-  }
-};
-    
-    // Calculate random rewards!
-    const rewards = calculateReward(currentEnemy);
-    setEarnedRewards(rewards);
-    
-    setGameState('victory');
-    addLog(`${enemy.name} has been defeated!`);
-    setEnemiesDefeated(prev => [...prev, currentEnemy]);
-    
-    // Don't auto-redirect - let player see victory screen and choose when to exit
-  };
-
-  // REPLACE your playerDefeated function with:
-const playerDefeated = () => {
-  setGameState('claiming-defeat');
-  addLog(`${fighter.name} has fallen...`);
-  claimDefeatOnChain(); // Call blockchain function
-};
-
-// ADD this new function:
-const claimDefeatOnChain = async () => {
-  try {
-    setTxPending(true);
-    setError(null);
-
-    const signer = await provider.getSigner();
-    const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
-
-    addLog('⏳ Recording defeat...');
-    
-    const tx = await battleContract.claimDefeat(selectedFighter.tokenId);
-    await tx.wait();
-    
-    addLog('Defeat recorded');
-    
-    setActiveBattleId(null);
-    setGameState('defeat');
-    setTxPending(false);
-    
-    await loadUserData(); // Refresh
-    
-  } catch (err) {
-    console.error('Error claiming defeat:', err);
-    setError(err.message || 'Failed to record defeat');
-    setTxPending(false);
-  }
-};
-
-  // Continue to next enemy
   const continueToNextEnemy = () => {
-    // Remove Battle Boosts that were used (they're consumed after the battle ends)
-    // Keep instant-effect boosts that weren't used
     setActiveBoosts(boosts => boosts.filter(b => {
-      // Remove Battle Boosts that were used this battle
       if (b.usedThisBattle && 
           (b.id === 'konfisof_minor' || 
            b.id === 'konfisof_major' || 
            b.id === 'witkastle_morale')) {
-        return false; // Remove it
+        return false;
       }
-      // Keep everything else and reset usedThisBattle flag
       return true;
     }).map(b => ({...b, usedThisBattle: false})));
     
     setCurrentEnemy(null);
-    setGameState('enemy-select');
+    setSelectedFighter(null);
+    setFighter(null);
+    setGameState('arena-intro');
     setBattleLog([]);
+    loadUserData();
   };
 
-  // Return to dashboard
   const exitArena = () => {
     if (onNavigate) {
       onNavigate('dashboard');
     }
   };
+
+  // ============ RENDER ============
 
   if (!connected) {
     return (
@@ -834,8 +612,41 @@ const claimDefeatOnChain = async () => {
     );
   }
 
+  if (loading || gameState === 'loading') {
+    return (
+      <div className="max-w-4xl mx-auto text-center py-16">
+        <Loader className="w-16 h-16 text-red-500 mx-auto mb-4 animate-spin" />
+        <h2 className="text-2xl font-bold mb-4">Loading Battle Data...</h2>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-900/20 border border-red-600 rounded-lg p-4 mb-4">
+          <p className="text-red-400">{error}</p>
+          <button 
+            onClick={() => setError(null)}
+            className="text-sm text-red-300 underline mt-2"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Transaction Pending Overlay */}
+      {txPending && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 text-center">
+            <Loader className="w-16 h-16 text-red-500 mx-auto mb-4 animate-spin" />
+            <h3 className="text-xl font-bold mb-2">Transaction Pending</h3>
+            <p className="text-gray-400">Please confirm in your wallet...</p>
+          </div>
+        </div>
+      )}
+
       {/* Arena Intro */}
       {gameState === 'arena-intro' && (
         <div className="text-center">
@@ -843,9 +654,25 @@ const claimDefeatOnChain = async () => {
             <h1 className="text-5xl font-bold mb-2">{arena.name}</h1>
             <p className="text-xl text-gray-400 mb-1">{arena.clan} Clan Territory</p>
             <p className="text-gray-500">{arena.description}</p>
+            
+            <div className="mt-6 flex justify-center gap-6 text-sm">
+              <div>
+                <span className="text-gray-400">Staked Fighters: </span>
+                <span className="font-bold text-white">{userFighters.length}</span>
+              </div>
+              <div>
+                <span className="text-gray-400">FOOD Balance: </span>
+                <span className="font-bold text-yellow-400">{parseFloat(foodBalance).toFixed(0)} 🍖</span>
+              </div>
+              <div>
+                <span className="text-gray-400">Herald Staked: </span>
+                <span className={`font-bold ${hasStakedHerald ? 'text-green-400' : 'text-red-400'}`}>
+                  {hasStakedHerald ? '✓' : '✗'}
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* Arena Video/Image */}
           <div className="relative w-full h-96 bg-gray-900 rounded-lg overflow-hidden mb-8">
             <video
               autoPlay
@@ -856,7 +683,6 @@ const claimDefeatOnChain = async () => {
               poster={arena.staticImage}
             >
               <source src={arena.backgroundVideo} type="video/mp4" />
-              {/* Fallback to static image */}
               <img src={arena.staticImage} alt={arena.name} className="w-full h-full object-cover" />
             </video>
             
@@ -864,74 +690,92 @@ const claimDefeatOnChain = async () => {
             
             <div className="absolute bottom-8 left-0 right-0 text-center">
               <h2 className="text-3xl font-bold text-white mb-4">Three Enemies Await</h2>
-              // In arena-intro, replace the "Enter Battle" button with:
-{userFighters.length > 0 ? (
-  <button
-    onClick={() => setGameState('fighter-select')}
-    className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-bold text-xl"
-  >
-    Select Fighter (50 FOOD Entry)
-  </button>
-) : (
-  <div className="bg-gray-900/80 border border-gray-700 rounded-lg p-4 max-w-md mx-auto">
-    <p className="text-yellow-400 font-bold mb-2">⚠️ No Fighters Available</p>
-    <p className="text-sm text-gray-400">Stake a Fighter to enter battle</p>
-  </div>
-)}
+              {userFighters.length > 0 ? (
+                <button
+                  onClick={() => setGameState('fighter-select')}
+                  className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-bold text-xl transition"
+                >
+                  Select Fighter (50 FOOD Entry)
+                </button>
+              ) : (
+                <div className="bg-gray-900/80 border border-gray-700 rounded-lg p-4 max-w-md mx-auto">
+                  <p className="text-yellow-400 font-bold mb-2">⚠️ No Fighters Available</p>
+                  <p className="text-sm text-gray-400">Stake a Fighter to enter battle</p>
+                </div>
+              )}
             </div>
           </div>
+          
+          <button
+            onClick={exitArena}
+            className="bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded-lg font-semibold transition"
+          >
+            <ArrowLeft className="w-4 h-4 inline mr-2" />
+            Back to Dashboard
+          </button>
         </div>
       )}
 
-{gameState === 'fighter-select' && (
-  <div>
-    <h2 className="text-4xl font-bold mb-8 text-center">Choose Your Fighter</h2>
+      {/* Fighter Selection */}
+      {gameState === 'fighter-select' && (
+        <div>
+          <h2 className="text-4xl font-bold mb-8 text-center">Choose Your Fighter</h2>
 
-    <div className="grid md:grid-cols-3 gap-6 mb-8">
-      {userFighters.map(f => {
-        const rarityNames = ['Bronze', 'Silver', 'Gold'];
-        const rarityColors = ['#CD7F32', '#C0C0C0', '#FFD700'];
-        const canFight = f.energy >= 20 && !f.inBattle && f.refuelStartTime.toString() === '0';
-        
-        return (
-          <div
-            key={f.tokenId}
-            className={`bg-gray-800/50 border-2 rounded-lg p-6 ${
-              canFight ? 'cursor-pointer hover:border-red-600' : 'opacity-50 cursor-not-allowed'
-            }`}
-            style={{ borderColor: canFight ? rarityColors[f.rarity] : '#1f2937' }}
-            onClick={() => canFight && selectFighterForBattle(f)}
-          >
-            <h3 className="text-xl font-bold mb-2">Fighter #{f.tokenId}</h3>
-            <p className="text-sm mb-2" style={{ color: rarityColors[f.rarity] }}>
-              {rarityNames[f.rarity]}
-            </p>
-            <div className="space-y-1 text-sm">
-              <div>Energy: {f.energy.toString()}/100</div>
-              <div>Record: {f.wins.toString()}W - {f.losses.toString()}L</div>
-            </div>
-            
-            {canFight ? (
-              <button className="w-full mt-4 bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-bold">
-                Select Fighter
-              </button>
-            ) : (
-              <div className="mt-4 text-center text-sm text-gray-500">
-                {f.inBattle ? 'In Battle' : f.energy < 20 ? 'Low Energy' : 'Refueling'}
-              </div>
-            )}
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            {userFighters.map(f => {
+              const rarityNames = ['Bronze', 'Silver', 'Gold'];
+              const rarityColors = ['#CD7F32', '#C0C0C0', '#FFD700'];
+              const canFight = f.energy >= 20 && !f.inBattle && f.refuelStartTime.toString() === '0';
+              
+              return (
+                <div
+                  key={f.tokenId}
+                  className={`bg-gray-800/50 border-2 rounded-lg p-6 transition ${
+                    canFight ? 'cursor-pointer hover:border-red-600' : 'opacity-50 cursor-not-allowed'
+                  }`}
+                  style={{ borderColor: canFight ? rarityColors[f.rarity] : '#1f2937' }}
+                  onClick={() => canFight && selectFighterForBattle(f)}
+                >
+                  <h3 className="text-xl font-bold mb-2">Fighter #{f.tokenId}</h3>
+                  <p className="text-sm mb-2" style={{ color: rarityColors[f.rarity] }}>
+                    {rarityNames[f.rarity]}
+                  </p>
+                  <div className="space-y-1 text-sm">
+                    <div>
+                      <span className="text-gray-400">Energy: </span>
+                      <span className="font-bold">{f.energy.toString()}/100</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Record: </span>
+                      <span className="font-bold">{f.wins.toString()}W - {f.losses.toString()}L</span>
+                    </div>
+                  </div>
+                  
+                  {canFight ? (
+                    <button className="w-full mt-4 bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-bold transition">
+                      Select Fighter
+                    </button>
+                  ) : (
+                    <div className="mt-4 text-center text-sm text-gray-500">
+                      {f.inBattle ? 'In Battle' : f.energy < 20 ? 'Low Energy' : 'Refueling'}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
-    </div>
-    
-    <div className="text-center">
-      <button onClick={() => setGameState('arena-intro')} className="bg-gray-700 px-6 py-3 rounded-lg">
-        Back
-      </button>
-    </div>
-  </div>
-)}
+          
+          <div className="text-center">
+            <button 
+              onClick={() => setGameState('arena-intro')} 
+              className="bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded-lg font-semibold transition"
+            >
+              <ArrowLeft className="w-4 h-4 inline mr-2" />
+              Back
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Enemy Selection */}
       {gameState === 'enemy-select' && (
@@ -960,10 +804,8 @@ const claimDefeatOnChain = async () => {
                   }`}
                   onClick={() => isAvailable && !isDefeated && selectEnemy(enemyNum)}
                 >
-                  {/* Enemy Character Video/Image */}
                   <div className="w-full h-64 bg-gray-900 rounded-lg mb-4 overflow-hidden">
                     {isCurrent && !isDefeated ? (
-                      // Current available enemy - show video
                       <video
                         autoPlay
                         loop
@@ -976,7 +818,6 @@ const claimDefeatOnChain = async () => {
                         <img src={enemy.staticImage} alt={enemy.name} className="w-full h-full object-cover" />
                       </video>
                     ) : (
-                      // Locked or defeated enemies - show static image
                       <img src={enemy.staticImage} alt={enemy.name} className="w-full h-full object-cover" />
                     )}
                   </div>
@@ -1025,32 +866,11 @@ const claimDefeatOnChain = async () => {
       )}
 
       {/* Pre-Battle Screen */}
-      {gameState === 'pre-battle' && currentEnemy && (
+      {gameState === 'pre-battle' && currentEnemy && fighter && (
         <div className="text-center">
           <h2 className="text-4xl font-bold mb-8">Prepare for Battle</h2>
           
-          {/* Fighter Rarity Selector (Temporary for Testing) */}
-          <div className="mb-6 p-4 bg-gray-900/50 border border-gray-700 rounded-lg max-w-md mx-auto">
-            <p className="text-sm text-gray-400 mb-2">Select Fighter Rarity (Testing):</p>
-            <div className="flex gap-2 justify-center">
-              {['Bronze', 'Silver', 'Gold'].map(rarity => (
-                <button
-                  key={rarity}
-                  onClick={() => setFighter({...fighter, rarity})}
-                  className={`px-4 py-2 rounded font-bold transition ${
-                    fighter.rarity === rarity
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
-                  }`}
-                >
-                  {rarity}
-                </button>
-              ))}
-            </div>
-          </div>
-          
           <div className="grid md:grid-cols-2 gap-8 mb-8">
-            {/* Fighter */}
             <div className="bg-blue-900/20 border-2 border-blue-600 rounded-lg p-6">
               <h3 className="text-2xl font-bold mb-4">{fighter.name}</h3>
               <div className="w-48 h-48 bg-gray-900 rounded-lg mx-auto mb-4 overflow-hidden">
@@ -1071,7 +891,6 @@ const claimDefeatOnChain = async () => {
               <p className="text-sm text-yellow-400">Hit Chance: {calculateFighterAccuracy(fighter.rarity, currentEnemy)}%</p>
             </div>
 
-            {/* Enemy */}
             <div className="bg-red-900/20 border-2 border-red-600 rounded-lg p-6">
               <h3 className="text-2xl font-bold mb-4">{enemies[currentEnemy].name}</h3>
               <div className="w-48 h-48 bg-gray-900 rounded-lg mx-auto mb-4 overflow-hidden">
@@ -1092,20 +911,20 @@ const claimDefeatOnChain = async () => {
             </div>
           </div>
 
-          <button onClick={() => enterArena(currentEnemy)}
-  disabled={txPending}
-            className="bg-red-600 hover:bg-red-700 px-12 py-4 rounded-lg font-bold text-xl transition"
+          <button 
+            onClick={() => enterArena(currentEnemy)}
+            disabled={txPending}
+            className="bg-red-600 hover:bg-red-700 px-12 py-4 rounded-lg font-bold text-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Swords className="w-6 h-6 inline mr-2" />
-            BEGIN BATTLE
+            {txPending ? 'Entering Arena...' : 'BEGIN BATTLE'}
           </button>
         </div>
       )}
 
       {/* Active Battle */}
-      {gameState === 'fighting' && currentEnemy && (
+      {gameState === 'fighting' && currentEnemy && fighter && (
         <div className="max-w-7xl mx-auto">
-          {/* Battle Boosts at Top - Always Visible */}
           {activeBoosts.length > 0 && (
             <div className="mb-4 p-3 bg-purple-900/20 border border-purple-600 rounded-lg">
               <p className="text-xs text-purple-400 mb-2 text-center font-bold">Battle Boosts (Click to Use):</p>
@@ -1137,15 +956,12 @@ const claimDefeatOnChain = async () => {
             </div>
           )}
 
-          {/* Compact Battle Arena - Single Screen */}
           <div className="bg-gray-900/50 rounded-lg p-4 mb-4">
-            {/* Arena Name & Round */}
             <div className="text-center mb-3">
               <h2 className="text-xl font-bold text-gray-400">{arena.name} - Round {round}</h2>
             </div>
 
             <div className="grid grid-cols-7 gap-3 items-center">
-              {/* Fighter Side - 2 columns */}
               <div className="col-span-2 text-center">
                 <h3 className="text-lg font-bold mb-2">{fighter.name}</h3>
                 <div className="flex justify-center gap-1 mb-2">
@@ -1184,7 +1000,6 @@ const claimDefeatOnChain = async () => {
                 </div>
               </div>
 
-              {/* Center Combat - 3 columns */}
               <div className="col-span-3 flex flex-col justify-center items-center">
                 {weaponAnimation ? (
                   <div className="w-full h-32 bg-black rounded-lg overflow-hidden mb-2">
@@ -1244,7 +1059,6 @@ const claimDefeatOnChain = async () => {
                 )}
               </div>
 
-              {/* Enemy Side - 2 columns */}
               <div className="col-span-2 text-center">
                 <h3 className="text-lg font-bold mb-2">{enemies[currentEnemy].name}</h3>
                 <div className="flex justify-center gap-1 mb-2">
@@ -1287,7 +1101,6 @@ const claimDefeatOnChain = async () => {
             </div>
           </div>
 
-          {/* Battle Log - Compact */}
           <div className="bg-gray-900/50 rounded-lg p-3">
             <h3 className="text-sm font-bold mb-2 text-gray-400">Battle Log:</h3>
             <div className="space-y-1 max-h-24 overflow-y-auto">
@@ -1298,7 +1111,6 @@ const claimDefeatOnChain = async () => {
           </div>
         </div>
       )}
-
 
       {/* Victory Screen */}
       {gameState === 'victory' && currentEnemy && earnedRewards && (
@@ -1322,7 +1134,6 @@ const claimDefeatOnChain = async () => {
             </div>
           </div>
 
-          {/* Check if there are more enemies to fight */}
           {currentEnemy < 3 ? (
             <button
               onClick={continueToNextEnemy}
@@ -1345,7 +1156,7 @@ const claimDefeatOnChain = async () => {
       )}
 
       {/* Defeat Screen */}
-      {gameState === 'defeat' && (
+      {gameState === 'defeat' && fighter && (
         <div className="text-center">
           <Skull className="w-24 h-24 text-red-500 mx-auto mb-6" />
           <h2 className="text-5xl font-bold mb-4 text-red-500">DEFEATED</h2>
@@ -1356,31 +1167,6 @@ const claimDefeatOnChain = async () => {
             className="bg-gray-700 hover:bg-gray-600 px-8 py-4 rounded-lg font-bold transition"
           >
             Return to Dashboard
-          </button>
-        </div>
-      )}
-
-      {/* Complete Screen (All 3 Defeated) */}
-      {gameState === 'complete' && (
-        <div className="text-center">
-          <Crown className="w-24 h-24 text-yellow-400 mx-auto mb-6 animate-pulse" />
-          <h2 className="text-5xl font-bold mb-4 text-yellow-400">GRAND CHAMPION!</h2>
-          <p className="text-2xl mb-8">All enemies of The Castle Grounds have been vanquished!</p>
-
-          <div className="bg-yellow-900/20 border-2 border-yellow-600 rounded-lg p-6 max-w-md mx-auto mb-8">
-            <h3 className="font-bold mb-4 text-xl">Total Rewards + Completion Bonus:</h3>
-            <div className="space-y-2 text-lg">
-              <p>🍖 {battleConfig.rewards.enemy1.FOOD + battleConfig.rewards.enemy2.FOOD + battleConfig.rewards.enemy3.FOOD + battleConfig.rewards.completion.FOOD} FOOD</p>
-              <p>🪙 {battleConfig.rewards.enemy1.GOLD + battleConfig.rewards.enemy2.GOLD + battleConfig.rewards.enemy3.GOLD + battleConfig.rewards.completion.GOLD} GOLD</p>
-              <p>🪵 {battleConfig.rewards.enemy1.WOOD + battleConfig.rewards.enemy2.WOOD + battleConfig.rewards.enemy3.WOOD + battleConfig.rewards.completion.WOOD} WOOD</p>
-            </div>
-          </div>
-
-          <button
-            onClick={exitArena}
-            className="bg-yellow-600 hover:bg-yellow-700 px-8 py-4 rounded-lg font-bold transition"
-          >
-            Return Victorious
           </button>
         </div>
       )}
