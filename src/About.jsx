@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Crown, Coins, Swords, Shield, Flame, AlertTriangle, BookOpen, FileText, X } from 'lucide-react';
 
-export default function AboutPage() {
+export default function AboutPage({ onNavigate }) {  // ← ADDED onNavigate prop!
   const [showWhitepaper, setShowWhitepaper] = useState(false);
   
  return (
@@ -28,8 +28,6 @@ export default function AboutPage() {
           </p>
         </div>
       </section>
-
-
 
         {/* Gameplay Features */}
         <section className="mb-12">
@@ -194,6 +192,47 @@ export default function AboutPage() {
             </div>
           </div>
         </section>
+
+        {/* 🧪 TESTING SECTION - Remove before public launch */}
+        <div className="mt-16 pt-8 border-t border-gray-700">
+          <div className="max-w-2xl mx-auto bg-gray-800/30 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-yellow-400 mb-4 text-center">
+              🧪 Testing Panel (Dev Only)
+            </h3>
+            <p className="text-xs text-gray-400 text-center mb-4">
+              For internal testing purposes - Remove before public launch
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Button 1: Mint Fighter */}
+              <button
+                onClick={() => onNavigate('mint-fighter')}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 px-4 py-3 rounded-lg font-semibold transition transform hover:scale-105"
+              >
+                🎨 Mint Fighter
+              </button>
+              
+              {/* Button 2: Fighter Staking */}
+              <button
+                onClick={() => onNavigate('stake-fighters')}
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-4 py-3 rounded-lg font-semibold transition transform hover:scale-105"
+              >
+                ⚡ Stake Fighters
+              </button>
+              
+              {/* Button 3: Battle */}
+              <button
+                onClick={() => onNavigate('battle')}
+                className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 px-4 py-3 rounded-lg font-semibold transition transform hover:scale-105"
+              >
+                ⚔️ Enter Battle
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 text-center mt-4 italic">
+              Scroll to bottom of About page to access testing features
+            </p>
+          </div>
+        </div>
+
       </div>
 
       {/* Whitepaper Modal */}
@@ -203,46 +242,7 @@ export default function AboutPage() {
             <button
               onClick={() => setShowWhitepaper(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-white transition"
-            >     {/* 🧪 TESTING SECTION - Remove before public launch */}
-<div className="mt-16 pt-8 border-t border-gray-700">
-  <div className="max-w-2xl mx-auto bg-gray-800/30 rounded-lg p-6">
-    <h3 className="text-lg font-bold text-yellow-400 mb-4 text-center">
-      🧪 Testing Panel (Dev Only)
-    </h3>
-    <p className="text-xs text-gray-400 text-center mb-4">
-      For internal testing purposes - Remove before public launch
-    </p>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {/* Button 1: Mint Fighter */}
-      <button
-        onClick={() => onNavigate('mint-fighter')}
-        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 px-4 py-3 rounded-lg font-semibold transition transform hover:scale-105"
-      >
-        🎨 Mint Fighter
-      </button>
-      
-      {/* Button 2: Fighter Staking */}
-      <button
-        onClick={() => onNavigate('stake-fighters')}
-        className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-4 py-3 rounded-lg font-semibold transition transform hover:scale-105"
-      >
-        ⚡ Stake Fighters
-      </button>
-      
-      {/* Button 3: Battle */}
-      <button
-        onClick={() => onNavigate('battle')}
-        className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 px-4 py-3 rounded-lg font-semibold transition transform hover:scale-105"
-      >
-        ⚔️ Enter Battle
-      </button>
-    </div>
-    <p className="text-xs text-gray-500 text-center mt-4 italic">
-      Scroll to bottom of About page to access testing features
-    </p>
-  </div>
-</div>
-
+            >
               <X className="w-8 h-8" />
             </button>
 
@@ -318,10 +318,8 @@ export default function AboutPage() {
             >
               Close
             </button>
-
-           </div>
+          </div>
         </div>
-        
       )}
     </div>
   );
