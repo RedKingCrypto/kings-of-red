@@ -236,6 +236,15 @@ export const getHeraldImageUrl = (clan, rarity) => {
   return `${baseUrl}/${rarityName}_${clanName}.png`;
 };
 
+// Backward compatibility aliases
+export const HERALD_CONTRACT_ADDRESS = HERALD_ADDRESS;
+export const FOOD_TOKEN_ABI = ERC20_ABI;
+export const GOLD_TOKEN_ABI = ERC20_ABI;
+export const WOOD_TOKEN_ABI = ERC20_ABI;
+export const REDKING_TOKEN_ABI = ERC20_ABI;
+export const GAME_BALANCE_ADDRESS = GAME_BALANCE_V4_ADDRESS;
+export const GAME_BALANCE_ABI = GAME_BALANCE_V4_ABI;
+
 export default {
   // Addresses
   FIGHTER_V3_ADDRESS,
