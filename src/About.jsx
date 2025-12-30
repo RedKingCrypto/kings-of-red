@@ -280,7 +280,12 @@ export default function AboutPage() {
               Close
             </button>
 
-            {/* 🧪 TESTING SECTION - Remove before public launch */}
+           </div>
+        </div>
+        
+      )}
+
+         {/* 🧪 TESTING SECTION - Remove before public launch */}
 <div className="mt-16 pt-8 border-t border-gray-700">
   <div className="max-w-2xl mx-auto bg-gray-800/30 rounded-lg p-6">
     <h3 className="text-lg font-bold text-yellow-400 mb-4 text-center">
@@ -321,10 +326,6 @@ export default function AboutPage() {
 </div>
 
 
-          </div>
-        </div>
-        
-      )}
     </div>
   );
 }
