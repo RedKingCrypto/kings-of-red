@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, Coins, Clock, Flame, Shield, Swords, Sparkles, Users, Trophy, Gift, Plus, Minus } from 'lucide-react';
 import { ethers } from 'ethers';
-import { HERALD_CONTRACT_ADDRESS, HERALD_ABI, BASE_MAINNET_CONFIG } from './contractConfig';
+import { HERALD_ADDRESS, HERALD_ABI } from './contractConfig';
 
 const CLANS = [
   { id: 0, name: 'Smizfume', color: 'from-red-600 to-orange-500', icon: Flame },
@@ -82,10 +82,10 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
       if (window.ethereum && connected) {
         provider = new ethers.BrowserProvider(window.ethereum);
       } else {
-        provider = new ethers.JsonRpcProvider(BASE_MAINNET_CONFIG.rpcUrls[0]);
+        provider = new ethers.JsonRpcProvider('https://mainnet.base.org');
       }
       
-      const contract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, provider);
+      const contract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI, provider);
       
       // Load supply data - force fresh read
       const [bronzeMinted, silverMinted, goldMinted, bronzePrice, silverPrice, goldPrice] = await Promise.all([
@@ -130,7 +130,7 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
   const checkGenesisStatus = async () => {
   try {
     const provider = new ethers.BrowserProvider(window.ethereum);
-    const contract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, provider);
+    const contract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI, provider);
     
     // Check if user has Genesis badge
     const hasGenesis = await contract.hasGenesisBadge(walletAddress);
