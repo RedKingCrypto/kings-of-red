@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, Shield, Swords, Clock, Flame, Droplet, Heart, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { ethers } from 'ethers';
-import { FIGHTER_V3_ADDRESS, BATTLE_ADDRESS, FIGHTER_V3_ABI, BATTLE_ABI, FOOD_TOKEN_ADDRESS, FOOD_TOKEN_ABI } from '../contractConfig';
+import { FIGHTER_V3_ADDRESS, BATTLE_ADDRESS, FIGHTER_V3_ABI, BATTLE_ABI, FOOD_TOKEN_ADDRESS, ERC20_ABI } from '../contractConfig';
 
 const CLAN_NAMES = ['Smizfume', 'Coalheart', 'Warmdice', 'Bervation', 'Konfisof', 'Witkastle', 'Bowkin'];
 const RARITY_NAMES = ['Bronze', 'Silver', 'Gold'];
@@ -58,7 +58,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
 
   const loadFoodBalance = async () => {
     try {
-      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, FOOD_TOKEN_ABI, provider);
+      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, ERC20_ABI, provider);
       const balance = await foodContract.balanceOf(walletAddress);
       setFoodBalance(Number(ethers.formatEther(balance)));
     } catch (err) {
@@ -192,7 +192,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
       }
 
       const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, signer);
-      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, FOOD_TOKEN_ABI, signer);
+      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, ERC20_ABI, signer);
       
       // Check allowance
       const allowance = await foodContract.allowance(walletAddress, FIGHTER_CONTRACT);

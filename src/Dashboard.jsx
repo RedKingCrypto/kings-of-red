@@ -8,7 +8,7 @@ import {
   WOOD_TOKEN_ADDRESS,
   GAME_BALANCE_ADDRESS,
   HERALD_ABI,
-  FOOD_TOKEN_ABI,
+  ERC20_ABI,
   GOLD_TOKEN_ABI,
   WOOD_TOKEN_ABI,
   GAME_BALANCE_ABI,
@@ -55,7 +55,7 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
       const provider = new ethers.BrowserProvider(window.ethereum);
       
       // Token contracts
-      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, FOOD_TOKEN_ABI, provider);
+      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, ERC20_ABI, provider);
       const goldContract = new ethers.Contract(GOLD_TOKEN_ADDRESS, GOLD_TOKEN_ABI, provider);
       const woodContract = new ethers.Contract(WOOD_TOKEN_ADDRESS, WOOD_TOKEN_ABI, provider);
       

@@ -6,7 +6,7 @@ import {
   GOLD_TOKEN_ADDRESS,
   WOOD_TOKEN_ADDRESS,
   GAME_BALANCE_ADDRESS,
-  FOOD_TOKEN_ABI,
+  ERC20_ABI,
   GOLD_TOKEN_ABI,
   WOOD_TOKEN_ABI,
   GAME_BALANCE_ABI
@@ -52,7 +52,7 @@ export default function ExchangePage({ connected, walletAddress, onNavigate }) {
       setLoading(true);
       const provider = new ethers.BrowserProvider(window.ethereum);
       
-      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, FOOD_TOKEN_ABI, provider);
+      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, ERC20_ABI, provider);
       const goldContract = new ethers.Contract(GOLD_TOKEN_ADDRESS, GOLD_TOKEN_ABI, provider);
       const woodContract = new ethers.Contract(WOOD_TOKEN_ADDRESS, WOOD_TOKEN_ABI, provider);
       const gameBalanceContract = new ethers.Contract(GAME_BALANCE_ADDRESS, GAME_BALANCE_ABI, provider);
@@ -112,7 +112,7 @@ export default function ExchangePage({ connected, walletAddress, onNavigate }) {
       
       if (depositToken === 'FOOD') {
         tokenAddress = FOOD_TOKEN_ADDRESS;
-        tokenABI = FOOD_TOKEN_ABI;
+        tokenABI = ERC20_ABI;
         depositFunction = 'depositFood';
       } else if (depositToken === 'GOLD') {
         tokenAddress = GOLD_TOKEN_ADDRESS;
