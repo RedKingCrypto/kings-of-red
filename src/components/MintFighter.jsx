@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Swords, Crown, Sparkles, Users, Trophy, Gift, Plus, Minus, Zap } from 'lucide-react';
 import { ethers } from 'ethers';
-import { FIGHTER_V3_ADDRESS, BATTLE_ADDRESS, FIGHTER_V3_ABI, BATTLE_ABI } from './contractConfig';
+import { FIGHTER_V3_ADDRESS, BATTLE_ADDRESS, FIGHTER_V3_ABI, BATTLE_ABI } from '../contractConfig';
 
 const CLANS = [
   { id: 0, name: 'Smizfume', fighter: 'Kenshi Champion', color: 'from-purple-600 to-pink-600' },

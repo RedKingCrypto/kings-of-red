@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, Shield, Swords, Clock, Flame, Droplet, Heart, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { ethers } from 'ethers';
-import { FIGHTER_V3_ADDRESS, BATTLE_ADDRESS, FIGHTER_V3_ABI, BATTLE_ABI } from './contractConfig';
-import { FOOD_TOKEN_ADDRESS, FOOD_TOKEN_ABI } from '../contractConfig';
+import { FIGHTER_V3_ADDRESS, BATTLE_ADDRESS, FIGHTER_V3_ABI, BATTLE_ABI, FOOD_TOKEN_ADDRESS, FOOD_TOKEN_ABI } from '../contractConfig';
 
 const CLAN_NAMES = ['Smizfume', 'Coalheart', 'Warmdice', 'Bervation', 'Konfisof', 'Witkastle', 'Bowkin'];
 const RARITY_NAMES = ['Bronze', 'Silver', 'Gold'];
