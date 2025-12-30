@@ -71,7 +71,7 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
       ? provider 
       : new ethers.JsonRpcProvider('https://mainnet.base.org');
     
-    const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, contractProvider);
+    const contract = new ethers.Contract(FIGHTER_V3_ADDRESS, FIGHTER_V3_ABI, contractProvider);
     
     const [bronzeMinted, silverMinted, goldMinted, bronzePrice, silverPrice, goldPrice, isGenesis] = await Promise.all([
       contract.bronzeMinted(),
@@ -147,7 +147,7 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
       return;
     }
 
-    const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, signer);
+    const contract = new ethers.Contract(FIGHTER_V3_ADDRESS, FIGHTER_V3_ABI, signer);
     
     let pricePerNFT;
     let rarityNum;
@@ -186,7 +186,7 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
     }
     
     console.log('🎯 Minting with:', {
-      contract: FIGHTER_CONTRACT,
+      contract: FIGHTER_V3_ADDRESS,
       rarity: rarityName,
       rarityNum,
       quantity,

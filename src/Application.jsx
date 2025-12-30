@@ -325,7 +325,7 @@ export default function Application() {
         {currentPage === 'about' && <AboutPage onNavigate={navigateTo} />}
         {currentPage === 'faq' && <FAQPage onNavigate={navigateTo} />}
         {currentPage === 'leaderboard' && <LeaderboardPage connected={connected} walletAddress={walletAddress} onNavigate={navigateTo} />}
-        {currentPage === 'battle' && <BattlePage connected={connected} walletAddress={walletAddress} onNavigate={navigateTo} />}
+        {currentPage === 'battle' && <BattlePage connected={connected} walletAddress={walletAddress} provider={provider} onNavigate={navigateTo} />}
       </div>
 
       <footer className="border-t border-red-800/50 bg-black/40 backdrop-blur mt-12">
