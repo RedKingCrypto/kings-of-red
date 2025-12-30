@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Crown, Coins, Clock, AlertCircle, CheckCircle, Loader, Plus } from 'lucide-react';
 import { ethers } from 'ethers';
 import {
-  HERALD_CONTRACT_ADDRESS,
+  HERALD_ADDRESS,
   HERALD_STAKING_ADDRESS,
   HERALD_ABI,
   HERALD_STAKING_ABI,
@@ -48,7 +48,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
       setLoading(true);
       const provider = new ethers.BrowserProvider(window.ethereum);
       const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, provider);
-      const heraldContract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, provider);
+      const heraldContract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI, provider);
       
       // Get staked Herald IDs
       const stakedIds = await stakingContract.getUserStakedHeralds(walletAddress);
@@ -120,7 +120,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       
-      const heraldContract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, signer);
+      const heraldContract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI, signer);
       const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, signer);
       
       // Check if already approved

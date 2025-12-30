@@ -172,7 +172,7 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      const contract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, signer);
+      const contract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI, signer);
       
       // Get price and quantity for this rarity
       let pricePerNFT;

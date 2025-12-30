@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Crown, Coins, Droplet, RefreshCw, ExternalLink, AlertCircle } from 'lucide-react';
 import { ethers } from 'ethers';
 import {
-  HERALD_CONTRACT_ADDRESS,
+  HERALD_ADDRESS,
   FOOD_TOKEN_ADDRESS,
   GOLD_TOKEN_ADDRESS,
   WOOD_TOKEN_ADDRESS,
@@ -96,7 +96,7 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
   const loadHeralds = async () => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const heraldContract = new ethers.Contract(HERALD_CONTRACT_ADDRESS, HERALD_ABI, provider);
+      const heraldContract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI, provider);
       
       // Get user's Herald balance
       const balance = await heraldContract.balanceOf(walletAddress);
@@ -386,7 +386,7 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
                     <p className="text-sm text-gray-400">
                       View on{' '}
                       <a
-                        href={`https://basescan.org/token/${HERALD_CONTRACT_ADDRESS}?a=${walletAddress}`}
+                        href={`https://basescan.org/token/${HERALD_ADDRESS}?a=${walletAddress}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-400 hover:text-blue-300 underline"

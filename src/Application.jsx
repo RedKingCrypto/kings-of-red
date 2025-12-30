@@ -15,7 +15,7 @@ import BattleBoosts from './components/BattleBoosts.jsx';
 
 // Import contract addresses
 import { 
-  HERALD_CONTRACT_ADDRESS,
+  HERALD_ADDRESS,
   FOOD_TOKEN_ADDRESS,
   GOLD_TOKEN_ADDRESS,
   GAME_BALANCE_ADDRESS
