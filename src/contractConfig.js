@@ -39,9 +39,35 @@ export const FIGHTER_V3_ABI = [
   "function totalSupply() view returns (uint256)",
   "function nextTokenId() view returns (uint256)",
   "function battleContract() view returns (address)",
+  "function bronzePrice() view returns (uint256)",
+"function silverPrice() view returns (uint256)",
+"function goldPrice() view returns (uint256)",
+"function bronzeMinted() view returns (uint256)",
+"function silverMinted() view returns (uint256)",
+"function goldMinted() view returns (uint256)",
+
+    // PRICE FUNCTIONS:
+  "function bronzePrice() view returns (uint256)",
+  "function silverPrice() view returns (uint256)",
+  "function goldPrice() view returns (uint256)",
+  "function bronzeMinted() view returns (uint256)",
+  "function silverMinted() view returns (uint256)",
+  "function goldMinted() view returns (uint256)",
   
   // Write Functions
   "function mint(uint8 rarity, uint8 clan, address referrer) payable",
+  "function stake(uint256 tokenId)",
+  "function unstake(uint256 tokenId)",
+  "function startRefuel(uint256 tokenId)",
+  "function completeRefuel(uint256 tokenId)",
+  "function approve(address to, uint256 tokenId)",
+  "function setApprovalForAll(address operator, bool approved)",
+
+   // MINT FUNCTIONS:
+  "function mintBronze() payable",
+  "function mintSilver() payable",
+  "function mintGold() payable",
+  
   "function stake(uint256 tokenId)",
   "function unstake(uint256 tokenId)",
   "function startRefuel(uint256 tokenId)",
