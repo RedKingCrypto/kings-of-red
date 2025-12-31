@@ -45,6 +45,9 @@ export const FIGHTER_V3_ABI = [
 "function bronzeMinted() view returns (uint256)",
 "function silverMinted() view returns (uint256)",
 "function goldMinted() view returns (uint256)",
+ "function currentPhase() view returns (uint8)",
+  "function getPhaseSupply(uint8 phase) view returns (uint256 bronzeLimit, uint256 silverLimit, uint256 goldLimit, uint256 bronzeMintedInPhase, uint256 silverMintedInPhase, uint256 goldMintedInPhase)",
+  "function version() view returns (string)",
 
     // PRICE FUNCTIONS:
   "function bronzePrice() view returns (uint256)",
