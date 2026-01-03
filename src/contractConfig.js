@@ -1,14 +1,17 @@
-// Contract Configuration - Updated for Fighter V3 & Battle System
-// Last Updated: December 29, 2025
+// Contract Configuration - Updated for Fighter V4 & Battle System
+// Last Updated: January 3, 2026
 
 // ============ CONTRACT ADDRESSES ============
 
-// Core Contracts
-export const FIGHTER_V3_ADDRESS = '0x303C26E8819be824f6bAEdAeEb3a2DeF3B624552';
+// Core Contracts - FIGHTER V4 DEPLOYED!
+export const FIGHTER_V4_ADDRESS = '0x303C26E8819be824f6bAEdAeEb3a2DeF3B624552';
 export const BATTLE_ADDRESS = '0x8207b7aadbF253B2A087606cf01A3ED3330B3b91'; 
 export const GAME_BALANCE_V4_ADDRESS = '0x3332c61Ced87a85C09ef2Cb55aE07Bd169dB0aA6';
 export const HERALD_ADDRESS = '0xb282DC4c005C88A3E81D513D09a78f48CA404311';
 export const HERALD_STAKING_ADDRESS = '0x2cd116Ba4f7710a8fCFd32974e82369d88929C91';
+
+// Backward compatibility alias
+export const FIGHTER_V3_ADDRESS = FIGHTER_V4_ADDRESS;
 
 // Legacy Contracts (kept for reference)
 export const FIGHTER_V2_ADDRESS = '0xA94bd2542C5f7a3774717f067b1e2cdc4A588df6';
@@ -24,68 +27,100 @@ export const REDKING_TOKEN_ADDRESS = '0xd6F65D10CE2062d6dC330DA61ADd3c0693895fFf
 export const TREASURY_ADDRESS = '0xef0f1f34c7687eb31a6b4ada2af45ce7360c04e9';
 export const BATTLE_REWARDS_ADDRESS = '0x1c4c352561df1d61338bc729b60036e56efcd25d';
 
-// ============ FIGHTER V3 ABI ============
+// ============ FIGHTER V4 ABI ============
 
-export const FIGHTER_V3_ABI = [
-  // Read Functions
-  "function fighters(uint256) view returns (uint8 rarity, uint8 clan, uint8 energy, uint32 wins, uint32 losses, uint32 pvpWins, uint32 pvpLosses, bool isStaked, bool inBattle, uint256 refuelStartTime, uint256 lastBattleReward)",
+export const FIGHTER_V4_ABI = [
+  // ===== READ FUNCTIONS =====
+  
+  // Fighter data
+  "function fighters(uint256) view returns (uint8 rarity, uint8 clan, uint64 energy, uint64 refuelStartTime, uint32 wins, uint32 losses, uint32 pvpWins, uint32 pvpLosses, bool isStaked, bool inBattle)",
+  "function getFighterStats(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint256 energy, bool isStaked, bool inBattle, bool isRefueling, uint256 refuelCompleteTime, uint256 wins, uint256 losses, uint256 pvpWins, uint256 pvpLosses, uint256 points)",
+  "function getFighterInfo(uint256 tokenId) view returns (uint8 rarity, uint8 clan)",
+  
+  // Ownership & balance
   "function ownerOf(uint256 tokenId) view returns (address)",
   "function balanceOf(address owner) view returns (uint256)",
+  "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
+  "function tokensOfOwner(address owner) view returns (uint256[])",
   "function tokenURI(uint256 tokenId) view returns (string)",
+  
+  // Staking
   "function getUserStakedFighters(address user) view returns (uint256[])",
+  "function stakedCount(address user) view returns (uint256)",
+  "function stakedByClan(address user, uint8 clan) view returns (uint256)",
+  
+  // Energy & Refuel
   "function getRefuelTimeRemaining(uint256 tokenId) view returns (uint256)",
-  "function getMintPrice(uint8 rarity) view returns (uint256)",
-  "function getRemainingSupply(uint8 rarity) view returns (uint256)",
-  "function totalSupply() view returns (uint256)",
-  "function nextTokenId() view returns (uint256)",
-  "function battleContract() view returns (address)",
-  "function bronzePrice() view returns (uint256)",
-"function silverPrice() view returns (uint256)",
-"function goldPrice() view returns (uint256)",
-"function bronzeMinted() view returns (uint256)",
-"function silverMinted() view returns (uint256)",
-"function goldMinted() view returns (uint256)",
- "function currentPhase() view returns (uint8)",
-  "function getPhaseSupply(uint8 phase) view returns (uint256 bronzeLimit, uint256 silverLimit, uint256 goldLimit, uint256 bronzeMintedInPhase, uint256 silverMintedInPhase, uint256 goldMintedInPhase)",
-  "function version() view returns (string)",
-
-    // PRICE FUNCTIONS:
+  "function maxEnergy() view returns (uint256)",
+  "function energyPerBattle() view returns (uint256)",
+  "function refuelCost() view returns (uint256)",
+  "function refuelDuration() view returns (uint256)",
+  
+  // Prices
   "function bronzePrice() view returns (uint256)",
   "function silverPrice() view returns (uint256)",
   "function goldPrice() view returns (uint256)",
+  "function getMintPrice(uint8 rarity) view returns (uint256)",
+  
+  // Supply
+  "function totalSupply() view returns (uint256)",
+  "function totalMinted() view returns (uint256)",
   "function bronzeMinted() view returns (uint256)",
   "function silverMinted() view returns (uint256)",
   "function goldMinted() view returns (uint256)",
+  "function getRemainingSupply(uint8 rarity) view returns (uint256)",
+  "function nextTokenId() view returns (uint256)",
   
-  // Write Functions
-  "function mint(uint8 rarity, uint8 clan, address referrer) payable",
+  // Phase & Supply info
+  "function currentPhase() view returns (uint256)",
+  "function getPhaseSupply() view returns (uint256 phase, uint256 bronzeRemaining, uint256 silverRemaining, uint256 goldRemaining)",
+  "function phaseLimits(uint256 phase, uint256 index) view returns (uint256)",
+  "function phaseMinted(uint256 phase, uint256 index) view returns (uint256)",
+  
+  // Contract info
+  "function VERSION() view returns (string)",
+  "function version() view returns (string)",
+  "function clanArraysInitialized() view returns (bool)",
+  "function mintingPaused() view returns (bool)",
+  "function stakingPaused() view returns (bool)",
+  "function battlesPaused() view returns (bool)",
+  
+  // Authorization
+  "function canUseFighter(uint256 tokenId, address user) view returns (bool)",
+  "function authorizedBattleContracts(address) view returns (bool)",
+  
+  // ===== WRITE FUNCTIONS =====
+  
+  // Minting - V4 style (with quantity)
+  "function mintBronze(uint256 amount) payable",
+  "function mintSilver(uint256 amount) payable",
+  "function mintGold(uint256 amount) payable",
+  
+  // Staking
   "function stake(uint256 tokenId)",
   "function unstake(uint256 tokenId)",
-  "function startRefuel(uint256 tokenId)",
-  "function completeRefuel(uint256 tokenId)",
-  "function approve(address to, uint256 tokenId)",
-  "function setApprovalForAll(address operator, bool approved)",
-
-   // MINT FUNCTIONS:
-  "function mintBronze() payable",
-  "function mintSilver() payable",
-  "function mintGold() payable",
   
-  "function stake(uint256 tokenId)",
-  "function unstake(uint256 tokenId)",
+  // Refuel
   "function startRefuel(uint256 tokenId)",
   "function completeRefuel(uint256 tokenId)",
+  
+  // Approvals
   "function approve(address to, uint256 tokenId)",
   "function setApprovalForAll(address operator, bool approved)",
   
-  // Events
-  "event FighterMinted(address indexed owner, uint256 indexed tokenId, uint8 rarity, uint8 clan)",
-  "event FighterStaked(address indexed owner, uint256 indexed tokenId)",
-  "event FighterUnstaked(address indexed owner, uint256 indexed tokenId)",
-  "event RefuelStarted(uint256 indexed tokenId, uint256 endTime)",
+  // ===== EVENTS =====
+  "event FighterMinted(uint256 indexed tokenId, address indexed to, uint8 rarity, uint8 clan)",
+  "event FighterStaked(uint256 indexed tokenId, address indexed owner)",
+  "event FighterUnstaked(uint256 indexed tokenId, address indexed owner)",
+  "event RefuelStarted(uint256 indexed tokenId)",
   "event RefuelCompleted(uint256 indexed tokenId)",
+  "event EnergyDeducted(uint256 indexed tokenId, uint256 remaining)",
+  "event BattleRecorded(uint256 indexed tokenId, bool won, bool isPvP)",
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
 ];
+
+// Backward compatibility alias
+export const FIGHTER_V3_ABI = FIGHTER_V4_ABI;
 
 // ============ BATTLE CONTRACT ABI ============
 
@@ -233,15 +268,32 @@ export const ARENA_IDS = {
   WARMDICE: 2,
   BERVATION: 3,
   KONFISOF: 4,
-  WITKASTLE: 5, // Currently active
+  WITKASTLE: 5,
   BOWKIN: 6
 };
 
+// Fighter V4 Constants
+export const MAX_BRONZE = 777;
+export const MAX_SILVER = 560;
+export const MAX_GOLD = 343;
+export const MAX_SUPPLY = 1680;
+export const MAX_MINT_PER_TX = 7;
+export const MAX_STAKED_PER_WALLET = 7;
+
 export const ENERGY_PER_BATTLE = 20;
+export const MAX_ENERGY = 100;
 export const REFUEL_COST = 50; // FOOD tokens
 export const REFUEL_DURATION = 3 * 60 * 60; // 3 hours in seconds
 export const BATTLE_ENTRY_FEE = 50; // FOOD tokens
 export const BATTLE_TIMEOUT = 60 * 60; // 1 hour in seconds
+
+// Phase limits
+export const PHASE_LIMITS = {
+  1: { bronze: 98, silver: 77, gold: 49 },    // Genesis
+  2: { bronze: 210, silver: 140, gold: 70 },  // Early Bird
+  3: { bronze: 231, silver: 168, gold: 112 }, // Public A
+  4: { bronze: 238, silver: 175, gold: 112 }  // Public B
+};
 
 // ============ HELPER FUNCTIONS ============
 
@@ -257,11 +309,11 @@ export const parseTokenAmount = (amount, decimals = 18) => {
   return BigInt(Math.floor(amount * Math.pow(10, decimals)));
 };
 
-// Herald Image URL Generator - Pattern: {rarity}_{clan}.png
+// Herald Image URL Generator
 export const getHeraldImageUrl = (clan, rarity) => {
   const baseUrl = 'https://emerald-adequate-eagle-845.mypinata.cloud/ipfs/bafybeigvh7vjqgpj3jguhdbwktfdntvgqypmuu456usxpgsnrxxlh6pln4';
-  const rarityName = RARITY_NAMES[rarity].toLowerCase(); // bronze, silver, gold
-  const clanName = CLAN_NAMES[clan].toLowerCase(); // smizfume, coalheart, etc.
+  const rarityName = RARITY_NAMES[rarity].toLowerCase();
+  const clanName = CLAN_NAMES[clan].toLowerCase();
   return `${baseUrl}/${rarityName}_${clanName}.png`;
 };
 
@@ -276,7 +328,8 @@ export const GAME_BALANCE_ABI = GAME_BALANCE_V4_ABI;
 
 export default {
   // Addresses
-  FIGHTER_V3_ADDRESS,
+  FIGHTER_V4_ADDRESS,
+  FIGHTER_V3_ADDRESS, // Alias to V4
   BATTLE_ADDRESS,
   GAME_BALANCE_V4_ADDRESS,
   HERALD_ADDRESS,
@@ -287,7 +340,8 @@ export default {
   REDKING_TOKEN_ADDRESS,
   
   // ABIs
-  FIGHTER_V3_ABI,
+  FIGHTER_V4_ABI,
+  FIGHTER_V3_ABI, // Alias to V4
   BATTLE_ABI,
   GAME_BALANCE_V4_ABI,
   HERALD_STAKING_ABI,
@@ -300,6 +354,11 @@ export default {
   RARITY_COLORS,
   TOKEN_IDS,
   ARENA_IDS,
+  PHASE_LIMITS,
+  MAX_BRONZE,
+  MAX_SILVER,
+  MAX_GOLD,
+  MAX_SUPPLY,
   
   // Helpers
   getClanName,

@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Swords, Crown, Sparkles, Users, Trophy, Gift, Plus, Minus, Zap } from 'lucide-react';
 import { ethers } from 'ethers';
-import { FIGHTER_V3_ADDRESS, BATTLE_ADDRESS, FIGHTER_V3_ABI, BATTLE_ABI } from '../contractConfig';
+import { 
+  FIGHTER_V4_ADDRESS, 
+  FIGHTER_V4_ABI, 
+  PHASE_LIMITS,
+  MAX_BRONZE,
+  MAX_SILVER,
+  MAX_GOLD
+} from '../contractConfig';
 
 const CLANS = [
   { id: 0, name: 'Smizfume', fighter: 'Kenshi Champion', color: 'from-purple-600 to-pink-600' },
@@ -26,14 +33,15 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
   
   // Contract data
   const [supply, setSupply] = useState({
-    bronze: { total: 777, genesis: 98, minted: 0, price: '0.00638' },
-    silver: { total: 560, genesis: 77, minted: 0, price: '0.00974' },
-    gold: { total: 343, genesis: 49, minted: 0, price: '0.01310' }
+    bronze: { total: MAX_BRONZE, genesisLimit: 98, genesisRemaining: 98, minted: 0, price: '0.00638' },
+    silver: { total: MAX_SILVER, genesisLimit: 77, genesisRemaining: 77, minted: 0, price: '0.00974' },
+    gold: { total: MAX_GOLD, genesisLimit: 49, genesisRemaining: 49, minted: 0, price: '0.01310' }
   });
   const [loading, setLoading] = useState(false);
-  const [genesisSale, setGenesisSale] = useState(false);
+  const [currentPhase, setCurrentPhase] = useState(0);
+  const [contractReady, setContractReady] = useState(false);
 
- // Check URL for referral code on mount AND load stored code
+  // Check URL for referral code on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
@@ -63,63 +71,86 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
   }, [connected, walletAddress]);
 
   const loadContractData = async () => {
-  try {
-    setLoading(true);
-    
-    const contractProvider = connected && provider 
-      ? provider 
-      : new ethers.JsonRpcProvider('https://mainnet.base.org');
-    
-    const contract = new ethers.Contract(FIGHTER_V3_ADDRESS, FIGHTER_V3_ABI, contractProvider);
-    
-    // Read current phase and phase limits
-    const currentPhase = await contract.currentPhase();
-    const phaseSupply = await contract.getPhaseSupply(currentPhase);
-    
-    const [bronzeMinted, silverMinted, goldMinted, bronzePrice, silverPrice, goldPrice] = await Promise.all([
-      contract.bronzeMinted(),
-      contract.silverMinted(),
-      contract.goldMinted(),
-      contract.bronzePrice(),
-      contract.silverPrice(),
-      contract.goldPrice()
-    ]);
-    
-    setSupply({
-      bronze: { 
-        total: 777,
-        genesis: Number(phaseSupply[0]), // From contract
-        minted: Number(bronzeMinted), 
-        price: ethers.formatEther(bronzePrice) 
-      },
-      silver: { 
-        total: 560,
-        genesis: Number(phaseSupply[1]), // From contract
-        minted: Number(silverMinted), 
-        price: ethers.formatEther(silverPrice) 
-      },
-      gold: { 
-        total: 343,
-        genesis: Number(phaseSupply[2]), // From contract
-        minted: Number(goldMinted), 
-        price: ethers.formatEther(goldPrice) 
-      }
-    });
-    
-    setGenesisSale(currentPhase === 1n);
-  } catch (error) {
-    console.error('Error loading contract data:', error);
-  } finally {
-    setLoading(false);
-  }
-};
-
+    try {
+      setLoading(true);
+      
+      const contractProvider = connected && provider 
+        ? provider 
+        : new ethers.JsonRpcProvider('https://mainnet.base.org');
+      
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, contractProvider);
+      
+      // Read current phase
+      const phase = await contract.currentPhase();
+      setCurrentPhase(Number(phase));
+      
+      // Check if contract is ready (clan arrays initialized, minting not paused)
+      const [clanArraysReady, mintingPaused] = await Promise.all([
+        contract.clanArraysInitialized(),
+        contract.mintingPaused()
+      ]);
+      setContractReady(clanArraysReady && !mintingPaused && Number(phase) > 0);
+      
+      // Get phase supply (returns remaining, not limits)
+      // getPhaseSupply() returns (phase, bronzeRemaining, silverRemaining, goldRemaining)
+      const phaseSupply = await contract.getPhaseSupply();
+      
+      // Get prices and total minted
+      const [bronzeMinted, silverMinted, goldMinted, bronzePrice, silverPrice, goldPrice] = await Promise.all([
+        contract.bronzeMinted(),
+        contract.silverMinted(),
+        contract.goldMinted(),
+        contract.bronzePrice(),
+        contract.silverPrice(),
+        contract.goldPrice()
+      ]);
+      
+      // Get phase limits from constants
+      const phaseLimits = PHASE_LIMITS[Number(phase)] || { bronze: 0, silver: 0, gold: 0 };
+      
+      setSupply({
+        bronze: { 
+          total: MAX_BRONZE,
+          genesisLimit: phaseLimits.bronze,
+          genesisRemaining: Number(phaseSupply[1]), // bronzeRemaining from contract
+          minted: Number(bronzeMinted), 
+          price: ethers.formatEther(bronzePrice) 
+        },
+        silver: { 
+          total: MAX_SILVER,
+          genesisLimit: phaseLimits.silver,
+          genesisRemaining: Number(phaseSupply[2]), // silverRemaining
+          minted: Number(silverMinted), 
+          price: ethers.formatEther(silverPrice) 
+        },
+        gold: { 
+          total: MAX_GOLD,
+          genesisLimit: phaseLimits.gold,
+          genesisRemaining: Number(phaseSupply[3]), // goldRemaining
+          minted: Number(goldMinted), 
+          price: ethers.formatEther(goldPrice) 
+        }
+      });
+      
+      console.log('✅ Contract data loaded:', {
+        phase: Number(phase),
+        contractReady: clanArraysReady && !mintingPaused,
+        bronzeRemaining: Number(phaseSupply[1]),
+        silverRemaining: Number(phaseSupply[2]),
+        goldRemaining: Number(phaseSupply[3])
+      });
+      
+    } catch (error) {
+      console.error('Error loading contract data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const updateQuantity = (rarity, change) => {
     setQuantities(prev => {
       const newQty = prev[rarity] + change;
-      const maxSupply = genesisSale ? supply[rarity].genesis : supply[rarity].total;
-      const remaining = maxSupply - supply[rarity].minted;
+      const remaining = supply[rarity].genesisRemaining;
       return {
         ...prev,
         [rarity]: Math.max(1, Math.min(7, Math.min(newQty, remaining)))
@@ -127,139 +158,130 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
     });
   };
 
-  const MintFighter = async (rarity) => {
-  if (!connected) {
-    alert('Please connect your wallet first!');
-    return;
-  }
-
-  setMinting(true);
-
-  try {
-    if (!signer) {
+  const mintFighter = async (rarity) => {
+    if (!connected) {
       alert('Please connect your wallet first!');
-      setMinting(false);
       return;
     }
 
-    const contract = new ethers.Contract(FIGHTER_V3_ADDRESS, FIGHTER_V3_ABI, signer);
-    
-    let pricePerNFT;
-    let rarityNum;
-    let rarityName;
-    const quantity = quantities[rarity];
-    
-    if (rarity === 'bronze') {
-      pricePerNFT = await contract.bronzePrice();
-      rarityNum = 0;
-      rarityName = 'Bronze';
-    } else if (rarity === 'silver') {
-      pricePerNFT = await contract.silverPrice();
-      rarityNum = 1;
-      rarityName = 'Silver';
-    } else {
-      pricePerNFT = await contract.goldPrice();
-      rarityNum = 2;
-      rarityName = 'Gold';
-    }
-    
-    const totalPrice = pricePerNFT * BigInt(quantity);
-    
-    const maxSupply = genesisSale ? supply[rarity].genesis : supply[rarity].total;
-    const remaining = maxSupply - supply[rarity].minted;
-    
-    if (remaining <= 0) {
-      alert(`${rarityName} Fighters are sold out!`);
-      setMinting(false);
+    if (!contractReady) {
+      alert('Minting is not currently active. Please check back later.');
       return;
     }
-    
-    if (quantity > remaining) {
-      alert(`Only ${remaining} ${rarityName} Fighter${remaining > 1 ? 's' : ''} remaining!`);
-      setMinting(false);
-      return;
-    }
-    
-    console.log('🎯 Minting with:', {
-      contract: FIGHTER_V3_ADDRESS,
-      rarity: rarityName,
-      rarityNum,
-      quantity,
-      totalPrice: ethers.formatEther(totalPrice)
-    });
-    
-    // Fighter V3: mint(uint8 rarity, uint8 clan, address referrer)
-    // Clan = 0 means random assignment by contract
-    // Referrer = zero address (referrals removed from Fighters)
-    const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-    
-    // Mint fighters one at a time (Fighter V3 doesn't support batch minting)
-    alert(`Starting to mint ${quantity} ${rarityName} Fighter${quantity > 1 ? 's' : ''}...\n\nThis will require ${quantity} transaction${quantity > 1 ? 's' : ''}.`);
-    
-    let mintedTokenIds = [];
-    
-    for (let i = 0; i < quantity; i++) {
-      try {
-        console.log(`Minting Fighter ${i + 1} of ${quantity}...`);
-        const tx = await contract.mint(rarityNum, 0, ZERO_ADDRESS, { value: pricePerNFT });
-        const receipt = await tx.wait();
-        
-        // Try to parse the FighterMinted event to get token ID
-        try {
-          const mintEvent = receipt.logs
-            .map(log => {
-              try {
-                return contract.interface.parseLog(log);
-              } catch {
-                return null;
-              }
-            })
-            .find(event => event && event.name === 'FighterMinted');
-          
-          if (mintEvent) {
-            mintedTokenIds.push(mintEvent.args.tokenId.toString());
-          }
-        } catch (e) {
-          console.log('Could not parse mint event:', e);
-        }
-        
-      } catch (error) {
-        console.error(`Failed to mint Fighter ${i + 1}:`, error);
-        if (i === 0) {
-          // First mint failed - throw error
-          throw error;
-        } else {
-          // Some mints succeeded - show partial success
-          alert(`Minted ${i} of ${quantity} Fighters successfully. Transaction failed on Fighter ${i + 1}.`);
-          break;
-        }
+
+    setMinting(true);
+
+    try {
+      if (!signer) {
+        alert('Please connect your wallet first!');
+        setMinting(false);
+        return;
       }
+
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
+      const quantity = quantities[rarity];
+      
+      let pricePerNFT;
+      let mintFunction;
+      let rarityName;
+      
+      // Fighter V4 uses separate mint functions with quantity parameter
+      if (rarity === 'bronze') {
+        pricePerNFT = await contract.bronzePrice();
+        mintFunction = 'mintBronze';
+        rarityName = 'Bronze';
+      } else if (rarity === 'silver') {
+        pricePerNFT = await contract.silverPrice();
+        mintFunction = 'mintSilver';
+        rarityName = 'Silver';
+      } else {
+        pricePerNFT = await contract.goldPrice();
+        mintFunction = 'mintGold';
+        rarityName = 'Gold';
+      }
+      
+      const totalPrice = pricePerNFT * BigInt(quantity);
+      const remaining = supply[rarity].genesisRemaining;
+      
+      if (remaining <= 0) {
+        alert(`${rarityName} Fighters are sold out for this phase!`);
+        setMinting(false);
+        return;
+      }
+      
+      if (quantity > remaining) {
+        alert(`Only ${remaining} ${rarityName} Fighter${remaining > 1 ? 's' : ''} remaining in this phase!`);
+        setMinting(false);
+        return;
+      }
+      
+      console.log('🎯 Minting with Fighter V4:', {
+        contract: FIGHTER_V4_ADDRESS,
+        function: mintFunction,
+        rarity: rarityName,
+        quantity,
+        pricePerNFT: ethers.formatEther(pricePerNFT),
+        totalPrice: ethers.formatEther(totalPrice)
+      });
+      
+      // Fighter V4: mintBronze(amount), mintSilver(amount), mintGold(amount)
+      // All mints happen in ONE transaction!
+      const tx = await contract[mintFunction](quantity, { value: totalPrice });
+      
+      console.log('📝 Transaction submitted:', tx.hash);
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt.hash);
+      
+      // Parse minted token IDs from events
+      let mintedTokenIds = [];
+      try {
+        receipt.logs.forEach(log => {
+          try {
+            const parsed = contract.interface.parseLog(log);
+            if (parsed && parsed.name === 'FighterMinted') {
+              mintedTokenIds.push(parsed.args.tokenId.toString());
+              console.log(`🎉 Minted Fighter #${parsed.args.tokenId} - ${rarityName} Clan ${parsed.args.clan}`);
+            }
+          } catch (e) {
+            // Not a FighterMinted event
+          }
+        });
+      } catch (e) {
+        console.log('Could not parse mint events:', e);
+      }
+      
+      setMintSuccess({
+        rarity: rarityName,
+        quantity: mintedTokenIds.length || quantity,
+        tokenIds: mintedTokenIds,
+        totalPrice: ethers.formatEther(totalPrice),
+        pricePerNFT: ethers.formatEther(pricePerNFT),
+        txHash: receipt.hash
+      });
+      
+      // Reload contract data
+      await loadContractData();
+      
+    } catch (error) {
+      console.error('❌ Minting failed:', error);
+      
+      if (error.code === 'ACTION_REJECTED') {
+        alert('Transaction cancelled by user.');
+      } else if (error.message?.includes('insufficient funds')) {
+        alert('Insufficient funds. Please add more ETH to your wallet on Base network.');
+      } else if (error.message?.includes('M') || error.message?.includes('Minting')) {
+        alert('Minting is currently paused. Please try again later.');
+      } else if (error.message?.includes('P') || error.message?.includes('phase')) {
+        alert('Sale is not active. Please wait for the sale to begin.');
+      } else if (error.message?.includes('X') || error.message?.includes('supply')) {
+        alert('Not enough supply remaining. Try minting fewer Fighters.');
+      } else {
+        alert('Minting failed: ' + (error.reason || error.shortMessage || error.message || 'Unknown error'));
+      }
+    } finally {
+      setMinting(false);
     }
-    
-    setMintSuccess({
-      rarity: rarityName,
-      quantity: mintedTokenIds.length || quantity,
-      totalPrice: ethers.formatEther(pricePerNFT * BigInt(mintedTokenIds.length || quantity)),
-      pricePerNFT: ethers.formatEther(pricePerNFT),
-      txHash: 'multiple' // Multiple transactions
-    });
-    
-    await loadContractData();
-    
-  } catch (error) {
-    console.error('❌ Minting failed:', error);
-    
-    if (error.code === 'ACTION_REJECTED') {
-      alert('Transaction cancelled by user.');
-    } else if (error.message.includes('insufficient funds')) {
-      alert('Insufficient funds. Please add more ETH to your wallet on Base network.');
-    } else {
-      alert('Minting failed: ' + (error.reason || error.message || 'Unknown error'));
-    }
-  } finally {
-    setMinting(false);
-  }
-};
+  };
 
   const getRarityColor = (rarity) => {
     const r = rarity.toLowerCase();
@@ -268,6 +290,16 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
       case 'silver': return 'from-gray-400 to-slate-300';
       case 'bronze': return 'from-orange-600 to-amber-700';
       default: return 'from-gray-600 to-gray-500';
+    }
+  };
+
+  const getPhaseName = (phase) => {
+    switch(phase) {
+      case 1: return 'Genesis';
+      case 2: return 'Early Bird';
+      case 3: return 'Public A';
+      case 4: return 'Public B';
+      default: return 'Inactive';
     }
   };
 
@@ -299,13 +331,28 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
             Choose your warrior! Fighters battle monsters for rewards. Higher rarity = better hit chance = easier victories!
           </p>
           
+          {/* Phase indicator */}
+          {currentPhase > 0 && (
+            <div className="inline-block bg-purple-600/30 border border-purple-500/50 rounded-lg px-4 py-2 mb-4">
+              <span className="text-purple-300">Current Phase:</span>{' '}
+              <span className="font-bold text-white">{getPhaseName(currentPhase)}</span>
+            </div>
+          )}
+          
           {loading && (
             <p className="text-yellow-400 animate-pulse">Loading contract data...</p>
+          )}
+          
+          {!contractReady && !loading && (
+            <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 max-w-md mx-auto">
+              <p className="text-red-400">⚠️ Minting is not currently active</p>
+              <p className="text-sm text-gray-400 mt-1">Please check back when the sale begins</p>
+            </div>
           )}
         </div>
 
         {/* Genesis Sale Perks */}
-        {genesisSale && (
+        {currentPhase === 1 && (
           <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-lg p-6 mb-8 max-w-4xl mx-auto">
             <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
               <Gift className="w-6 h-6" />
@@ -332,9 +379,10 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 max-w-6xl mx-auto">
           {['bronze', 'silver', 'gold'].map(rarity => {
             const rarityData = supply[rarity];
-            const maxSupply = genesisSale ? rarityData.genesis : rarityData.total;
-            const remaining = maxSupply - rarityData.minted;
-            const percentMinted = (rarityData.minted / maxSupply) * 100;
+            const remaining = rarityData.genesisRemaining;
+            const genesisLimit = rarityData.genesisLimit;
+            const genesisMinted = genesisLimit - remaining;
+            const percentMinted = genesisLimit > 0 ? (genesisMinted / genesisLimit) * 100 : 0;
             const quantity = quantities[rarity];
             const pricePerNFT = parseFloat(rarityData.price);
             const totalPrice = (pricePerNFT * quantity).toFixed(5);
@@ -355,9 +403,9 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
                   <div className="mb-4">
                     <div className="flex justify-between text-sm mb-2">
                       <span className="text-gray-400">
-                        {genesisSale ? 'Genesis Supply' : 'Supply'}
+                        {getPhaseName(currentPhase)} Supply
                       </span>
-                      <span className="font-bold">{remaining}/{maxSupply}</span>
+                      <span className="font-bold">{remaining}/{genesisLimit}</span>
                     </div>
                     <div className="w-full bg-gray-800 rounded-full h-2">
                       <div
@@ -365,11 +413,9 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
                         style={{ width: `${percentMinted}%` }}
                       />
                     </div>
-                    {genesisSale && (
-                      <p className="text-xs text-yellow-400 mt-1">
-                        Genesis: {maxSupply} | Total: {rarityData.total}
-                      </p>
-                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      {getPhaseName(currentPhase)}: {genesisLimit} | Total: {rarityData.total}
+                    </p>
                   </div>
 
                   <div className="bg-black/50 rounded-lg p-4 mb-4">
@@ -380,7 +426,7 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
                   </div>
 
                   {/* Quantity Selector */}
-                  {remaining > 0 && connected && (
+                  {remaining > 0 && connected && contractReady && (
                     <div className="bg-black/30 rounded-lg p-4 mb-4">
                       <div className="text-sm text-gray-400 mb-2 text-center">Quantity</div>
                       <div className="flex items-center justify-center gap-4">
@@ -411,14 +457,16 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
                   )}
 
                   <button
-                    onClick={() => MintFighter(rarity)}
-                    disabled={minting || remaining === 0 || !connected}
+                    onClick={() => mintFighter(rarity)}
+                    disabled={minting || remaining === 0 || !connected || !contractReady}
                     className={`w-full py-3 rounded-lg font-bold transition ${
                       remaining === 0
                         ? 'bg-gray-700 cursor-not-allowed text-gray-500'
                         : minting
                         ? 'bg-gray-700 cursor-wait text-gray-300'
                         : !connected
+                        ? 'bg-gray-700 cursor-not-allowed text-gray-400'
+                        : !contractReady
                         ? 'bg-gray-700 cursor-not-allowed text-gray-400'
                         : 'bg-gradient-to-r from-purple-600 to-red-600 hover:from-purple-700 hover:to-red-700'
                     }`}
@@ -429,6 +477,8 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
                       ? 'Minting...'
                       : !connected
                       ? 'Connect Wallet to Mint'
+                      : !contractReady
+                      ? 'Sale Not Active'
                       : `Mint ${quantity} Fighter${quantity > 1 ? 's' : ''}`}
                   </button>
                 </div>
@@ -449,7 +499,7 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
                   {mintSuccess.quantity} Fighter{mintSuccess.quantity > 1 ? 's' : ''} Minted!
                 </h3>
                 <p className="text-gray-400 mb-6">
-                  Your {mintSuccess.rarity} Fighter{mintSuccess.quantity > 1 ? 's' : ''} are ready for battle
+                  Your {mintSuccess.rarity} Fighter{mintSuccess.quantity > 1 ? 's are' : ' is'} ready for battle
                 </p>
 
                 <div className="space-y-2 mb-6 bg-black/30 rounded-lg p-4">
@@ -457,6 +507,12 @@ export default function FighterMintingPage({ onNavigate, connected, walletAddres
                     <span className="text-gray-400">Quantity:</span>
                     <span className="font-bold">{mintSuccess.quantity}</span>
                   </div>
+                  {mintSuccess.tokenIds?.length > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Token IDs:</span>
+                      <span className="font-bold">{mintSuccess.tokenIds.join(', ')}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Price Per NFT:</span>
                     <span className="font-bold">{mintSuccess.pricePerNFT} ETH</span>
