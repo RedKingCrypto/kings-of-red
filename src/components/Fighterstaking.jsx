@@ -16,6 +16,34 @@ const RARITY_COLORS = {
   2: 'from-yellow-600 to-amber-500'
 };
 
+// Fighter types per clan
+const CLAN_FIGHTERS = {
+  0: 'Kenshi Champion',
+  1: 'Shinobi',
+  2: 'Boarding Bruiser',
+  3: 'Templar Guard',
+  4: 'Enforcer',
+  5: 'Knight',
+  6: 'Oakwood Guardian'
+};
+
+// Base IPFS URL for fighter images
+const FIGHTER_IMAGE_BASE = 'https://emerald-adequate-eagle-845.mypinata.cloud/ipfs/bafybeia2alwupvq4ffp6pexcc4ekxz5nmtj4fguk7goxaddd7dcp7w2vbm';
+
+// Get fighter image URL based on rarity and clan
+const getFighterImageUrl = (rarity, clan) => {
+  const rarityName = RARITY_NAMES[rarity]?.toLowerCase() || 'bronze';
+  const clanName = CLAN_NAMES[clan]?.toLowerCase() || 'witkastle';
+  return `${FIGHTER_IMAGE_BASE}/${rarityName}_${clanName}.png`;
+};
+
+// Get fighter display name
+const getFighterDisplayName = (rarity, clan) => {
+  const rarityName = RARITY_NAMES[rarity] || 'Bronze';
+  const fighterType = CLAN_FIGHTERS[clan] || 'Fighter';
+  return `${rarityName} ${fighterType}`;
+};
+
 export default function FighterStaking({ connected, walletAddress, provider, signer, onNavigate }) {
   const [fighters, setFighters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -486,12 +514,24 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
                 className={`bg-gradient-to-br ${RARITY_COLORS[fighter.rarity]} p-0.5 rounded-xl`}
               >
                 <div className="bg-gray-900 rounded-xl p-6">
+                  {/* Fighter Image */}
+                  <div className="w-full h-40 bg-gray-800 rounded-lg mb-4 overflow-hidden">
+                    <img 
+                      src={getFighterImageUrl(fighter.rarity, fighter.clan)} 
+                      alt={getFighterDisplayName(fighter.rarity, fighter.clan)}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.src = '/images/fighter_placeholder.png';
+                      }}
+                    />
+                  </div>
+                  
                   {/* Header */}
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="text-xl font-bold">Fighter #{fighter.tokenId}</h3>
+                      <h3 className="text-lg font-bold">{getFighterDisplayName(fighter.rarity, fighter.clan)}</h3>
                       <p className="text-sm text-gray-400">
-                        {RARITY_NAMES[fighter.rarity]} • {CLAN_NAMES[fighter.clan]}
+                        #{fighter.tokenId} • {CLAN_NAMES[fighter.clan]}
                       </p>
                     </div>
                     <div className={`flex items-center gap-1 text-xs font-bold ${status.color}`}>
