@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, Shield, Swords, Clock, Flame, Droplet, Heart, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { ethers } from 'ethers';
-import { FIGHTER_V3_ADDRESS, BATTLE_ADDRESS, FIGHTER_V3_ABI, BATTLE_ABI, FOOD_TOKEN_ADDRESS, ERC20_ABI } from '../contractConfig';
+import { 
+  FIGHTER_V4_ADDRESS, 
+  FIGHTER_V4_ABI, 
+  GAME_BALANCE_V4_ADDRESS,
+  GAME_BALANCE_V4_ABI,
+  CLAN_NAMES,
+  RARITY_NAMES
+} from '../contractConfig';
 
-const CLAN_NAMES = ['Smizfume', 'Coalheart', 'Warmdice', 'Bervation', 'Konfisof', 'Witkastle', 'Bowkin'];
-const RARITY_NAMES = ['Bronze', 'Silver', 'Gold'];
 const RARITY_COLORS = {
   0: 'from-orange-600 to-amber-700',
   1: 'from-gray-400 to-slate-300',
@@ -19,7 +24,8 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
   const [success, setSuccess] = useState('');
   const [foodBalance, setFoodBalance] = useState(0);
   const [refuelCost, setRefuelCost] = useState(50);
-  const [refuelTime, setRefuelTime] = useState(10800); // 3 hours in seconds
+  const [refuelDuration, setRefuelDuration] = useState(10800); // 3 hours in seconds
+  const [maxEnergy, setMaxEnergy] = useState(100);
 
   useEffect(() => {
     if (connected && provider) {
@@ -42,15 +48,17 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
 
   const loadRefuelSettings = async () => {
     try {
-      const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, provider);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, provider);
       
-      const [cost, time] = await Promise.all([
+      const [cost, duration, energy] = await Promise.all([
         contract.refuelCost(),
-        contract.refuelTime()
+        contract.refuelDuration(),
+        contract.maxEnergy()
       ]);
       
       setRefuelCost(Number(ethers.formatEther(cost)));
-      setRefuelTime(Number(time));
+      setRefuelDuration(Number(duration));
+      setMaxEnergy(Number(energy));
     } catch (err) {
       console.error('Error loading refuel settings:', err);
     }
@@ -58,8 +66,9 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
 
   const loadFoodBalance = async () => {
     try {
-      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, ERC20_ABI, provider);
-      const balance = await foodContract.balanceOf(walletAddress);
+      // Load from GameBalance V4 (in-game balance)
+      const gameBalance = new ethers.Contract(GAME_BALANCE_V4_ADDRESS, GAME_BALANCE_V4_ABI, provider);
+      const balance = await gameBalance.getBalance(walletAddress, 1); // Token ID 1 = FOOD
       setFoodBalance(Number(ethers.formatEther(balance)));
     } catch (err) {
       console.error('Error loading FOOD balance:', err);
@@ -69,11 +78,13 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
   const loadFighters = async () => {
     try {
       setLoading(true);
-      const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, provider);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, provider);
       
       // Get user's fighter count
       const balance = await contract.balanceOf(walletAddress);
       const fighterCount = Number(balance);
+      
+      console.log(`Loading ${fighterCount} fighters for ${walletAddress}`);
       
       if (fighterCount === 0) {
         setFighters([]);
@@ -81,39 +92,68 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
         return;
       }
       
-      // Load all fighters
+      // Load all token IDs
       const fighterPromises = [];
       for (let i = 0; i < fighterCount; i++) {
         fighterPromises.push(contract.tokenOfOwnerByIndex(walletAddress, i));
       }
       
       const tokenIds = await Promise.all(fighterPromises);
+      console.log('Token IDs:', tokenIds.map(t => Number(t)));
       
-      // Load fighter details
+      // Load fighter details using getFighterStats for complete data
       const detailPromises = tokenIds.map(async (tokenId) => {
-        const fighter = await contract.fighters(tokenId);
-        
-        return {
-          tokenId: Number(tokenId),
-          rarity: fighter.rarity,
-          clan: fighter.clan,
-          energy: fighter.energy,
-          wins: Number(fighter.wins),
-          losses: Number(fighter.losses),
-          pvpWins: Number(fighter.pvpWins),
-          pvpLosses: Number(fighter.pvpLosses),
-          isStaked: fighter.isStaked,
-          inBattle: fighter.inBattle,
-          refuelStartTime: Number(fighter.refuelStartTime)
-        };
+        try {
+          // getFighterStats returns all the data we need
+          const stats = await contract.getFighterStats(tokenId);
+          
+          return {
+            tokenId: Number(tokenId),
+            rarity: Number(stats.rarity),
+            clan: Number(stats.clan),
+            energy: Number(stats.energy),
+            isStaked: stats.isStaked,
+            inBattle: stats.inBattle,
+            isRefueling: stats.isRefueling,
+            refuelCompleteTime: Number(stats.refuelCompleteTime),
+            wins: Number(stats.wins),
+            losses: Number(stats.losses),
+            pvpWins: Number(stats.pvpWins),
+            pvpLosses: Number(stats.pvpLosses),
+            points: Number(stats.points)
+          };
+        } catch (err) {
+          console.error(`Error loading fighter ${tokenId}:`, err);
+          // Fallback to basic fighters() call
+          const fighter = await contract.fighters(tokenId);
+          return {
+            tokenId: Number(tokenId),
+            rarity: Number(fighter.rarity),
+            clan: Number(fighter.clan),
+            energy: Number(fighter.energy),
+            isStaked: fighter.isStaked,
+            inBattle: fighter.inBattle,
+            isRefueling: Number(fighter.refuelStartTime) > 0,
+            refuelCompleteTime: Number(fighter.refuelStartTime) > 0 
+              ? Number(fighter.refuelStartTime) + refuelDuration 
+              : 0,
+            wins: Number(fighter.wins),
+            losses: Number(fighter.losses),
+            pvpWins: Number(fighter.pvpWins),
+            pvpLosses: Number(fighter.pvpLosses),
+            points: 0
+          };
+        }
       });
       
       const loadedFighters = await Promise.all(detailPromises);
+      console.log('Loaded fighters:', loadedFighters);
       setFighters(loadedFighters);
+      setError('');
       
     } catch (err) {
       console.error('Error loading fighters:', err);
-      setError('Failed to load fighters');
+      setError('Failed to load fighters: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -130,7 +170,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
     setSuccess('');
 
     try {
-      const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, signer);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
       
       const tx = await contract.stake(tokenId);
       await tx.wait();
@@ -140,7 +180,15 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
       
     } catch (err) {
       console.error('Staking error:', err);
-      setError(err.reason || err.message || 'Staking failed');
+      if (err.message?.includes('C') || err.message?.includes('clan')) {
+        setError('You already have a fighter from this clan staked. Only one per clan allowed.');
+      } else if (err.message?.includes('M') || err.message?.includes('max')) {
+        setError('Maximum 7 fighters can be staked at once.');
+      } else if (err.message?.includes('S') || err.message?.includes('Staking')) {
+        setError('Staking is currently paused.');
+      } else {
+        setError(err.reason || err.shortMessage || err.message || 'Staking failed');
+      }
     } finally {
       setActionLoading(null);
     }
@@ -157,7 +205,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
     setSuccess('');
 
     try {
-      const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, signer);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
       
       const tx = await contract.unstake(tokenId);
       await tx.wait();
@@ -167,7 +215,11 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
       
     } catch (err) {
       console.error('Unstaking error:', err);
-      setError(err.reason || err.message || 'Unstaking failed');
+      if (err.message?.includes('F') || err.message?.includes('energy')) {
+        setError('Fighter must have full energy (100) to unstake.');
+      } else {
+        setError(err.reason || err.shortMessage || err.message || 'Unstaking failed');
+      }
     } finally {
       setActionLoading(null);
     }
@@ -186,35 +238,28 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
     try {
       // Check FOOD balance
       if (foodBalance < refuelCost) {
-        setError(`Insufficient FOOD! Need ${refuelCost} FOOD to refuel.`);
+        setError(`Insufficient FOOD! Need ${refuelCost} FOOD to refuel. You have ${foodBalance.toFixed(0)} FOOD.`);
         setActionLoading(null);
         return;
       }
 
-      const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, signer);
-      const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, ERC20_ABI, signer);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
       
-      // Check allowance
-      const allowance = await foodContract.allowance(walletAddress, FIGHTER_CONTRACT);
-      const refuelAmount = ethers.parseEther(refuelCost.toString());
-      
-      if (allowance < refuelAmount) {
-        // Approve FOOD spending
-        const approveTx = await foodContract.approve(FIGHTER_CONTRACT, ethers.parseEther('1000000'));
-        await approveTx.wait();
-      }
-      
-      // Start refuel
+      // Start refuel - this spends tokens from GameBalance automatically
       const tx = await contract.startRefuel(tokenId);
       await tx.wait();
       
-      setSuccess(`Refueling started! Fighter will be ready in ${refuelTime / 3600} hours.`);
+      setSuccess(`Refueling started! Fighter will be ready in ${refuelDuration / 3600} hours.`);
       await loadFighters();
       await loadFoodBalance();
       
     } catch (err) {
       console.error('Refuel error:', err);
-      setError(err.reason || err.message || 'Refuel failed');
+      if (err.message?.includes('E') || err.message?.includes('energy')) {
+        setError('Fighter must have 0 energy to start refueling.');
+      } else {
+        setError(err.reason || err.shortMessage || err.message || 'Refuel failed');
+      }
     } finally {
       setActionLoading(null);
     }
@@ -231,36 +276,38 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
     setSuccess('');
 
     try {
-      const contract = new ethers.Contract(FIGHTER_CONTRACT, FIGHTER_ABI, signer);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
       
       const tx = await contract.completeRefuel(tokenId);
       await tx.wait();
       
-      setSuccess(`Fighter #${tokenId} refueled! Energy restored to 100.`);
+      setSuccess(`Fighter #${tokenId} refueled! Energy restored to ${maxEnergy}.`);
       await loadFighters();
       
     } catch (err) {
       console.error('Complete refuel error:', err);
-      setError(err.reason || err.message || 'Complete refuel failed');
+      if (err.message?.includes('W') || err.message?.includes('wait')) {
+        setError('Refuel is not complete yet. Please wait.');
+      } else {
+        setError(err.reason || err.shortMessage || err.message || 'Complete refuel failed');
+      }
     } finally {
       setActionLoading(null);
     }
   };
 
   const getRefuelStatus = (fighter) => {
-    if (fighter.refuelStartTime === 0) {
+    if (!fighter.isRefueling && fighter.refuelCompleteTime === 0) {
       return { status: 'none', timeRemaining: 0 };
     }
 
     const now = Math.floor(Date.now() / 1000);
-    const elapsed = now - fighter.refuelStartTime;
-    const remaining = refuelTime - elapsed;
-
-    if (remaining <= 0) {
+    
+    if (fighter.refuelCompleteTime <= now) {
       return { status: 'ready', timeRemaining: 0 };
     }
 
-    return { status: 'refueling', timeRemaining: remaining };
+    return { status: 'refueling', timeRemaining: fighter.refuelCompleteTime - now };
   };
 
   const formatTime = (seconds) => {
@@ -304,14 +351,14 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
   };
 
   const canStake = (fighter) => {
-    return !fighter.isStaked && fighter.refuelStartTime === 0;
+    return !fighter.isStaked && !fighter.isRefueling;
   };
 
   const canUnstake = (fighter) => {
     const refuelStatus = getRefuelStatus(fighter);
     return fighter.isStaked && 
            !fighter.inBattle && 
-           fighter.energy === 100 && 
+           fighter.energy === maxEnergy && 
            refuelStatus.status === 'none';
   };
 
@@ -396,15 +443,15 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
           </div>
           <div>
             <p className="text-gray-400 mb-1">Refuel Duration:</p>
-            <p className="text-lg font-bold text-yellow-400">{refuelTime / 3600} Hours</p>
+            <p className="text-lg font-bold text-yellow-400">{refuelDuration / 3600} Hours</p>
           </div>
           <div>
             <p className="text-gray-400 mb-1">Energy Restored:</p>
-            <p className="text-lg font-bold text-yellow-400">0 → 100</p>
+            <p className="text-lg font-bold text-yellow-400">0 → {maxEnergy}</p>
           </div>
         </div>
         <p className="text-xs text-gray-400 mt-4">
-          ⚡ Each battle costs 20 energy • Cannot unstake until 100 energy • Cannot refuel until 0 energy
+          ⚡ Each battle costs 20 energy • Cannot unstake until {maxEnergy} energy • Cannot refuel until 0 energy
         </p>
       </div>
 
@@ -443,7 +490,9 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <h3 className="text-xl font-bold">Fighter #{fighter.tokenId}</h3>
-                      <p className="text-sm text-gray-400">{RARITY_NAMES[fighter.rarity]} • {CLAN_NAMES[fighter.clan]}</p>
+                      <p className="text-sm text-gray-400">
+                        {RARITY_NAMES[fighter.rarity]} • {CLAN_NAMES[fighter.clan]}
+                      </p>
                     </div>
                     <div className={`flex items-center gap-1 text-xs font-bold ${status.color}`}>
                       <StatusIcon className="w-4 h-4" />
@@ -455,7 +504,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
                   <div className="mb-4">
                     <div className="flex items-center justify-between text-sm mb-2">
                       <span className="text-gray-400">Energy:</span>
-                      <span className="font-bold text-yellow-400">{fighter.energy}/100</span>
+                      <span className="font-bold text-yellow-400">{fighter.energy}/{maxEnergy}</span>
                     </div>
                     <div className="w-full bg-gray-800 rounded-full h-3">
                       <div
@@ -463,7 +512,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
                           fighter.energy > 60 ? 'bg-green-500' :
                           fighter.energy > 20 ? 'bg-yellow-500' : 'bg-red-500'
                         }`}
-                        style={{ width: `${fighter.energy}%` }}
+                        style={{ width: `${(fighter.energy / maxEnergy) * 100}%` }}
                       />
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
@@ -482,7 +531,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
                         <div
                           className="bg-yellow-500 h-2 rounded-full transition-all"
                           style={{ 
-                            width: `${((refuelTime - refuelStatus.timeRemaining) / refuelTime) * 100}%` 
+                            width: `${((refuelDuration - refuelStatus.timeRemaining) / refuelDuration) * 100}%` 
                           }}
                         />
                       </div>
@@ -549,7 +598,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
                       </div>
                     )}
 
-                    {!canStake(fighter) && !canUnstake(fighter) && !canRefuel(fighter) && !canCompleteRefuel(fighter) && !fighter.inBattle && fighter.energy < 100 && (
+                    {!canStake(fighter) && !canUnstake(fighter) && !canRefuel(fighter) && !canCompleteRefuel(fighter) && !fighter.inBattle && fighter.energy < maxEnergy && fighter.energy > 0 && (
                       <div className="w-full bg-gray-800/50 border border-gray-600 py-2 rounded-lg text-center">
                         <p className="text-gray-400 text-sm">Energy must reach 0 to refuel</p>
                       </div>
