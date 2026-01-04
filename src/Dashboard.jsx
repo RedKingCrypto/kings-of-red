@@ -1,21 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, Coins, Droplet, RefreshCw, ExternalLink, AlertCircle } from 'lucide-react';
+import { Crown, Coins, Droplet, RefreshCw, ExternalLink, AlertCircle, Swords } from 'lucide-react';
 import { ethers } from 'ethers';
 import {
   HERALD_ADDRESS,
   FOOD_TOKEN_ADDRESS,
   GOLD_TOKEN_ADDRESS,
   WOOD_TOKEN_ADDRESS,
-  GAME_BALANCE_ADDRESS,
+  GAME_BALANCE_V4_ADDRESS,
+  FIGHTER_V4_ADDRESS,
   HERALD_ABI,
   ERC20_ABI,
   GOLD_TOKEN_ABI,
   WOOD_TOKEN_ABI,
-  GAME_BALANCE_ABI,
+  GAME_BALANCE_V4_ABI,
+  FIGHTER_V4_ABI,
   CLAN_NAMES,
   RARITY_NAMES,
+  TOKEN_IDS,
   getHeraldImageUrl
 } from './contractConfig';
+
+// Fighter image helper
+const FIGHTER_IMAGE_BASE = 'https://emerald-adequate-eagle-845.mypinata.cloud/ipfs/bafybeia2alwupvq4ffp6pexcc4ekxz5nmtj4fguk7goxaddd7dcp7w2vbm';
+
+const getFighterImageUrl = (rarity, clan) => {
+  const rarityName = RARITY_NAMES[rarity]?.toLowerCase() || 'bronze';
+  const clanName = CLAN_NAMES[clan]?.toLowerCase() || 'witkastle';
+  return `${FIGHTER_IMAGE_BASE}/${rarityName}_${clanName}.jpg`;
+};
 
 export default function DashboardPage({ connected, walletAddress, onNavigate }) {
   const [loading, setLoading] = useState(true);
@@ -28,6 +40,7 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
     inGameWood: '0'
   });
   const [heralds, setHeralds] = useState([]);
+  const [fighters, setFighters] = useState([]);
   const [totalValue, setTotalValue] = useState('0');
 
   useEffect(() => {
@@ -41,7 +54,8 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
       setLoading(true);
       await Promise.all([
         loadBalances(),
-        loadHeralds()
+        loadHeralds(),
+        loadFighters()
       ]);
       setLoading(false);
     } catch (error) {
@@ -54,22 +68,22 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       
-      // Token contracts
+      // Token contracts (wallet balances)
       const foodContract = new ethers.Contract(FOOD_TOKEN_ADDRESS, ERC20_ABI, provider);
       const goldContract = new ethers.Contract(GOLD_TOKEN_ADDRESS, GOLD_TOKEN_ABI, provider);
       const woodContract = new ethers.Contract(WOOD_TOKEN_ADDRESS, WOOD_TOKEN_ABI, provider);
       
-      // Game balance contract
-      const gameBalanceContract = new ethers.Contract(GAME_BALANCE_ADDRESS, GAME_BALANCE_ABI, provider);
+      // Game balance contract V4 (in-game balances)
+      const gameBalanceContract = new ethers.Contract(GAME_BALANCE_V4_ADDRESS, GAME_BALANCE_V4_ABI, provider);
       
       // Get all balances
       const [walletFood, walletGold, walletWood, gameFood, gameGold, gameWood] = await Promise.all([
         foodContract.balanceOf(walletAddress),
         goldContract.balanceOf(walletAddress),
         woodContract.balanceOf(walletAddress),
-        gameBalanceContract.inGameFood(walletAddress),
-        gameBalanceContract.inGameGold(walletAddress),
-        gameBalanceContract.inGameWood(walletAddress)
+        gameBalanceContract.getBalance(walletAddress, TOKEN_IDS.FOOD),
+        gameBalanceContract.getBalance(walletAddress, TOKEN_IDS.GOLD),
+        gameBalanceContract.getBalance(walletAddress, TOKEN_IDS.WOOD)
       ]);
       
       setBalances({
@@ -108,7 +122,6 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
       }
       
       // FAST METHOD: Query Transfer events to find user's Heralds
-      // This gets all transfers TO the user's address
       const transferFilter = heraldContract.filters.Transfer(null, walletAddress);
       const transferEvents = await heraldContract.queryFilter(transferFilter, 0, 'latest');
       
@@ -131,7 +144,6 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
             });
           }
         } catch (e) {
-          // Token was burned or doesn't exist, skip
           continue;
         }
       }
@@ -140,6 +152,72 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
       
     } catch (error) {
       console.error('Error loading Heralds:', error);
+    }
+  };
+
+  const loadFighters = async () => {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const fighterContract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, provider);
+      
+      // Get user's Fighter balance
+      const balance = await fighterContract.balanceOf(walletAddress);
+      const fighterCount = parseInt(balance.toString());
+      
+      if (fighterCount === 0) {
+        setFighters([]);
+        return;
+      }
+      
+      // Query Transfer events to find user's Fighters
+      const transferFilter = fighterContract.filters.Transfer(null, walletAddress);
+      const transferEvents = await fighterContract.queryFilter(transferFilter, 0, 'latest');
+      
+      const potentialTokenIds = [...new Set(transferEvents.map(event => event.args.tokenId.toString()))];
+      
+      const userFighters = [];
+      
+      for (const tokenId of potentialTokenIds) {
+        try {
+          const owner = await fighterContract.ownerOf(tokenId);
+          if (owner.toLowerCase() === walletAddress.toLowerCase()) {
+            // Use getFighterStats for complete data
+            try {
+              const stats = await fighterContract.getFighterStats(tokenId);
+              userFighters.push({
+                tokenId: tokenId,
+                rarity: Number(stats.rarity),
+                clan: Number(stats.clan),
+                energy: Number(stats.energy),
+                isStaked: stats.isStaked,
+                inBattle: stats.inBattle,
+                wins: Number(stats.wins),
+                losses: Number(stats.losses)
+              });
+            } catch (e) {
+              // Fallback to basic fighters() call
+              const fighter = await fighterContract.fighters(tokenId);
+              userFighters.push({
+                tokenId: tokenId,
+                rarity: Number(fighter.rarity),
+                clan: Number(fighter.clan),
+                energy: Number(fighter.energy),
+                isStaked: fighter.isStaked,
+                inBattle: fighter.inBattle,
+                wins: Number(fighter.wins),
+                losses: Number(fighter.losses)
+              });
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+      
+      setFighters(userFighters);
+      
+    } catch (error) {
+      console.error('Error loading Fighters:', error);
     }
   };
 
@@ -308,7 +386,7 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
           {/* Quick Actions */}
           <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 mb-8">
             <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-4 gap-4">
               <button
                 onClick={() => onNavigate('exchange')}
                 className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-semibold transition"
@@ -319,18 +397,117 @@ export default function DashboardPage({ connected, walletAddress, onNavigate }) 
                 onClick={() => onNavigate('staking')}
                 className="bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-lg font-semibold transition"
               >
-                Stake NFTs
+                Stake Heralds
               </button>
               <button
-                onClick={() => onNavigate('mint')}
+                onClick={() => onNavigate('stake-fighters')}
+                className="bg-orange-600 hover:bg-orange-700 px-6 py-3 rounded-lg font-semibold transition"
+              >
+                Stake Fighters
+              </button>
+              <button
+                onClick={() => onNavigate('battle')}
                 className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-semibold transition"
               >
-                Mint More
+                Enter Battle
               </button>
             </div>
           </div>
 
-          {/* NFT Portfolio */}
+          {/* Fighter NFTs */}
+          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold">Your Fighter NFTs</h3>
+              <Swords className="w-6 h-6 text-red-500" />
+            </div>
+
+            {fighters.length === 0 ? (
+              <div className="text-center py-12">
+                <Swords className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-400 mb-4">You don't own any Fighter NFTs yet</p>
+                <button
+                  onClick={() => onNavigate('mint-fighter')}
+                  className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-semibold transition"
+                >
+                  Mint Your First Fighter
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
+                  {fighters.map((fighter) => (
+                    <div
+                      key={fighter.tokenId}
+                      className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden hover:border-red-500 transition group"
+                    >
+                      <div className="aspect-square relative bg-gray-800">
+                        <img
+                          src={getFighterImageUrl(fighter.rarity, fighter.clan)}
+                          alt={`Fighter #${fighter.tokenId}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.src = '/images/fighter_placeholder.png';
+                          }}
+                        />
+                        <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded text-xs">
+                          <span className={
+                            fighter.rarity === 2 ? 'text-yellow-400' :
+                            fighter.rarity === 1 ? 'text-gray-300' :
+                            'text-orange-400'
+                          }>
+                            {RARITY_NAMES[fighter.rarity]}
+                          </span>
+                        </div>
+                        {fighter.isStaked && (
+                          <div className="absolute top-2 left-2 bg-green-600/80 px-2 py-1 rounded text-xs">
+                            Staked
+                          </div>
+                        )}
+                        {fighter.inBattle && (
+                          <div className="absolute bottom-2 left-2 bg-red-600/80 px-2 py-1 rounded text-xs">
+                            In Battle
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-3">
+                        <p className="text-sm font-bold text-center">#{fighter.tokenId}</p>
+                        <p className="text-xs text-gray-400 text-center">{CLAN_NAMES[fighter.clan]}</p>
+                        <div className="flex justify-between text-xs mt-2">
+                          <span className="text-gray-500">Energy: {fighter.energy}/100</span>
+                          <span className="text-gray-500">{fighter.wins}W-{fighter.losses}L</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
+                  <div>
+                    <p className="font-bold">{fighters.length} Fighter{fighters.length !== 1 ? 's' : ''} Owned</p>
+                    <p className="text-sm text-gray-400">
+                      View on{' '}
+                      <a
+                        href={`https://basescan.org/token/${FIGHTER_V4_ADDRESS}?a=${walletAddress}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 underline"
+                      >
+                        BaseScan
+                      </a>
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onNavigate('stake-fighters')}
+                    className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-semibold transition"
+                  >
+                    Stake Fighters
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Herald NFTs */}
           <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold">Your Herald NFTs</h3>

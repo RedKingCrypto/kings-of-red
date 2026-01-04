@@ -18,12 +18,12 @@ import {
 // Fighter types per clan
 const CLAN_FIGHTERS = {
   0: { name: 'Kenshi Champion', weapon: 'Katana' },
-  1: { name: 'Shinobi', weapon: 'Ninjato' },
+  1: { name: 'Shinobi', weapon: 'Kunai' },
   2: { name: 'Boarding Bruiser', weapon: "Sailor's Dirk" },
-  3: { name: 'Templar Guard', weapon: 'Holy Sceptre' },
-  4: { name: 'Enforcer', weapon: 'Assault Rifle' },
-  5: { name: 'Knight', weapon: 'Arming Sword' },
-  6: { name: 'Oakwood Guardian', weapon: 'Ironbark Staff' }
+  3: { name: 'Templar Guard', weapon: 'Holy Sword' },
+  4: { name: 'Enforcer', weapon: 'Iron Mace' },
+  5: { name: 'Knight', weapon: 'Longsword' },
+  6: { name: 'Oakwood Guardian', weapon: 'Bow' }
 };
 
 // Base IPFS URL for fighter images
@@ -120,7 +120,7 @@ export default function BattlePage({ connected, walletAddress, provider, onNavig
   const getFighterImageUrl = (rarity, clan) => {
     const rarityName = RARITY_NAMES[rarity]?.toLowerCase() || 'bronze';
     const clanName = CLAN_NAMES[clan]?.toLowerCase() || 'witkastle';
-    return `${FIGHTER_IMAGE_BASE}/${rarityName}_${clanName}.png`;
+    return `${FIGHTER_IMAGE_BASE}/${rarityName}_${clanName}.jpg`;
   };
 
   // Get fighter display name

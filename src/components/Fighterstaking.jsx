@@ -34,7 +34,7 @@ const FIGHTER_IMAGE_BASE = 'https://emerald-adequate-eagle-845.mypinata.cloud/ip
 const getFighterImageUrl = (rarity, clan) => {
   const rarityName = RARITY_NAMES[rarity]?.toLowerCase() || 'bronze';
   const clanName = CLAN_NAMES[clan]?.toLowerCase() || 'witkastle';
-  return `${FIGHTER_IMAGE_BASE}/${rarityName}_${clanName}.png`;
+  return `${FIGHTER_IMAGE_BASE}/${rarityName}_${clanName}.jpg`;
 };
 
 // Get fighter display name
