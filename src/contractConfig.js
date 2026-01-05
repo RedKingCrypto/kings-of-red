@@ -83,7 +83,7 @@ export const HERALD_STAKING_ABI = [
   // View Functions
   "function stakedHeralds(address user) view returns (uint256[])",
   "function isStaked(uint256 tokenId) view returns (bool)",
-  "function getStakedInfo(uint256 tokenId) view returns (address owner, uint256 stakedAt, uint256 lastClaimed)",
+  "function getStakedInfo(uint256 tokenId) view returns (address owner, uint256 stakedAt, getHeraldImageUrl, uint256 lastClaimed)",
   "function getPendingRewards(uint256 tokenId) view returns (uint256)",
   "function getTotalPendingRewards(address user) view returns (uint256)",
   "function hasClanStaked(address user, uint8 clan) view returns (bool)",
