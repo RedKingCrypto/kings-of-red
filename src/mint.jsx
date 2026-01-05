@@ -1,7 +1,73 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, Coins, Clock, Flame, Shield, Swords, Sparkles, Users, Trophy, Gift, Plus, Minus } from 'lucide-react';
 import { ethers } from 'ethers';
-import { HERALD_ADDRESS, HERALD_ABI } from './contractConfig';
+
+// ============================================================
+// HERALD CONTRACT - SELF-CONTAINED (No external imports needed)
+// ============================================================
+
+const HERALD_ADDRESS = '0xb282DC4c005C88A3E81D513D09a78f48CA404311';
+
+// ABI based on actual BaseScan contract functions
+const HERALD_ABI = [
+  // Price functions (from BaseScan)
+  "function bronzePrice() view returns (uint256)",
+  "function silverPrice() view returns (uint256)",
+  "function goldPrice() view returns (uint256)",
+  "function getMintPrice(uint8 rarity) view returns (uint256)",
+  
+  // Minted count functions
+  "function bronzeMinted() view returns (uint256)",
+  "function silverMinted() view returns (uint256)",
+  "function goldMinted() view returns (uint256)",
+  
+  // Supply constants
+  "function MAX_BRONZE() view returns (uint256)",
+  "function MAX_SILVER() view returns (uint256)",
+  "function MAX_GOLD() view returns (uint256)",
+  "function MAX_SUPPLY() view returns (uint256)",
+  
+  // Phase functions
+  "function currentPhase() view returns (uint8)",
+  "function getPhaseSupply(uint8 phase) view returns (uint256 bronze, uint256 silver, uint256 gold)",
+  "function phaseLimits(uint8 phase) view returns (uint256)",
+  "function phaseMinted(uint8 phase) view returns (uint256)",
+  "function mintingActive() view returns (bool)",
+  "function genesisLaunchTime() view returns (uint256)",
+  
+  // Genesis & Affiliate functions
+  "function hasGenesisBadge(address user) view returns (bool)",
+  "function hasGeneratedCode(address user) view returns (bool)",
+  "function affiliateCode(address user) view returns (string)",
+  "function codeToWallet(string code) view returns (address)",
+  
+  // Herald data
+  "function getHerald(uint256 tokenId) view returns (uint8 rarity, uint8 clan)",
+  "function heralds(uint256 tokenId) view returns (uint8 rarity, uint8 clan)",
+  
+  // Standard ERC721
+  "function balanceOf(address owner) view returns (uint256)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
+  "function totalSupply() view returns (uint256)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
+  "function baseTokenURI() view returns (string)",
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function owner() view returns (address)",
+  "function getApproved(uint256 tokenId) view returns (address)",
+  "function isApprovedForAll(address owner, address operator) view returns (bool)",
+  "function supportsInterface(bytes4 interfaceId) view returns (bool)",
+  "function royaltyInfo(uint256 tokenId, uint256 salePrice) view returns (address receiver, uint256 royaltyAmount)",
+  
+  // Mint function (write)
+  "function mintHerald(uint8 rarity, uint256 quantity, string referralCode) payable",
+  
+  // Events
+  "event HeraldMinted(address indexed owner, uint256 indexed tokenId, uint8 rarity, uint8 clan)",
+  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
+];
+
+// ============================================================
 
 const CLANS = [
   { id: 0, name: 'Smizfume', color: 'from-red-600 to-orange-500', icon: Flame },
@@ -32,13 +98,16 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
   });
   const [loading, setLoading] = useState(false);
 
- // Check URL for affiliate code on mount AND load stored code
+  // Check URL for affiliate code on mount AND load stored code
   useEffect(() => {
     // Check URL first
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
     if (refCode) {
       setAffiliateCode(refCode);
+      // Store for 30 days
+      localStorage.setItem('referralCode', refCode);
+      localStorage.setItem('referralExpiry', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
     } else {
       // If no code in URL, check localStorage
       const storedCode = localStorage.getItem('referralCode');
@@ -48,15 +117,9 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
         const expiryTime = parseInt(expiry);
         
         if (Date.now() < expiryTime) {
-          // Code still valid
           setAffiliateCode(storedCode);
           console.log(`✅ Using stored referral: ${storedCode}`);
-          
-          // Calculate days remaining
-          const daysRemaining = Math.ceil((expiryTime - Date.now()) / (24 * 60 * 60 * 1000));
-          console.log(`Referral valid for ${daysRemaining} more days`);
         } else {
-          // Code expired
           localStorage.removeItem('referralCode');
           localStorage.removeItem('referralExpiry');
           console.log('⏰ Referral code expired');
@@ -87,7 +150,11 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
       
       const contract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI, provider);
       
-      // Load supply data - force fresh read
+      // Verify contract is working
+      console.log('Loading Herald contract data...');
+      console.log('Contract address:', HERALD_ADDRESS);
+      
+      // Load supply data
       const [bronzeMinted, silverMinted, goldMinted, bronzePrice, silverPrice, goldPrice] = await Promise.all([
         contract.bronzeMinted(),
         contract.silverMinted(),
@@ -97,10 +164,13 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
         contract.goldPrice()
       ]);
       
-      console.log('Contract data loaded:', {
-        bronze: Number(bronzeMinted),
-        silver: Number(silverMinted),
-        gold: Number(goldMinted)
+      console.log('✅ Contract data loaded:', {
+        bronzeMinted: Number(bronzeMinted),
+        silverMinted: Number(silverMinted),
+        goldMinted: Number(goldMinted),
+        bronzePrice: ethers.formatEther(bronzePrice),
+        silverPrice: ethers.formatEther(silverPrice),
+        goldPrice: ethers.formatEther(goldPrice)
       });
       
       setSupply({
@@ -121,33 +191,30 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
         }
       });
     } catch (error) {
-      console.error('Error loading contract data:', error);
+      console.error('❌ Error loading contract data:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const checkGenesisStatus = async () => {
-  try {
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const contract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI, provider);
-    
-    // Check if user has Genesis badge
-    const hasGenesis = await contract.hasGenesisBadge(walletAddress);
-    
-    // Get the actual affiliate code from the contract
-    const code = await contract.affiliateCode(walletAddress);
-    
-    if (code && code !== '') {
-      setUserAffiliateCode(code);
-      console.log('Affiliate code loaded:', code);
-    } else {
-      console.log('No affiliate code yet for this wallet');
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const contract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI, provider);
+      
+      // Get the actual affiliate code from the contract
+      const code = await contract.affiliateCode(walletAddress);
+      
+      if (code && code !== '') {
+        setUserAffiliateCode(code);
+        console.log('✅ Affiliate code loaded:', code);
+      } else {
+        console.log('No affiliate code yet for this wallet');
+      }
+    } catch (error) {
+      console.error('Error checking Genesis status:', error);
     }
-  } catch (error) {
-    console.error('Error checking Genesis status:', error);
-  }
-};
+  };
 
   const updateQuantity = (rarity, change) => {
     setQuantities(prev => {
@@ -197,6 +264,10 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
       // Calculate total price
       const totalPrice = pricePerNFT * BigInt(quantity);
       
+      console.log(`Minting ${quantity} ${rarityName} Herald(s)...`);
+      console.log(`Price per NFT: ${ethers.formatEther(pricePerNFT)} ETH`);
+      console.log(`Total price: ${ethers.formatEther(totalPrice)} ETH`);
+      
       // Check if sold out
       const remaining = supply[rarity].total - supply[rarity].minted;
       if (remaining <= 0) {
@@ -213,12 +284,15 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
       
       // Send mint transaction with affiliate code
       const refCode = affiliateCode || '';
+      console.log(`Using referral code: "${refCode}"`);
+      
       const tx = await contract.mintHerald(rarityNum, quantity, refCode, { value: totalPrice });
       
       alert(`Transaction sent! Minting ${quantity} Herald${quantity > 1 ? 's' : ''}...\n\nThis may take 10-30 seconds.`);
       
       // Wait for transaction to be mined
       const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt.hash);
       
       // Parse the HeraldMinted events to get clan and tokenIds
       let mintedNFTs = [];
@@ -272,7 +346,7 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
       }
       
     } catch (error) {
-      console.error('Minting failed:', error);
+      console.error('❌ Minting failed:', error);
       
       if (error.code === 'ACTION_REJECTED') {
         alert('Transaction cancelled by user.');
@@ -310,25 +384,26 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
         {/* Hero Section */}
         <div className="text-center mb-12">
           {/* Active Referral Code Indicator */}
-        {affiliateCode && (
-          <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/50 rounded-lg p-4 mb-8 max-w-2xl mx-auto">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <span className="text-2xl">🤝</span>
-              <span className="font-bold text-green-400">Referral Active</span>
-            </div>
-            <p className="text-sm text-gray-300 text-center">
-              Code: <strong className="text-white">{affiliateCode}</strong>
-            </p>
-            <p className="text-xs text-gray-400 text-center mt-1">
-              Your mint will support this referrer (they earn 7% commission)
-            </p>
-            {!window.location.search.includes('ref=') && (
-              <p className="text-xs text-green-400 text-center mt-2">
-                ✅ Code saved from previous visit
+          {affiliateCode && (
+            <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/50 rounded-lg p-4 mb-8 max-w-2xl mx-auto">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-2xl">🤝</span>
+                <span className="font-bold text-green-400">Referral Active</span>
+              </div>
+              <p className="text-sm text-gray-300 text-center">
+                Code: <strong className="text-white">{affiliateCode}</strong>
               </p>
-            )}
-          </div>
-        )}
+              <p className="text-xs text-gray-400 text-center mt-1">
+                Your mint will support this referrer (they earn 7% commission)
+              </p>
+              {!window.location.search.includes('ref=') && (
+                <p className="text-xs text-green-400 text-center mt-2">
+                  ✅ Code saved from previous visit
+                </p>
+              )}
+            </div>
+          )}
+          
           <div className="inline-block mb-4">
             <Sparkles className="w-16 h-16 mx-auto text-yellow-400 animate-pulse" />
           </div>
