@@ -87,6 +87,29 @@ export const BATTLE_ENTRY_FEE = 50; // FOOD tokens
 // Herald claim cost
 export const HERALD_CLAIM_COST = 7; // GOLD tokens
 
+// ==================== FIGHTER SUPPLY CONSTANTS ====================
+
+// Total supply per rarity
+export const MAX_BRONZE = 777;
+export const MAX_SILVER = 560;
+export const MAX_GOLD = 343;
+export const MAX_FIGHTERS = 1680; // Total: 777 + 560 + 343
+
+// Phase limits for Fighter minting
+// Phase 0 = Inactive, Phase 1 = Genesis, Phase 2 = Early Bird, Phase 3 = Public A, Phase 4 = Public B
+export const PHASE_LIMITS = {
+  0: { bronze: 0, silver: 0, gold: 0 },       // Inactive
+  1: { bronze: 98, silver: 77, gold: 49 },    // Genesis Sale
+  2: { bronze: 210, silver: 140, gold: 70 },  // Early Bird (30/20/10 per clan)
+  3: { bronze: 231, silver: 168, gold: 112 }, // Public Sale A (33/24/16 per clan)
+  4: { bronze: 238, silver: 175, gold: 112 }  // Public Sale B (34/25/16 per clan)
+};
+
+// Genesis phase limits (commonly used)
+export const GENESIS_BRONZE = 98;
+export const GENESIS_SILVER = 77;
+export const GENESIS_GOLD = 49;
+
 // ==================== HELPER FUNCTIONS ====================
 
 // IPFS CID for Herald images
@@ -381,8 +404,48 @@ export const ERC20_ABI = [
 
 // ==================== LEGACY EXPORTS (for backward compatibility) ====================
 
-// Some older components may use these names
-export const HERALD_CONTRACT_ADDRESS = HERALD_ADDRESS;
+// Some older components may use these names - ADD ALL VARIATIONS HERE
+
+// Fighter variations
 export const FIGHTER_CONTRACT_ADDRESS = FIGHTER_ADDRESS;
+export const FIGHTER_V4_ADDRESS = FIGHTER_ADDRESS;
+export const FIGHTER_V4_ABI = FIGHTER_ABI;
+
+// Battle variations
 export const BATTLE_CONTRACT_ADDRESS = BATTLE_ADDRESS;
+export const BATTLE_V2_ADDRESS = BATTLE_ADDRESS;
+export const BATTLE_V2_ABI = BATTLE_ABI;
+
+// Herald variations
+export const HERALD_CONTRACT_ADDRESS = HERALD_ADDRESS;
+export const HERALD_NFT_ADDRESS = HERALD_ADDRESS;
+export const HERALD_NFT_ABI = HERALD_ABI;
+
+// Staking variations
 export const STAKING_ADDRESS = HERALD_STAKING_ADDRESS;
+export const HERALD_STAKING_CONTRACT_ADDRESS = HERALD_STAKING_ADDRESS;
+export const STAKING_ABI = HERALD_STAKING_ABI;
+
+// GameBalance variations
+export const GAME_BALANCE_ADDRESS = GAMEBALANCE_ADDRESS;
+export const GAME_BALANCE_V4_ADDRESS = GAMEBALANCE_ADDRESS;
+export const GAMEBALANCE_V4_ADDRESS = GAMEBALANCE_ADDRESS;
+export const GAME_BALANCE_ABI = GAMEBALANCE_ABI;
+export const GAME_BALANCE_V4_ABI = GAMEBALANCE_ABI;
+export const GAMEBALANCE_V4_ABI = GAMEBALANCE_ABI;
+
+// Token variations
+export const FOOD_TOKEN_ADDRESS = FOOD_ADDRESS;
+export const GOLD_TOKEN_ADDRESS = GOLD_ADDRESS;
+export const WOOD_TOKEN_ADDRESS = WOOD_ADDRESS;
+export const RKT_TOKEN_ADDRESS = RKT_ADDRESS;
+
+// Token ABI variations (all ERC20 tokens use the same ABI)
+export const FOOD_TOKEN_ABI = ERC20_ABI;
+export const GOLD_TOKEN_ABI = ERC20_ABI;
+export const WOOD_TOKEN_ABI = ERC20_ABI;
+export const RKT_TOKEN_ABI = ERC20_ABI;
+export const FOOD_ABI = ERC20_ABI;
+export const GOLD_ABI = ERC20_ABI;
+export const WOOD_ABI = ERC20_ABI;
+export const RKT_ABI = ERC20_ABI;
