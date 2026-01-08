@@ -1,6 +1,6 @@
 // ==============================================================================
 // KINGS OF RED - CONTRACT CONFIGURATION
-// Last Updated: January 4, 2026
+// Last Updated: January 5, 2026
 // Network: Base Mainnet (Chain ID: 8453)
 // ==============================================================================
 
@@ -31,50 +31,199 @@ export const RKT_ADDRESS = '0xd6F65D10CE2062d6dC330DA61ADd3c0693895fFf';
 export const TREASURY_ADDRESS = '0xef0f1f34c7687eb31a6b4ada2af45ce7360c04e9';
 export const OWNER_ADDRESS = '0x1350Bb46F203E5cD9b59f52FcBB43FF4fa8877b4';
 
+// ==================== CONSTANTS ====================
+
+export const CLANS = [
+  { id: 0, name: 'Smizfume', color: 'from-red-600 to-orange-500' },
+  { id: 1, name: 'Coalheart', color: 'from-gray-600 to-slate-400' },
+  { id: 2, name: 'Warmdice', color: 'from-purple-600 to-indigo-500' },
+  { id: 3, name: 'Bervation', color: 'from-blue-600 to-cyan-500' },
+  { id: 4, name: 'Konfisof', color: 'from-green-600 to-emerald-500' },
+  { id: 5, name: 'Witkastle', color: 'from-yellow-500 to-amber-400' },
+  { id: 6, name: 'Bowkin', color: 'from-rose-600 to-red-700' }
+];
+
+export const CLAN_NAMES = [
+  'Smizfume',
+  'Coalheart', 
+  'Warmdice',
+  'Bervation',
+  'Konfisof',
+  'Witkastle',
+  'Bowkin'
+];
+
+export const RARITY_NAMES = ['Bronze', 'Silver', 'Gold'];
+
+export const RARITIES = {
+  BRONZE: 0,
+  SILVER: 1,
+  GOLD: 2
+};
+
+export const TOKEN_IDS = {
+  FOOD: 1,
+  GOLD: 2,
+  WOOD: 3,
+  RKT: 4
+};
+
+// Daily production rates (per Herald)
+export const HERALD_DAILY_PRODUCTION = {
+  0: 20,   // Bronze: 20 FOOD/day
+  1: 65,   // Silver: 65 FOOD/day
+  2: 100   // Gold: 100 FOOD/day
+};
+
+// Fighter energy costs
+export const FIGHTER_BATTLE_ENERGY_COST = 20;
+export const FIGHTER_MAX_ENERGY = 100;
+export const FIGHTER_REFUEL_COST = 50; // FOOD tokens
+export const FIGHTER_REFUEL_TIME = 3 * 60 * 60; // 3 hours in seconds
+
+// Battle entry fee
+export const BATTLE_ENTRY_FEE = 50; // FOOD tokens
+
+// Herald claim cost
+export const HERALD_CLAIM_COST = 7; // GOLD tokens
+
+// ==================== HELPER FUNCTIONS ====================
+
+// IPFS CID for Herald images
+const HERALD_IMAGES_CID = 'bafybeibxmhmnfckv7vycd3wy6btmtzqh5hshk6vb7c6y2tvi2ohh3qnhsi';
+
+// IPFS CID for Fighter metadata
+const FIGHTER_METADATA_CID = 'bafybeia2alwupvq4ffp6pexcc4ekxz5nmtj4fguk7goxaddd7dcp7w2vbm';
+
+/**
+ * Get Herald image URL based on rarity and clan
+ * @param {number} rarity - 0=Bronze, 1=Silver, 2=Gold
+ * @param {number} clan - 0-6 clan index
+ * @returns {string} IPFS URL for the Herald image
+ */
+export const getHeraldImageUrl = (rarity, clan) => {
+  const rarityName = RARITY_NAMES[rarity]?.toLowerCase() || 'bronze';
+  const clanName = CLAN_NAMES[clan]?.toLowerCase() || 'smizfume';
+  return `https://ipfs.io/ipfs/${HERALD_IMAGES_CID}/${rarityName}_${clanName}.png`;
+};
+
+/**
+ * Get Fighter image URL based on rarity and clan
+ * @param {number} rarity - 0=Bronze, 1=Silver, 2=Gold
+ * @param {number} clan - 0-6 clan index
+ * @returns {string} IPFS URL for the Fighter image
+ */
+export const getFighterImageUrl = (rarity, clan) => {
+  const rarityName = RARITY_NAMES[rarity]?.toLowerCase() || 'bronze';
+  const clanName = CLAN_NAMES[clan]?.toLowerCase() || 'smizfume';
+  return `https://ipfs.io/ipfs/${FIGHTER_METADATA_CID}/${rarityName}_${clanName}.jpg`;
+};
+
+/**
+ * Get clan name by index
+ * @param {number} clanId - 0-6 clan index
+ * @returns {string} Clan name
+ */
+export const getClanName = (clanId) => {
+  return CLAN_NAMES[clanId] || 'Unknown';
+};
+
+/**
+ * Get rarity name by index
+ * @param {number} rarityId - 0=Bronze, 1=Silver, 2=Gold
+ * @returns {string} Rarity name
+ */
+export const getRarityName = (rarityId) => {
+  return RARITY_NAMES[rarityId] || 'Unknown';
+};
+
+/**
+ * Get clan color gradient by index
+ * @param {number} clanId - 0-6 clan index
+ * @returns {string} Tailwind gradient classes
+ */
+export const getClanColor = (clanId) => {
+  return CLANS[clanId]?.color || 'from-gray-600 to-gray-500';
+};
+
+/**
+ * Get rarity color gradient
+ * @param {number} rarityId - 0=Bronze, 1=Silver, 2=Gold
+ * @returns {string} Tailwind gradient classes
+ */
+export const getRarityColor = (rarityId) => {
+  const colors = [
+    'from-orange-600 to-amber-700',  // Bronze
+    'from-gray-400 to-slate-300',     // Silver
+    'from-yellow-500 to-amber-400'    // Gold
+  ];
+  return colors[rarityId] || 'from-gray-600 to-gray-500';
+};
+
 // ==================== HERALD ABI ====================
-// This is the CORRECT ABI for Herald minting page
 
 export const HERALD_ABI = [
-  // View Functions - Prices
+  // Price functions
   "function bronzePrice() view returns (uint256)",
   "function silverPrice() view returns (uint256)",
   "function goldPrice() view returns (uint256)",
+  "function getMintPrice(uint8 rarity) view returns (uint256)",
   
-  // View Functions - Minted Counts
+  // Minted count functions
   "function bronzeMinted() view returns (uint256)",
   "function silverMinted() view returns (uint256)",
   "function goldMinted() view returns (uint256)",
   
-  // View Functions - Supply Limits
-  "function bronzeSupply() view returns (uint256)",
-  "function silverSupply() view returns (uint256)",
-  "function goldSupply() view returns (uint256)",
+  // Supply constants
+  "function MAX_BRONZE() view returns (uint256)",
+  "function MAX_SILVER() view returns (uint256)",
+  "function MAX_GOLD() view returns (uint256)",
+  "function MAX_SUPPLY() view returns (uint256)",
   
-  // View Functions - Genesis & Affiliate
+  // Phase functions
+  "function currentPhase() view returns (uint8)",
+  "function getPhaseSupply(uint8 phase) view returns (uint256 bronze, uint256 silver, uint256 gold)",
+  "function phaseLimits(uint8 phase) view returns (uint256)",
+  "function phaseMinted(uint8 phase) view returns (uint256)",
+  "function mintingActive() view returns (bool)",
+  "function genesisLaunchTime() view returns (uint256)",
+  
+  // Genesis & Affiliate functions
   "function hasGenesisBadge(address user) view returns (bool)",
+  "function hasGeneratedCode(address user) view returns (bool)",
   "function affiliateCode(address user) view returns (string)",
-  "function isAffiliateCodeUsed(string code) view returns (bool)",
+  "function codeToWallet(string code) view returns (address)",
   
-  // View Functions - Token Info
-  "function tokenURI(uint256 tokenId) view returns (string)",
+  // Herald data
+  "function getHerald(uint256 tokenId) view returns (uint8 rarity, uint8 clan)",
+  "function heralds(uint256 tokenId) view returns (uint8 rarity, uint8 clan)",
+  
+  // Standard ERC721
   "function balanceOf(address owner) view returns (uint256)",
   "function ownerOf(uint256 tokenId) view returns (address)",
   "function totalSupply() view returns (uint256)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
+  "function baseTokenURI() view returns (string)",
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function owner() view returns (address)",
+  "function getApproved(uint256 tokenId) view returns (address)",
+  "function isApprovedForAll(address owner, address operator) view returns (bool)",
+  "function supportsInterface(bytes4 interfaceId) view returns (bool)",
+  "function royaltyInfo(uint256 tokenId, uint256 salePrice) view returns (address receiver, uint256 royaltyAmount)",
   
-  // View Functions - Token Data
-  "function tokenRarity(uint256 tokenId) view returns (uint8)",
-  "function tokenClan(uint256 tokenId) view returns (uint8)",
-  
-  // View Functions - Sale Phase
-  "function currentPhase() view returns (uint8)",
-  "function mintingActive() view returns (bool)",
-  
-  // Write Functions - Minting
+  // Write functions
   "function mintHerald(uint8 rarity, uint256 quantity, string referralCode) payable",
+  "function setApprovalForAll(address operator, bool approved)",
+  "function approve(address to, uint256 tokenId)",
+  "function transferFrom(address from, address to, uint256 tokenId)",
+  "function safeTransferFrom(address from, address to, uint256 tokenId)",
   
   // Events
   "event HeraldMinted(address indexed owner, uint256 indexed tokenId, uint8 rarity, uint8 clan)",
-  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
+  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
+  "event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId)",
+  "event ApprovalForAll(address indexed owner, address indexed operator, bool approved)"
 ];
 
 // ==================== HERALD STAKING ABI ====================
@@ -83,7 +232,7 @@ export const HERALD_STAKING_ABI = [
   // View Functions
   "function stakedHeralds(address user) view returns (uint256[])",
   "function isStaked(uint256 tokenId) view returns (bool)",
-  "function getStakedInfo(uint256 tokenId) view returns (address owner, uint256 stakedAt, getHeraldImageUrl, uint256 lastClaimed)",
+  "function getStakedInfo(uint256 tokenId) view returns (address owner, uint256 stakedAt, uint256 lastClaimed)",
   "function getPendingRewards(uint256 tokenId) view returns (uint256)",
   "function getTotalPendingRewards(address user) view returns (uint256)",
   "function hasClanStaked(address user, uint8 clan) view returns (bool)",
@@ -124,6 +273,7 @@ export const FIGHTER_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
   "function ownerOf(uint256 tokenId) view returns (address)",
   "function totalSupply() view returns (uint256)",
+  "function baseURI() view returns (string)",
   
   // View Functions - Fighter Data
   "function getFighter(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint8 energy, uint32 wins, uint32 losses, bool isStaked, uint256 lastRefuelTime)",
@@ -145,6 +295,15 @@ export const FIGHTER_ABI = [
   
   // Write Functions - Refuel
   "function refuel(uint256 tokenId)",
+  
+  // Write Functions - ERC721
+  "function setApprovalForAll(address operator, bool approved)",
+  "function approve(address to, uint256 tokenId)",
+  "function transferFrom(address from, address to, uint256 tokenId)",
+  "function safeTransferFrom(address from, address to, uint256 tokenId)",
+  
+  // Owner Functions
+  "function setBaseURI(string newBaseURI)",
   
   // Events
   "event FighterMinted(address indexed owner, uint256 indexed tokenId, uint8 rarity, uint8 clan)",
@@ -220,46 +379,10 @@ export const ERC20_ABI = [
   "function name() view returns (string)"
 ];
 
-// ==================== CONSTANTS ====================
+// ==================== LEGACY EXPORTS (for backward compatibility) ====================
 
-export const CLANS = [
-  { id: 0, name: 'Smizfume', color: 'from-red-600 to-orange-500' },
-  { id: 1, name: 'Coalheart', color: 'from-gray-600 to-slate-400' },
-  { id: 2, name: 'Warmdice', color: 'from-purple-600 to-indigo-500' },
-  { id: 3, name: 'Bervation', color: 'from-blue-600 to-cyan-500' },
-  { id: 4, name: 'Konfisof', color: 'from-green-600 to-emerald-500' },
-  { id: 5, name: 'Witkastle', color: 'from-yellow-500 to-amber-400' },
-  { id: 6, name: 'Bowkin', color: 'from-rose-600 to-red-700' }
-];
-
-export const RARITIES = {
-  BRONZE: 0,
-  SILVER: 1,
-  GOLD: 2
-};
-
-export const TOKEN_IDS = {
-  FOOD: 1,
-  GOLD: 2,
-  WOOD: 3,
-  RKT: 4
-};
-
-// Daily production rates (per Herald)
-export const HERALD_DAILY_PRODUCTION = {
-  0: 20,   // Bronze: 20 FOOD/day
-  1: 65,   // Silver: 65 FOOD/day
-  2: 100   // Gold: 100 FOOD/day
-};
-
-// Fighter energy costs
-export const FIGHTER_BATTLE_ENERGY_COST = 20;
-export const FIGHTER_MAX_ENERGY = 100;
-export const FIGHTER_REFUEL_COST = 50; // FOOD tokens
-export const FIGHTER_REFUEL_TIME = 3 * 60 * 60; // 3 hours in seconds
-
-// Battle entry fee
-export const BATTLE_ENTRY_FEE = 50; // FOOD tokens
-
-// Herald claim cost
-export const HERALD_CLAIM_COST = 7; // GOLD tokens
+// Some older components may use these names
+export const HERALD_CONTRACT_ADDRESS = HERALD_ADDRESS;
+export const FIGHTER_CONTRACT_ADDRESS = FIGHTER_ADDRESS;
+export const BATTLE_CONTRACT_ADDRESS = BATTLE_ADDRESS;
+export const STAKING_ADDRESS = HERALD_STAKING_ADDRESS;
