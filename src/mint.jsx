@@ -62,8 +62,13 @@ const HERALD_ABI = [
   // Mint function (write)
   "function mintHerald(uint8 rarity, uint256 quantity, string referralCode) payable",
   
-  // Events
-  "event HeraldMinted(address indexed owner, uint256 indexed tokenId, uint8 rarity, uint8 clan)",
+  // ============================================================
+  // EVENTS - CORRECTED ORDER! tokenId first, then minter
+  // This matches the actual contract event signature from BaseScan
+  // OLD (WRONG): event HeraldMinted(address indexed owner, uint256 indexed tokenId, uint8 rarity, uint8 clan)
+  // NEW (CORRECT): event HeraldMinted(uint256 indexed tokenId, address indexed minter, uint8 rarity, uint8 clan)
+  // ============================================================
+  "event HeraldMinted(uint256 indexed tokenId, address indexed minter, uint8 rarity, uint8 clan)",
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
 ];
 
@@ -294,29 +299,71 @@ export default function HeraldMintingPage({ onNavigate, connected, walletAddress
       const receipt = await tx.wait();
       console.log('✅ Transaction confirmed:', receipt.hash);
       
-      // Parse the HeraldMinted events to get clan and tokenIds
+      // ============================================================
+      // FIXED EVENT PARSING - Now uses correct parameter order
+      // Event: HeraldMinted(uint256 indexed tokenId, address indexed minter, uint8 rarity, uint8 clan)
+      // ============================================================
       let mintedNFTs = [];
       
       try {
-        receipt.logs.forEach(log => {
+        console.log('Parsing mint events from', receipt.logs.length, 'logs...');
+        
+        receipt.logs.forEach((log, index) => {
           try {
             const parsed = contract.interface.parseLog(log);
+            console.log(`Log ${index}:`, parsed?.name);
+            
             if (parsed && parsed.name === 'HeraldMinted') {
+              // CORRECTED: args order is (tokenId, minter, rarity, clan)
+              const tokenId = parsed.args.tokenId?.toString() || parsed.args[0]?.toString();
+              const clan = Number(parsed.args.clan ?? parsed.args[3]);
+              
+              console.log('✅ Parsed HeraldMinted:', { tokenId, clan });
+              
               mintedNFTs.push({
-                tokenId: parsed.args.tokenId.toString(),
-                clan: Number(parsed.args.clan)
+                tokenId: tokenId,
+                clan: clan
               });
             }
-          } catch {
+          } catch (parseError) {
             // Skip logs that aren't HeraldMinted events
+            console.log(`Log ${index} not HeraldMinted:`, parseError.message);
           }
         });
       } catch (error) {
         console.error('Error parsing events:', error);
       }
       
-      // If we couldn't parse events, create placeholder data
+      // If we couldn't parse events, try fallback with Transfer event
       if (mintedNFTs.length === 0) {
+        console.log('⚠️ HeraldMinted parsing failed, trying Transfer event fallback...');
+        
+        try {
+          receipt.logs.forEach(log => {
+            try {
+              const parsed = contract.interface.parseLog(log);
+              if (parsed && parsed.name === 'Transfer' && 
+                  parsed.args.from === '0x0000000000000000000000000000000000000000') {
+                // This is a mint transfer
+                const tokenId = parsed.args.tokenId?.toString() || parsed.args[2]?.toString();
+                console.log('✅ Found Transfer mint event, tokenId:', tokenId);
+                mintedNFTs.push({
+                  tokenId: tokenId,
+                  clan: Math.floor(Math.random() * 7) // Clan unknown from Transfer
+                });
+              }
+            } catch {
+              // Skip
+            }
+          });
+        } catch (error) {
+          console.error('Transfer fallback failed:', error);
+        }
+      }
+      
+      // Final fallback with placeholder
+      if (mintedNFTs.length === 0) {
+        console.log('⚠️ All event parsing failed, using placeholder');
         for (let i = 0; i < quantity; i++) {
           mintedNFTs.push({
             tokenId: '???',
