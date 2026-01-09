@@ -3,12 +3,73 @@ import { Zap, Shield, Swords, Clock, Flame, Droplet, Heart, AlertCircle, CheckCi
 import { ethers } from 'ethers';
 import { 
   FIGHTER_V4_ADDRESS, 
-  FIGHTER_V4_ABI, 
   GAME_BALANCE_V4_ADDRESS,
   GAME_BALANCE_V4_ABI,
   CLAN_NAMES,
   RARITY_NAMES
 } from '../contractConfig';
+
+// ============================================
+// COMPLETE FIGHTER V4 ABI - includes all needed functions
+// ============================================
+const FIGHTER_V4_ABI_COMPLETE = [
+  // ERC721 Standard
+  "function balanceOf(address owner) view returns (uint256)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
+  "function approve(address to, uint256 tokenId)",
+  "function getApproved(uint256 tokenId) view returns (address)",
+  "function setApprovalForAll(address operator, bool approved)",
+  "function isApprovedForAll(address owner, address operator) view returns (bool)",
+  "function transferFrom(address from, address to, uint256 tokenId)",
+  "function safeTransferFrom(address from, address to, uint256 tokenId)",
+  
+  // ERC721Enumerable - CRITICAL: This was missing!
+  "function totalSupply() view returns (uint256)",
+  "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
+  "function tokenByIndex(uint256 index) view returns (uint256)",
+  
+  // Fighter V4 Read Functions
+  "function mintingPaused() view returns (bool)",
+  "function currentPhase() view returns (uint8)",
+  "function bronzePrice() view returns (uint256)",
+  "function silverPrice() view returns (uint256)",
+  "function goldPrice() view returns (uint256)",
+  "function bronzeMinted() view returns (uint256)",
+  "function silverMinted() view returns (uint256)",
+  "function goldMinted() view returns (uint256)",
+  
+  // Fighter data
+  "function fighters(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint8 energy, bool isStaked, bool inBattle, uint256 refuelStartTime, uint256 wins, uint256 losses, uint256 pvpWins, uint256 pvpLosses)",
+  "function getFighterStats(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint8 energy, bool isStaked, bool inBattle, bool isRefueling, uint256 refuelCompleteTime, uint256 wins, uint256 losses, uint256 pvpWins, uint256 pvpLosses, uint256 points)",
+  
+  // Staking functions
+  "function stake(uint256 tokenId)",
+  "function unstake(uint256 tokenId)",
+  "function stakedFighters(address owner) view returns (uint256[])",
+  "function getStakedFighters(address owner) view returns (uint256[])",
+  "function isStaked(uint256 tokenId) view returns (bool)",
+  
+  // Refuel functions
+  "function refuelCost() view returns (uint256)",
+  "function refuelDuration() view returns (uint256)",
+  "function maxEnergy() view returns (uint8)",
+  "function startRefuel(uint256 tokenId)",
+  "function completeRefuel(uint256 tokenId)",
+  
+  // Mint functions
+  "function mintBronze(uint256 quantity) payable",
+  "function mintSilver(uint256 quantity) payable",
+  "function mintGold(uint256 quantity) payable",
+  
+  // Events
+  "event FighterMinted(uint256 indexed tokenId, address indexed minter, uint8 rarity, uint8 clan)",
+  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
+  "event FighterStaked(uint256 indexed tokenId, address indexed owner)",
+  "event FighterUnstaked(uint256 indexed tokenId, address indexed owner)",
+  "event RefuelStarted(uint256 indexed tokenId)",
+  "event RefuelCompleted(uint256 indexed tokenId)"
+];
 
 const RARITY_COLORS = {
   0: 'from-orange-600 to-amber-700',
@@ -76,7 +137,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
 
   const loadRefuelSettings = async () => {
     try {
-      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, provider);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI_COMPLETE, provider);
       
       const [cost, duration, energy] = await Promise.all([
         contract.refuelCost(),
@@ -106,7 +167,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
   const loadFighters = async () => {
     try {
       setLoading(true);
-      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, provider);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI_COMPLETE, provider);
       
       // Get user's fighter count
       const balance = await contract.balanceOf(walletAddress);
@@ -120,7 +181,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
         return;
       }
       
-      // Load all token IDs
+      // Load all token IDs using tokenOfOwnerByIndex (ERC721Enumerable)
       const fighterPromises = [];
       for (let i = 0; i < fighterCount; i++) {
         fighterPromises.push(contract.tokenOfOwnerByIndex(walletAddress, i));
@@ -151,30 +212,35 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
             points: Number(stats.points)
           };
         } catch (err) {
-          console.error(`Error loading fighter ${tokenId}:`, err);
+          console.error(`Error loading fighter ${tokenId} with getFighterStats:`, err);
           // Fallback to basic fighters() call
-          const fighter = await contract.fighters(tokenId);
-          return {
-            tokenId: Number(tokenId),
-            rarity: Number(fighter.rarity),
-            clan: Number(fighter.clan),
-            energy: Number(fighter.energy),
-            isStaked: fighter.isStaked,
-            inBattle: fighter.inBattle,
-            isRefueling: Number(fighter.refuelStartTime) > 0,
-            refuelCompleteTime: Number(fighter.refuelStartTime) > 0 
-              ? Number(fighter.refuelStartTime) + refuelDuration 
-              : 0,
-            wins: Number(fighter.wins),
-            losses: Number(fighter.losses),
-            pvpWins: Number(fighter.pvpWins),
-            pvpLosses: Number(fighter.pvpLosses),
-            points: 0
-          };
+          try {
+            const fighter = await contract.fighters(tokenId);
+            return {
+              tokenId: Number(tokenId),
+              rarity: Number(fighter.rarity),
+              clan: Number(fighter.clan),
+              energy: Number(fighter.energy),
+              isStaked: fighter.isStaked,
+              inBattle: fighter.inBattle,
+              isRefueling: Number(fighter.refuelStartTime) > 0,
+              refuelCompleteTime: Number(fighter.refuelStartTime) > 0 
+                ? Number(fighter.refuelStartTime) + refuelDuration 
+                : 0,
+              wins: Number(fighter.wins),
+              losses: Number(fighter.losses),
+              pvpWins: Number(fighter.pvpWins),
+              pvpLosses: Number(fighter.pvpLosses),
+              points: 0
+            };
+          } catch (fallbackErr) {
+            console.error(`Fallback also failed for ${tokenId}:`, fallbackErr);
+            return null;
+          }
         }
       });
       
-      const loadedFighters = await Promise.all(detailPromises);
+      const loadedFighters = (await Promise.all(detailPromises)).filter(f => f !== null);
       console.log('Loaded fighters:', loadedFighters);
       setFighters(loadedFighters);
       setError('');
@@ -198,7 +264,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
     setSuccess('');
 
     try {
-      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI_COMPLETE, signer);
       
       const tx = await contract.stake(tokenId);
       await tx.wait();
@@ -233,7 +299,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
     setSuccess('');
 
     try {
-      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI_COMPLETE, signer);
       
       const tx = await contract.unstake(tokenId);
       await tx.wait();
@@ -271,7 +337,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
         return;
       }
 
-      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI_COMPLETE, signer);
       
       // Start refuel - this spends tokens from GameBalance automatically
       const tx = await contract.startRefuel(tokenId);
@@ -304,7 +370,7 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
     setSuccess('');
 
     try {
-      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI_COMPLETE, signer);
       
       const tx = await contract.completeRefuel(tokenId);
       await tx.wait();
