@@ -4,12 +4,40 @@ import { ethers } from 'ethers';
 import {
   HERALD_ADDRESS,
   HERALD_STAKING_ADDRESS,
-  HERALD_ABI,
   HERALD_STAKING_ABI,
   CLAN_NAMES,
   RARITY_NAMES,
   getHeraldImageUrl
 } from './contractConfig';
+
+// ============================================
+// COMPLETE HERALD ABI - includes ERC721Enumerable functions
+// ============================================
+const HERALD_ABI_COMPLETE = [
+  // ERC721 Standard
+  "function balanceOf(address owner) view returns (uint256)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
+  "function approve(address to, uint256 tokenId)",
+  "function getApproved(uint256 tokenId) view returns (address)",
+  "function setApprovalForAll(address operator, bool approved)",
+  "function isApprovedForAll(address owner, address operator) view returns (bool)",
+  "function transferFrom(address from, address to, uint256 tokenId)",
+  "function safeTransferFrom(address from, address to, uint256 tokenId)",
+  
+  // ERC721Enumerable - CRITICAL for finding user's tokens
+  "function totalSupply() view returns (uint256)",
+  "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
+  "function tokenByIndex(uint256 index) view returns (uint256)",
+  
+  // Herald-specific functions
+  "function getHerald(uint256 tokenId) view returns (uint8 rarity, uint8 clan)",
+  "function heralds(uint256 tokenId) view returns (uint8 rarity, uint8 clan)",
+  
+  // Events
+  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
+  "event HeraldMinted(uint256 indexed tokenId, address indexed minter, uint8 rarity, uint8 clan)"
+];
 
 const CLAN_COLORS = [
   'from-red-600 to-orange-500',
@@ -48,68 +76,132 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
       setLoading(true);
       const provider = new ethers.BrowserProvider(window.ethereum);
       const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, provider);
-      const heraldContract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI, provider);
+      const heraldContract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI_COMPLETE, provider);
+      
+      console.log('Loading Herald staking data for:', walletAddress);
       
       // Get staked Herald IDs
       const stakedIds = await stakingContract.getUserStakedHeralds(walletAddress);
+      console.log('Staked Herald IDs:', stakedIds.map(id => id.toString()));
       
       // Load staked Heralds details organized by clan
       const stakedData = {};
       for (let i = 0; i < stakedIds.length; i++) {
         const tokenId = stakedIds[i];
-        const [owner, stakedAt, lastClaim, clan, rarity, canClaim] = await stakingContract.getStakeInfo(tokenId);
-        const timeUntil = await stakingContract.getTimeUntilClaim(tokenId);
-        
-        const clanNum = parseInt(clan);
-        stakedData[clanNum] = {
-          tokenId: tokenId.toString(),
-          clan: clanNum,
-          rarity: parseInt(rarity),
-          canClaim,
-          timeUntilClaim: parseInt(timeUntil.toString()),
-          lastClaim: parseInt(lastClaim.toString()),
-          imageUrl: getHeraldImageUrl(clanNum, parseInt(rarity))
-        };
-      }
-      
-      setStakedByClans(stakedData);
-      
-      // Load owned (unstaked) Heralds using Transfer events
-      const transferFilter = heraldContract.filters.Transfer(null, walletAddress);
-      const transferEvents = await heraldContract.queryFilter(transferFilter, 0, 'latest');
-      const potentialTokenIds = [...new Set(transferEvents.map(event => event.args.tokenId.toString()))];
-      
-      const userHeralds = [];
-      for (const tokenId of potentialTokenIds) {
         try {
-          const owner = await heraldContract.ownerOf(tokenId);
-          if (owner.toLowerCase() === walletAddress.toLowerCase()) {
-            // Check if it's staked
-            const isStaked = stakedIds.some(id => id.toString() === tokenId);
-            if (!isStaked) {
-              const [rarity, clan] = await heraldContract.getHerald(tokenId);
-              userHeralds.push({
-                tokenId: tokenId,
-                rarity: parseInt(rarity),
-                clan: parseInt(clan),
-                imageUrl: getHeraldImageUrl(parseInt(clan), parseInt(rarity))
-              });
-            }
-          }
-        } catch (e) {
-          continue;
+          const [owner, stakedAt, lastClaim, clan, rarity, canClaim] = await stakingContract.getStakeInfo(tokenId);
+          const timeUntil = await stakingContract.getTimeUntilClaim(tokenId);
+          
+          const clanNum = parseInt(clan);
+          stakedData[clanNum] = {
+            tokenId: tokenId.toString(),
+            clan: clanNum,
+            rarity: parseInt(rarity),
+            canClaim,
+            timeUntilClaim: parseInt(timeUntil.toString()),
+            lastClaim: parseInt(lastClaim.toString()),
+            imageUrl: getHeraldImageUrl(clanNum, parseInt(rarity))
+          };
+        } catch (err) {
+          console.error(`Error loading staked Herald ${tokenId}:`, err);
         }
       }
       
+      setStakedByClans(stakedData);
+      console.log('Staked by clans:', stakedData);
+      
+      // ============================================
+      // FIXED: Load owned Heralds using tokenOfOwnerByIndex (ERC721Enumerable)
+      // ============================================
+      const userHeralds = [];
+      
+      try {
+        // Get user's Herald balance
+        const balance = await heraldContract.balanceOf(walletAddress);
+        const heraldCount = Number(balance);
+        console.log(`User owns ${heraldCount} Heralds`);
+        
+        if (heraldCount > 0) {
+          // Load all token IDs using tokenOfOwnerByIndex
+          for (let i = 0; i < heraldCount; i++) {
+            try {
+              const tokenId = await heraldContract.tokenOfOwnerByIndex(walletAddress, i);
+              const tokenIdStr = tokenId.toString();
+              
+              // Check if this Herald is already staked
+              const isStaked = stakedIds.some(id => id.toString() === tokenIdStr);
+              
+              if (!isStaked) {
+                // Get Herald details
+                const [rarity, clan] = await heraldContract.getHerald(tokenId);
+                const rarityNum = parseInt(rarity);
+                const clanNum = parseInt(clan);
+                
+                console.log(`Found unstaked Herald #${tokenIdStr}: ${RARITY_NAMES[rarityNum]} ${CLAN_NAMES[clanNum]}`);
+                
+                userHeralds.push({
+                  tokenId: tokenIdStr,
+                  rarity: rarityNum,
+                  clan: clanNum,
+                  imageUrl: getHeraldImageUrl(clanNum, rarityNum)
+                });
+              } else {
+                console.log(`Herald #${tokenIdStr} is staked, skipping`);
+              }
+            } catch (err) {
+              console.error(`Error loading Herald at index ${i}:`, err);
+            }
+          }
+        }
+      } catch (enumError) {
+        console.error('ERC721Enumerable method failed, trying fallback:', enumError);
+        
+        // Fallback: Use Transfer events (less reliable but works as backup)
+        try {
+          const transferFilter = heraldContract.filters.Transfer(null, walletAddress);
+          const transferEvents = await heraldContract.queryFilter(transferFilter, 0, 'latest');
+          const potentialTokenIds = [...new Set(transferEvents.map(event => event.args.tokenId.toString()))];
+          
+          console.log('Fallback: Found potential token IDs from events:', potentialTokenIds);
+          
+          for (const tokenIdStr of potentialTokenIds) {
+            try {
+              // Verify current ownership
+              const owner = await heraldContract.ownerOf(tokenIdStr);
+              if (owner.toLowerCase() === walletAddress.toLowerCase()) {
+                // Check if staked
+                const isStaked = stakedIds.some(id => id.toString() === tokenIdStr);
+                if (!isStaked) {
+                  const [rarity, clan] = await heraldContract.getHerald(tokenIdStr);
+                  userHeralds.push({
+                    tokenId: tokenIdStr,
+                    rarity: parseInt(rarity),
+                    clan: parseInt(clan),
+                    imageUrl: getHeraldImageUrl(parseInt(clan), parseInt(rarity))
+                  });
+                }
+              }
+            } catch (e) {
+              // Token might have been transferred out
+              continue;
+            }
+          }
+        } catch (fallbackError) {
+          console.error('Fallback event method also failed:', fallbackError);
+        }
+      }
+      
+      console.log('Owned (unstaked) Heralds:', userHeralds);
       setOwnedHeralds(userHeralds);
       setLoading(false);
     } catch (error) {
       console.error('Error loading staking data:', error);
+      setMessage({ type: 'error', text: 'Failed to load Heralds: ' + error.message });
       setLoading(false);
     }
   };
 
-  const showMessage = (type, text) => {
+  const showMessageFunc = (type, text) => {
     setMessage({ type, text });
     setTimeout(() => setMessage({ type: '', text: '' }), 5000);
   };
@@ -120,29 +212,29 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       
-      const heraldContract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI, signer);
+      const heraldContract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI_COMPLETE, signer);
       const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, signer);
       
       // Check if already approved
       const approved = await heraldContract.getApproved(tokenId);
       if (approved.toLowerCase() !== HERALD_STAKING_ADDRESS.toLowerCase()) {
-        showMessage('info', 'Approving Herald for staking...');
+        showMessageFunc('info', 'Approving Herald for staking...');
         const approveTx = await heraldContract.approve(HERALD_STAKING_ADDRESS, tokenId);
         await approveTx.wait();
       }
       
       // Stake
-      showMessage('info', 'Staking Herald...');
+      showMessageFunc('info', 'Staking Herald...');
       const stakeTx = await stakingContract.stakeHerald(tokenId);
       await stakeTx.wait();
       
-      showMessage('success', 'Herald staked successfully!');
+      showMessageFunc('success', 'Herald staked successfully!');
       setShowStakeModal(false);
       await loadStakingData();
       setProcessing(false);
     } catch (error) {
       console.error('Error staking:', error);
-      showMessage('error', error.message || 'Failed to stake Herald');
+      showMessageFunc('error', error.reason || error.message || 'Failed to stake Herald');
       setProcessing(false);
     }
   };
@@ -154,16 +246,16 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
       const signer = await provider.getSigner();
       const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, signer);
       
-      showMessage('info', 'Unstaking Herald...');
+      showMessageFunc('info', 'Unstaking Herald...');
       const tx = await stakingContract.unstakeHerald(tokenId);
       await tx.wait();
       
-      showMessage('success', 'Herald unstaked successfully!');
+      showMessageFunc('success', 'Herald unstaked successfully!');
       await loadStakingData();
       setProcessing(false);
     } catch (error) {
       console.error('Error unstaking:', error);
-      showMessage('error', error.message || 'Failed to unstake');
+      showMessageFunc('error', error.reason || error.message || 'Failed to unstake');
       setProcessing(false);
     }
   };
@@ -178,19 +270,19 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
       const signer = await provider.getSigner();
       const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, signer);
       
-      showMessage('info', 'Claiming rewards...');
+      showMessageFunc('info', 'Claiming rewards...');
       const tx = await stakingContract.claimRewards();
       await tx.wait();
       
-      showMessage('success', `Claimed ${PRODUCTION_RATES[herald.rarity]} FOOD! Check Dashboard.`);
+      showMessageFunc('success', `Claimed ${PRODUCTION_RATES[herald.rarity]} FOOD! Check Dashboard.`);
       await loadStakingData();
       setClaimingClan(null);
     } catch (error) {
       console.error('Error claiming:', error);
       const errorMsg = error.message.includes('Insufficient in-game GOLD')
         ? 'Not enough GOLD! Visit Exchange to deposit GOLD.'
-        : error.message || 'Failed to claim';
-      showMessage('error', errorMsg);
+        : error.reason || error.message || 'Failed to claim';
+      showMessageFunc('error', errorMsg);
       setClaimingClan(null);
     }
   };
@@ -223,6 +315,11 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Herald Staking</h1>
         <p className="text-gray-400">Stake one Herald per clan to earn FOOD tokens (max 7 total)</p>
+        
+        {/* Debug info - remove in production */}
+        <p className="text-xs text-gray-600 mt-2">
+          Owned Heralds: {ownedHeralds.length} | Staked Clans: {Object.keys(stakedByClans).length}
+        </p>
       </div>
 
       {message.text && (
@@ -251,6 +348,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
             {CLAN_NAMES.map((clanName, clanId) => {
               const herald = stakedByClans[clanId];
               const isStaked = !!herald;
+              const availableForClan = ownedHeralds.filter(h => h.clan === clanId);
               
               return (
                 <div key={clanId} className={`bg-gradient-to-br ${CLAN_COLORS[clanId]} p-1 rounded-lg`}>
@@ -287,6 +385,11 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
                           <div className="text-center">
                             <Plus className="w-12 h-12 text-gray-600 mx-auto mb-2" />
                             <p className="text-sm text-gray-500">Empty Slot</p>
+                            {availableForClan.length > 0 && (
+                              <p className="text-xs text-green-400 mt-1">
+                                {availableForClan.length} available
+                              </p>
+                            )}
                           </div>
                         </div>
                       )}
@@ -336,10 +439,10 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
                             setSelectedClan(clanId);
                             setShowStakeModal(true);
                           }}
-                          disabled={ownedHeralds.length === 0}
+                          disabled={availableForClan.length === 0}
                           className="block w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-3 py-2 rounded font-semibold text-sm text-center transition"
                         >
-                          {ownedHeralds.length === 0 ? 'No Heralds to Stake' : 'Stake Herald'}
+                          {availableForClan.length === 0 ? 'No Heralds Available' : `Stake Herald (${availableForClan.length})`}
                         </button>
                       )}
                     </div>
@@ -348,6 +451,20 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
               );
             })}
           </div>
+
+          {/* Summary of owned Heralds */}
+          {ownedHeralds.length > 0 && (
+            <div className="mt-8 p-4 bg-green-900/20 border border-green-800/50 rounded-lg">
+              <h3 className="font-bold text-green-300 mb-2">Your Unstaked Heralds ({ownedHeralds.length})</h3>
+              <div className="flex flex-wrap gap-2">
+                {ownedHeralds.map(h => (
+                  <span key={h.tokenId} className="bg-gray-800 px-2 py-1 rounded text-sm">
+                    #{h.tokenId} - {RARITY_NAMES[h.rarity]} {CLAN_NAMES[h.clan]}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="mt-8 p-4 bg-yellow-900/20 border border-yellow-800/50 rounded-lg">
             <div className="flex items-start gap-2">
@@ -393,6 +510,18 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
                   <p className="text-sm text-gray-500">
                     You have Heralds from other clans. Try a different slot!
                   </p>
+                  {ownedHeralds.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-sm text-gray-400 mb-2">Your available Heralds:</p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {ownedHeralds.map(h => (
+                          <span key={h.tokenId} className="bg-gray-800 px-2 py-1 rounded text-xs">
+                            {CLAN_NAMES[h.clan]}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="grid md:grid-cols-3 gap-4">
