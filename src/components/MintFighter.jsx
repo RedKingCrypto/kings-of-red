@@ -1,4 +1,4 @@
-// MintFighter.jsx - CORRECTED VERSION
+// MintFighter.jsx - FIXED VERSION with robust error handling
 // Matches your existing codebase pattern (no wagmi, uses props for wallet connection)
 
 import React, { useState, useEffect } from 'react';
@@ -10,8 +10,9 @@ import { ethers } from 'ethers';
 // ============================================
 const FIGHTER_ADDRESS = '0x303C26E8819be824f6bAEdAeEb3a2DeF3B624552';
 
+// Minimal ABI with only the functions we need for minting
 const FIGHTER_ABI = [
-    // Read functions
+    // Read functions for minting
     "function mintingPaused() view returns (bool)",
     "function currentPhase() view returns (uint8)",
     "function bronzePrice() view returns (uint256)",
@@ -21,13 +22,13 @@ const FIGHTER_ABI = [
     "function silverMinted() view returns (uint256)",
     "function goldMinted() view returns (uint256)",
     "function totalSupply() view returns (uint256)",
-    "function balanceOf(address owner) view returns (uint256)",
     // Write functions
     "function mintBronze(uint256 quantity) payable",
     "function mintSilver(uint256 quantity) payable",
     "function mintGold(uint256 quantity) payable",
     // Events
-    "event FighterMinted(uint256 indexed tokenId, address indexed minter, uint8 rarity, uint8 clan)"
+    "event FighterMinted(uint256 indexed tokenId, address indexed minter, uint8 rarity, uint8 clan)",
+    "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
 ];
 
 const CLANS = [
@@ -59,69 +60,92 @@ export default function MintFighter({ onNavigate, connected, walletAddress, conn
     const [mintingPaused, setMintingPaused] = useState(true);
     const [prices, setPrices] = useState({ bronze: '0.00638', silver: '0.00974', gold: '0.01310' });
     const [minted, setMinted] = useState({ bronze: 0, silver: 0, gold: 0 });
+    const [loadError, setLoadError] = useState('');
 
     // ============================================
-    // LOAD CONTRACT STATE
+    // LOAD CONTRACT STATE - with robust error handling
     // ============================================
     const loadContractState = async () => {
         try {
             setLoading(true);
+            setLoadError('');
             
-            // Use connected wallet provider if available, otherwise use public RPC
-            let provider;
-            if (window.ethereum && connected) {
-                provider = new ethers.BrowserProvider(window.ethereum);
-            } else {
-                provider = new ethers.JsonRpcProvider('https://mainnet.base.org');
-            }
-            
+            // Use public RPC for reading (doesn't require wallet connection)
+            const provider = new ethers.JsonRpcProvider('https://mainnet.base.org');
             const contract = new ethers.Contract(FIGHTER_ADDRESS, FIGHTER_ABI, provider);
             
             console.log('Loading Fighter V4 contract data...');
-            console.log('Contract address:', FIGHTER_ADDRESS);
 
-            // Read mintingPaused and currentPhase
-            const [paused, phase, bronzePrice, silverPrice, goldPrice, bronzeMintedCount, silverMintedCount, goldMintedCount] = await Promise.all([
-                contract.mintingPaused(),
-                contract.currentPhase(),
-                contract.bronzePrice(),
-                contract.silverPrice(),
-                contract.goldPrice(),
-                contract.bronzeMinted(),
-                contract.silverMinted(),
-                contract.goldMinted()
-            ]);
-
+            // Load each value separately with individual try-catch
+            // This prevents one failing call from breaking everything
+            
+            let paused = true;
+            let phase = 0;
+            
+            // Read mintingPaused
+            try {
+                paused = await contract.mintingPaused();
+                setMintingPaused(paused);
+                console.log('mintingPaused:', paused);
+            } catch (e) {
+                console.warn('Could not read mintingPaused:', e.message);
+            }
+            
+            // Read currentPhase
+            try {
+                phase = await contract.currentPhase();
+                const phaseNum = Number(phase);
+                setCurrentPhase(phaseNum);
+                console.log('currentPhase:', phaseNum);
+            } catch (e) {
+                console.warn('Could not read currentPhase:', e.message);
+            }
+            
+            // Determine if minting is active
             const phaseNum = Number(phase);
-            
-            console.log('✅ Fighter contract data loaded:', {
-                mintingPaused: paused,
-                currentPhase: phaseNum,
-                phaseName: PHASE_NAMES[phaseNum]
-            });
-
-            setMintingPaused(paused);
-            setCurrentPhase(phaseNum);
-            
-            // CRITICAL: Minting is active when NOT paused AND phase > 0
             const isActive = !paused && phaseNum > 0;
             setIsMintingActive(isActive);
-            console.log('isMintingActive:', isActive, '(paused:', paused, ', phase:', phaseNum, ')');
+            console.log('isMintingActive:', isActive);
 
-            setPrices({
-                bronze: ethers.formatEther(bronzePrice),
-                silver: ethers.formatEther(silverPrice),
-                gold: ethers.formatEther(goldPrice)
-            });
+            // Read prices
+            try {
+                const [bronzePrice, silverPrice, goldPrice] = await Promise.all([
+                    contract.bronzePrice(),
+                    contract.silverPrice(),
+                    contract.goldPrice()
+                ]);
+                setPrices({
+                    bronze: ethers.formatEther(bronzePrice),
+                    silver: ethers.formatEther(silverPrice),
+                    gold: ethers.formatEther(goldPrice)
+                });
+                console.log('Prices loaded');
+            } catch (e) {
+                console.warn('Could not read prices:', e.message);
+            }
 
-            setMinted({
-                bronze: Number(bronzeMintedCount),
-                silver: Number(silverMintedCount),
-                gold: Number(goldMintedCount)
-            });
+            // Read minted counts
+            try {
+                const [bronzeMintedCount, silverMintedCount, goldMintedCount] = await Promise.all([
+                    contract.bronzeMinted(),
+                    contract.silverMinted(),
+                    contract.goldMinted()
+                ]);
+                setMinted({
+                    bronze: Number(bronzeMintedCount),
+                    silver: Number(silverMintedCount),
+                    gold: Number(goldMintedCount)
+                });
+                console.log('Minted counts loaded');
+            } catch (e) {
+                console.warn('Could not read minted counts:', e.message);
+            }
+
+            console.log('✅ Fighter contract data loaded successfully');
 
         } catch (error) {
             console.error('❌ Error loading Fighter contract data:', error);
+            setLoadError('Failed to load contract data. Please refresh the page.');
         } finally {
             setLoading(false);
         }
@@ -132,7 +156,7 @@ export default function MintFighter({ onNavigate, connected, walletAddress, conn
         loadContractState();
         const interval = setInterval(loadContractState, 30000);
         return () => clearInterval(interval);
-    }, [connected]);
+    }, []);
 
     // ============================================
     // UPDATE QUANTITY
@@ -265,12 +289,12 @@ export default function MintFighter({ onNavigate, connected, walletAddress, conn
         } catch (error) {
             console.error('❌ Minting failed:', error);
 
-            if (error.code === 'ACTION_REJECTED') {
+            if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
                 alert('Transaction cancelled by user.');
-            } else if (error.message.includes('insufficient funds')) {
+            } else if (error.message?.includes('insufficient funds')) {
                 alert('Insufficient funds. Please add more ETH to your wallet on Base network.');
             } else {
-                alert('Minting failed: ' + (error.reason || error.message || 'Unknown error'));
+                alert('Minting failed: ' + (error.reason || error.shortMessage || error.message || 'Unknown error'));
             }
         } finally {
             setMinting(false);
@@ -307,6 +331,10 @@ export default function MintFighter({ onNavigate, connected, walletAddress, conn
 
                     {loading && (
                         <p className="text-yellow-400 animate-pulse">Loading contract data...</p>
+                    )}
+                    
+                    {loadError && (
+                        <p className="text-red-400">{loadError}</p>
                     )}
                 </div>
 
