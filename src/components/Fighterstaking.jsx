@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Zap, Shield, Swords, Clock, Flame, Droplet, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { Zap, Shield, Swords, Clock, Flame, Droplet, AlertCircle, CheckCircle, Loader, Plus } from 'lucide-react';
 import { ethers } from 'ethers';
 import { 
   FIGHTER_V4_ADDRESS, 
@@ -10,17 +10,14 @@ import {
 } from '../contractConfig';
 
 // ============================================
-// COMPLETE FIGHTER V4 ABI
+// FIGHTER V4 ABI
 // ============================================
-const FIGHTER_V4_ABI_COMPLETE = [
+const FIGHTER_V4_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
   "function ownerOf(uint256 tokenId) view returns (address)",
-  "function tokenURI(uint256 tokenId) view returns (string)",
-  "function approve(address to, uint256 tokenId)",
-  "function getApproved(uint256 tokenId) view returns (address)",
   "function totalSupply() view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
-  "function tokenByIndex(uint256 index) view returns (uint256)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
   "function fighters(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint8 energy, bool isStaked, bool inBattle, uint256 refuelStartTime, uint256 wins, uint256 losses, uint256 pvpWins, uint256 pvpLosses)",
   "function getFighterStats(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint8 energy, bool isStaked, bool inBattle, bool isRefueling, uint256 refuelCompleteTime, uint256 wins, uint256 losses, uint256 pvpWins, uint256 pvpLosses, uint256 points)",
   "function stake(uint256 tokenId)",
@@ -30,60 +27,91 @@ const FIGHTER_V4_ABI_COMPLETE = [
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
 ];
 
-const RARITY_COLORS = {
-  0: 'from-orange-600 to-amber-700',
-  1: 'from-gray-400 to-slate-300',
-  2: 'from-yellow-600 to-amber-500'
-};
+const CLAN_COLORS = [
+  'from-red-600 to-orange-500',      // Smizfume
+  'from-gray-600 to-slate-400',      // Coalheart
+  'from-purple-600 to-indigo-500',   // Warmdice
+  'from-blue-600 to-cyan-500',       // Bervation
+  'from-green-600 to-emerald-500',   // Konfisof
+  'from-yellow-500 to-amber-400',    // Witkastle
+  'from-rose-600 to-red-700'         // Bowkin
+];
+
+const RARITY_COLORS = ['text-orange-400', 'text-gray-300', 'text-yellow-400'];
 
 const CLAN_FIGHTERS = {
   0: 'Kenshi Champion', 1: 'Shinobi', 2: 'Boarding Bruiser', 3: 'Templar Guard',
   4: 'Enforcer', 5: 'Knight', 6: 'Oakwood Guardian'
 };
 
-const FIGHTER_IMAGE_BASE = 'https://emerald-adequate-eagle-845.mypinata.cloud/ipfs/bafybeia2alwupvq4ffp6pexcc4ekxz5nmtj4fguk7goxaddd7dcp7w2vbm';
+// Image URLs - using the IMAGES CID (not metadata CID)
+const FIGHTER_IMAGE_BASE = 'https://emerald-adequate-eagle-845.mypinata.cloud/ipfs/bafybeidy2j57ufvelxbahduiht6aud34ufyufgwlp6632fcadwrh3dlr4i';
 
+// Build image URL - trying multiple extensions
 const getFighterImageUrl = (rarity, clan) => {
-  const rarityName = RARITY_NAMES[rarity]?.toLowerCase() || 'bronze';
-  const clanName = CLAN_NAMES[clan]?.toLowerCase() || 'witkastle';
-  return `${FIGHTER_IMAGE_BASE}/${rarityName}_${clanName}.jpg`;
+  const rarityName = (RARITY_NAMES[rarity] || 'bronze').toLowerCase();
+  const clanName = (CLAN_NAMES[clan] || 'witkastle').toLowerCase();
+  // Try .png extension (most common for NFT images)
+  return `${FIGHTER_IMAGE_BASE}/${rarityName}_${clanName}.png`;
 };
 
-const getFighterDisplayName = (rarity, clan) => {
-  const rarityName = RARITY_NAMES[rarity] || 'Bronze';
-  const fighterType = CLAN_FIGHTERS[clan] || 'Fighter';
-  return `${rarityName} ${fighterType}`;
+// Fallback image URLs to try
+const getFighterImageUrls = (rarity, clan) => {
+  const rarityName = (RARITY_NAMES[rarity] || 'bronze').toLowerCase();
+  const clanName = (CLAN_NAMES[clan] || 'witkastle').toLowerCase();
+  return [
+    `${FIGHTER_IMAGE_BASE}/${rarityName}_${clanName}.png`,
+    `${FIGHTER_IMAGE_BASE}/${rarityName}_${clanName}.jpg`,
+    `${FIGHTER_IMAGE_BASE}/${rarityName}_${clanName}.webp`,
+    `${FIGHTER_IMAGE_BASE}/${rarityName}-${clanName}.png`,
+    `${FIGHTER_IMAGE_BASE}/${clanName}_${rarityName}.png`,
+  ];
 };
+
+const HIT_CHANCES = { 0: '20%', 1: '30%', 2: '40%' };
 
 export default function FighterStaking({ connected, walletAddress, provider, signer, onNavigate }) {
   const [fighters, setFighters] = useState([]);
-  const [initialLoading, setInitialLoading] = useState(true); // Only for first load
+  const [initialLoading, setInitialLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [foodBalance, setFoodBalance] = useState(0);
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [showStakeModal, setShowStakeModal] = useState(false);
+  const [selectedClan, setSelectedClan] = useState(null);
+  const [imageErrors, setImageErrors] = useState({});
   const isFirstLoad = useRef(true);
   
   const refuelCost = 50;
   const refuelDuration = 10800;
   const maxEnergy = 100;
 
+  // Organize fighters by clan
+  const stakedByClans = {};
+  const unstakedByClans = {};
+  
+  fighters.forEach(f => {
+    if (f.isStaked) {
+      stakedByClans[f.clan] = f;
+    } else {
+      if (!unstakedByClans[f.clan]) unstakedByClans[f.clan] = [];
+      unstakedByClans[f.clan].push(f);
+    }
+  });
+
   useEffect(() => {
     if (connected && walletAddress) {
-      loadFighters(true); // Initial load with loading spinner
+      loadFighters(true);
       loadFoodBalance();
     } else {
       setInitialLoading(false);
     }
   }, [connected, walletAddress]);
 
-  // Silent refresh every 30 seconds - no loading spinner
   useEffect(() => {
     if (!connected || !walletAddress) return;
-    const interval = setInterval(() => {
-      loadFighters(false); // Silent refresh
-    }, 30000);
+    const interval = setInterval(() => loadFighters(false), 30000);
     return () => clearInterval(interval);
   }, [connected, walletAddress]);
 
@@ -100,20 +128,13 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
   };
 
   const loadFighters = async (showLoading = false) => {
-    if (!walletAddress) {
-      setInitialLoading(false);
-      return;
-    }
+    if (!walletAddress) { setInitialLoading(false); return; }
     
     try {
-      // Only show loading spinner on initial load
-      if (showLoading && isFirstLoad.current) {
-        setInitialLoading(true);
-      }
-      setError('');
+      if (showLoading && isFirstLoad.current) setInitialLoading(true);
       
       const rpcProvider = new ethers.JsonRpcProvider('https://mainnet.base.org');
-      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI_COMPLETE, rpcProvider);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, rpcProvider);
       
       const balance = await contract.balanceOf(walletAddress);
       const fighterCount = Number(balance);
@@ -125,38 +146,26 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
         return;
       }
       
-      // Get token IDs
       const tokenIds = [];
-      
-      // Try tokenOfOwnerByIndex first
       try {
         for (let i = 0; i < fighterCount; i++) {
           const tokenId = await contract.tokenOfOwnerByIndex(walletAddress, i);
           tokenIds.push(tokenId);
         }
       } catch (enumErr) {
-        console.warn('tokenOfOwnerByIndex failed, trying events:', enumErr.message);
-        
-        // Fallback to Transfer events
-        try {
-          const filter = contract.filters.Transfer(null, walletAddress);
-          const events = await contract.queryFilter(filter, 0, 'latest');
-          const potentialIds = [...new Set(events.map(e => e.args.tokenId.toString()))];
-          
-          for (const tokenIdStr of potentialIds) {
-            try {
-              const owner = await contract.ownerOf(tokenIdStr);
-              if (owner.toLowerCase() === walletAddress.toLowerCase()) {
-                tokenIds.push(BigInt(tokenIdStr));
-              }
-            } catch (e) {}
-          }
-        } catch (eventErr) {
-          console.error('Event fallback failed:', eventErr);
+        const filter = contract.filters.Transfer(null, walletAddress);
+        const events = await contract.queryFilter(filter, 0, 'latest');
+        const potentialIds = [...new Set(events.map(e => e.args.tokenId.toString()))];
+        for (const tokenIdStr of potentialIds) {
+          try {
+            const owner = await contract.ownerOf(tokenIdStr);
+            if (owner.toLowerCase() === walletAddress.toLowerCase()) {
+              tokenIds.push(BigInt(tokenIdStr));
+            }
+          } catch (e) {}
         }
       }
       
-      // Load fighter details
       const loadedFighters = [];
       for (const tokenId of tokenIds) {
         try {
@@ -176,7 +185,6 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
               losses: Number(stats.losses),
               pvpWins: Number(stats.pvpWins),
               pvpLosses: Number(stats.pvpLosses),
-              points: Number(stats.points || 0)
             };
           } catch {
             const fighter = await contract.fighters(tokenId);
@@ -194,9 +202,19 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
               losses: Number(fighter.losses),
               pvpWins: Number(fighter.pvpWins),
               pvpLosses: Number(fighter.pvpLosses),
-              points: 0
             };
           }
+          
+          // Try to get tokenURI for image
+          try {
+            const uri = await contract.tokenURI(tokenId);
+            // If it's an IPFS URI, we might be able to extract the image
+            console.log(`Token ${tokenId} URI:`, uri);
+            fighterData.tokenURI = uri;
+          } catch (e) {
+            console.warn(`Could not get tokenURI for ${tokenId}`);
+          }
+          
           loadedFighters.push(fighterData);
         } catch (err) {
           console.warn(`Error loading fighter ${tokenId}:`, err.message);
@@ -205,12 +223,9 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
       
       setFighters(loadedFighters);
       setLastRefresh(new Date().toLocaleTimeString());
-      
     } catch (err) {
       console.error('Error loading fighters:', err);
-      if (isFirstLoad.current) {
-        setError('Failed to load fighters: ' + err.message);
-      }
+      if (isFirstLoad.current) setError('Failed to load fighters');
     } finally {
       setInitialLoading(false);
       isFirstLoad.current = false;
@@ -219,17 +234,44 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
 
   const stakeFighter = async (tokenId) => {
     if (!signer) { setError('Please connect your wallet'); return; }
+    
+    // Check if clan already has a staked fighter (prevent in UI)
+    const fighter = fighters.find(f => f.tokenId === tokenId);
+    if (fighter && stakedByClans[fighter.clan]) {
+      setError(`❌ You already have a ${CLAN_NAMES[fighter.clan]} Fighter staked! Only one Fighter per clan is allowed.`);
+      return;
+    }
+    
     setActionLoading(tokenId);
     setError(''); setSuccess('');
 
     try {
-      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI_COMPLETE, signer);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
       const tx = await contract.stake(tokenId);
       await tx.wait();
-      setSuccess(`Fighter #${tokenId} staked successfully!`);
+      setSuccess(`✅ Fighter #${tokenId} staked successfully!`);
+      setShowStakeModal(false);
       await loadFighters(false);
     } catch (err) {
-      setError(err.reason || err.message || 'Staking failed');
+      console.error('Staking error:', err);
+      let errorMsg = 'Staking failed';
+      
+      if (err.message?.includes('CALL_EXCEPTION') || err.message?.includes('revert')) {
+        // Parse common staking errors
+        if (err.message?.includes('clan') || err.message?.includes('C')) {
+          errorMsg = '❌ You already have a Fighter from this clan staked. Only one per clan allowed!';
+        } else if (err.message?.includes('max') || err.message?.includes('M')) {
+          errorMsg = '❌ Maximum 7 Fighters can be staked at once.';
+        } else if (err.message?.includes('paused') || err.message?.includes('S')) {
+          errorMsg = '❌ Staking is currently paused.';
+        } else {
+          errorMsg = '❌ Cannot stake this Fighter. You may already have one from this clan staked.';
+        }
+      } else {
+        errorMsg = err.reason || err.message || 'Staking failed';
+      }
+      
+      setError(errorMsg);
     } finally {
       setActionLoading(null);
     }
@@ -241,13 +283,19 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
     setError(''); setSuccess('');
 
     try {
-      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI_COMPLETE, signer);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
       const tx = await contract.unstake(tokenId);
       await tx.wait();
-      setSuccess(`Fighter #${tokenId} unstaked successfully!`);
+      setSuccess(`✅ Fighter #${tokenId} unstaked!`);
       await loadFighters(false);
     } catch (err) {
-      setError(err.reason || err.message || 'Unstaking failed');
+      let errorMsg = 'Unstaking failed';
+      if (err.message?.includes('CALL_EXCEPTION')) {
+        errorMsg = '❌ Cannot unstake: Fighter must have full energy (100) to unstake.';
+      } else {
+        errorMsg = err.reason || err.message || 'Unstaking failed';
+      }
+      setError(errorMsg);
     } finally {
       setActionLoading(null);
     }
@@ -256,21 +304,27 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
   const startRefuel = async (tokenId) => {
     if (!signer) { setError('Please connect your wallet'); return; }
     if (foodBalance < refuelCost) {
-      setError(`Insufficient FOOD! Need ${refuelCost}, have ${foodBalance.toFixed(0)}`);
+      setError(`❌ Insufficient FOOD! Need ${refuelCost} FOOD, you have ${foodBalance.toFixed(0)}`);
       return;
     }
     setActionLoading(tokenId);
     setError(''); setSuccess('');
 
     try {
-      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI_COMPLETE, signer);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
       const tx = await contract.startRefuel(tokenId);
       await tx.wait();
-      setSuccess(`Refueling started! Ready in ${refuelDuration / 3600} hours.`);
+      setSuccess(`✅ Refueling started! Will be ready in ${refuelDuration / 3600} hours.`);
       await loadFighters(false);
       await loadFoodBalance();
     } catch (err) {
-      setError(err.reason || err.message || 'Refuel failed');
+      let errorMsg = 'Refuel failed';
+      if (err.message?.includes('CALL_EXCEPTION')) {
+        errorMsg = '❌ Cannot refuel: Fighter must have 0 energy and be staked.';
+      } else {
+        errorMsg = err.reason || err.message || 'Refuel failed';
+      }
+      setError(errorMsg);
     } finally {
       setActionLoading(null);
     }
@@ -282,13 +336,19 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
     setError(''); setSuccess('');
 
     try {
-      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI_COMPLETE, signer);
+      const contract = new ethers.Contract(FIGHTER_V4_ADDRESS, FIGHTER_V4_ABI, signer);
       const tx = await contract.completeRefuel(tokenId);
       await tx.wait();
-      setSuccess(`Fighter #${tokenId} refueled!`);
+      setSuccess(`✅ Fighter #${tokenId} refueled to full energy!`);
       await loadFighters(false);
     } catch (err) {
-      setError(err.reason || err.message || 'Complete refuel failed');
+      let errorMsg = 'Complete refuel failed';
+      if (err.message?.includes('CALL_EXCEPTION')) {
+        errorMsg = '❌ Refuel not ready yet. Please wait for the timer to complete.';
+      } else {
+        errorMsg = err.reason || err.message || 'Complete refuel failed';
+      }
+      setError(errorMsg);
     } finally {
       setActionLoading(null);
     }
@@ -308,48 +368,61 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
     return `${minutes}m`;
   };
 
-  const getFighterStatus = (fighter) => {
-    const refuelStatus = getRefuelStatus(fighter);
-    if (refuelStatus.status === 'refueling') return { text: 'REFUELING', color: 'text-yellow-400', icon: Clock };
-    if (refuelStatus.status === 'ready') return { text: 'REFUEL READY', color: 'text-green-400', icon: CheckCircle };
-    if (fighter.inBattle) return { text: 'IN BATTLE', color: 'text-red-400', icon: Swords };
-    if (!fighter.isStaked) return { text: 'UNSTAKED', color: 'text-gray-400', icon: Shield };
-    if (fighter.energy === 0) return { text: 'NO ENERGY', color: 'text-orange-400', icon: Zap };
-    return { text: 'READY', color: 'text-green-400', icon: CheckCircle };
-  };
-
-  const canStake = (fighter) => !fighter.isStaked && !fighter.isRefueling;
   const canUnstake = (fighter) => fighter.isStaked && !fighter.inBattle && fighter.energy === maxEnergy && getRefuelStatus(fighter).status === 'none';
   const canRefuel = (fighter) => fighter.isStaked && !fighter.inBattle && fighter.energy === 0 && getRefuelStatus(fighter).status === 'none';
   const canCompleteRefuel = (fighter) => getRefuelStatus(fighter).status === 'ready';
+
+  // Image component with fallback
+  const FighterImage = ({ fighter, className }) => {
+    const [imgIndex, setImgIndex] = useState(0);
+    const urls = getFighterImageUrls(fighter.rarity, fighter.clan);
+    
+    const handleError = () => {
+      if (imgIndex < urls.length - 1) {
+        setImgIndex(imgIndex + 1);
+      }
+    };
+    
+    return (
+      <div className={`${className} bg-gradient-to-br ${CLAN_COLORS[fighter.clan]} flex items-center justify-center`}>
+        <img 
+          src={urls[imgIndex]}
+          alt={`${RARITY_NAMES[fighter.rarity]} ${CLAN_NAMES[fighter.clan]} Fighter`}
+          className="w-full h-full object-cover"
+          onError={handleError}
+        />
+      </div>
+    );
+  };
 
   if (!connected) {
     return (
       <div className="max-w-4xl mx-auto text-center py-16">
         <Shield className="w-16 h-16 text-purple-500 mx-auto mb-4" />
         <h2 className="text-3xl font-bold mb-4">Fighter Staking</h2>
-        <p className="text-gray-400 mb-8">Connect your wallet to stake your Fighters</p>
+        <p className="text-gray-400">Connect your wallet to stake your Fighters</p>
       </div>
     );
   }
 
   return (
     <div className="max-w-7xl mx-auto">
+      {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-purple-500 via-red-500 to-orange-500 bg-clip-text text-transparent">
           Fighter Staking
         </h1>
-        <p className="text-xl text-gray-300 mb-6">Stake your Fighters to enable battles and earn rewards</p>
+        <p className="text-xl text-gray-300 mb-2">Stake one Fighter per clan to enable battles (max 7)</p>
         
-        <div className="inline-flex gap-6 bg-gray-800/50 border border-gray-700 rounded-lg px-8 py-4">
+        <div className="inline-flex gap-6 bg-gray-800/50 border border-gray-700 rounded-lg px-8 py-4 mt-4">
           <div className="flex items-center gap-2">
             <Swords className="w-5 h-5 text-purple-400" />
-            <span className="font-bold">{fighters.length} Fighters</span>
+            <span className="font-bold">{fighters.length} Owned</span>
           </div>
           <div className="w-px bg-gray-600"></div>
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-green-400" />
-            <span className="font-bold">{fighters.filter(f => f.isStaked).length} Staked</span>
+            <span className="font-bold">{Object.keys(stakedByClans).length}/7 Staked</span>
           </div>
           <div className="w-px bg-gray-600"></div>
           <div className="flex items-center gap-2">
@@ -357,35 +430,37 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
             <span className="font-bold">{foodBalance.toFixed(0)} FOOD</span>
           </div>
         </div>
-        {lastRefresh && <p className="text-xs text-gray-600 mt-2">Last updated: {lastRefresh}</p>}
+        {lastRefresh && <p className="text-xs text-gray-600 mt-2">Updated: {lastRefresh}</p>}
       </div>
 
+      {/* Messages */}
       {error && (
         <div className="mb-6 p-4 bg-red-900/30 border border-red-500 rounded-lg flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
           <p className="text-red-400">{error}</p>
         </div>
       )}
-
       {success && (
         <div className="mb-6 p-4 bg-green-900/30 border border-green-500 rounded-lg flex items-start gap-3">
-          <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+          <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
           <p className="text-green-400">{success}</p>
         </div>
       )}
 
+      {/* Refuel Info */}
       <div className="mb-8 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 border border-yellow-500/30 rounded-lg p-6">
         <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <Flame className="w-6 h-6 text-yellow-400" />
-          Refuel System
+          <Flame className="w-6 h-6 text-yellow-400" /> Refuel System
         </h3>
         <div className="grid md:grid-cols-3 gap-4 text-sm">
           <div><p className="text-gray-400">Cost:</p><p className="text-lg font-bold text-yellow-400">{refuelCost} FOOD</p></div>
           <div><p className="text-gray-400">Duration:</p><p className="text-lg font-bold text-yellow-400">{refuelDuration / 3600} Hours</p></div>
-          <div><p className="text-gray-400">Restores:</p><p className="text-lg font-bold text-yellow-400">0 → {maxEnergy}</p></div>
+          <div><p className="text-gray-400">Restores:</p><p className="text-lg font-bold text-yellow-400">0 → {maxEnergy} Energy</p></div>
         </div>
+        <p className="text-xs text-gray-400 mt-4">⚡ Each battle costs 20 energy • Cannot unstake until full energy • Cannot refuel until 0 energy</p>
       </div>
 
+      {/* Main Content */}
       {initialLoading ? (
         <div className="text-center py-16">
           <Loader className="w-12 h-12 text-purple-500 animate-spin mx-auto mb-4" />
@@ -401,100 +476,208 @@ export default function FighterStaking({ connected, walletAddress, provider, sig
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {fighters.map((fighter) => {
-            const status = getFighterStatus(fighter);
-            const StatusIcon = status.icon;
-            const refuelStatus = getRefuelStatus(fighter);
-            
-            return (
-              <div key={fighter.tokenId} className={`bg-gradient-to-br ${RARITY_COLORS[fighter.rarity]} p-0.5 rounded-xl`}>
-                <div className="bg-gray-900 rounded-xl p-6">
-                  <div className="w-full h-40 bg-gray-800 rounded-lg mb-4 overflow-hidden">
-                    <img src={getFighterImageUrl(fighter.rarity, fighter.clan)} alt={getFighterDisplayName(fighter.rarity, fighter.clan)}
-                      className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
-                  </div>
-                  
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-bold">{getFighterDisplayName(fighter.rarity, fighter.clan)}</h3>
-                      <p className="text-sm text-gray-400">#{fighter.tokenId} • {CLAN_NAMES[fighter.clan]}</p>
+        <>
+          {/* Clan-based Grid - similar to Herald staking */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {CLAN_NAMES.map((clanName, clanId) => {
+              const stakedFighter = stakedByClans[clanId];
+              const availableFighters = unstakedByClans[clanId] || [];
+              const isStaked = !!stakedFighter;
+              
+              return (
+                <div key={clanId} className={`bg-gradient-to-br ${CLAN_COLORS[clanId]} p-1 rounded-lg`}>
+                  <div className="bg-gray-900 rounded-lg overflow-hidden h-full">
+                    {/* Header */}
+                    <div className="p-3 border-b border-gray-800">
+                      <h3 className="font-bold text-center">{clanName}</h3>
+                      <p className="text-xs text-center text-gray-400">{CLAN_FIGHTERS[clanId]}</p>
+                      {isStaked && (
+                        <p className={`text-center text-sm font-bold ${RARITY_COLORS[stakedFighter.rarity]}`}>
+                          {RARITY_NAMES[stakedFighter.rarity]}
+                        </p>
+                      )}
                     </div>
-                    <div className={`flex items-center gap-1 text-xs font-bold ${status.color}`}>
-                      <StatusIcon className="w-4 h-4" /><span>{status.text}</span>
-                    </div>
-                  </div>
 
-                  <div className="mb-4">
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-gray-400">Energy:</span>
-                      <span className="font-bold text-yellow-400">{fighter.energy}/{maxEnergy}</span>
+                    {/* Image Area */}
+                    <div className="aspect-[3/4] relative bg-gray-800">
+                      {isStaked ? (
+                        <>
+                          <FighterImage fighter={stakedFighter} className="w-full h-full" />
+                          <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded text-xs">
+                            <span className="text-green-400 font-bold">{HIT_CHANCES[stakedFighter.rarity]} Hit</span>
+                          </div>
+                          {/* Energy bar overlay */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-2">
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-gray-300">Energy</span>
+                              <span className="text-yellow-400">{stakedFighter.energy}/{maxEnergy}</span>
+                            </div>
+                            <div className="w-full bg-gray-700 rounded-full h-2">
+                              <div className={`h-2 rounded-full ${stakedFighter.energy > 60 ? 'bg-green-500' : stakedFighter.energy > 20 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                                style={{ width: `${(stakedFighter.energy / maxEnergy) * 100}%` }} />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center">
+                            <Plus className="w-12 h-12 text-gray-600 mx-auto mb-2" />
+                            <p className="text-sm text-gray-500">Empty Slot</p>
+                            {availableFighters.length > 0 && (
+                              <p className="text-xs text-green-400 mt-1">{availableFighters.length} available</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="w-full bg-gray-800 rounded-full h-3">
-                      <div className={`h-3 rounded-full ${fighter.energy > 60 ? 'bg-green-500' : fighter.energy > 20 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                        style={{ width: `${(fighter.energy / maxEnergy) * 100}%` }} />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">{Math.floor(fighter.energy / 20)} battles remaining</p>
-                  </div>
 
-                  {refuelStatus.status === 'refueling' && (
-                    <div className="mb-4 p-3 bg-yellow-900/20 border border-yellow-500/30 rounded-lg">
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-yellow-400 font-bold">Refueling...</span>
-                        <span className="text-yellow-400">{formatTime(refuelStatus.timeRemaining)}</span>
-                      </div>
-                      <div className="w-full bg-gray-800 rounded-full h-2">
-                        <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${((refuelDuration - refuelStatus.timeRemaining) / refuelDuration) * 100}%` }} />
-                      </div>
-                    </div>
-                  )}
+                    {/* Actions */}
+                    <div className="p-3 space-y-2">
+                      {isStaked ? (
+                        <>
+                          {/* Refuel Progress */}
+                          {getRefuelStatus(stakedFighter).status === 'refueling' && (
+                            <div className="p-2 bg-yellow-900/30 border border-yellow-500/30 rounded text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <Clock className="w-4 h-4 text-yellow-400" />
+                                <span className="text-yellow-400 text-sm font-bold">
+                                  {formatTime(getRefuelStatus(stakedFighter).timeRemaining)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
 
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="bg-black/30 rounded p-2">
-                      <p className="text-xs text-gray-400">PvE</p>
-                      <p className="text-sm font-bold">{fighter.wins}W - {fighter.losses}L</p>
-                    </div>
-                    <div className="bg-black/30 rounded p-2">
-                      <p className="text-xs text-gray-400">PvP</p>
-                      <p className="text-sm font-bold">{fighter.pvpWins}W - {fighter.pvpLosses}L</p>
-                    </div>
-                  </div>
+                          {/* Stats */}
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="bg-black/30 rounded p-2 text-center">
+                              <p className="text-gray-400">PvE</p>
+                              <p className="font-bold">{stakedFighter.wins}W-{stakedFighter.losses}L</p>
+                            </div>
+                            <div className="bg-black/30 rounded p-2 text-center">
+                              <p className="text-gray-400">PvP</p>
+                              <p className="font-bold">{stakedFighter.pvpWins}W-{stakedFighter.pvpLosses}L</p>
+                            </div>
+                          </div>
 
-                  <div className="space-y-2">
-                    {canStake(fighter) && (
-                      <button onClick={() => stakeFighter(fighter.tokenId)} disabled={actionLoading === fighter.tokenId}
-                        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 py-2 rounded-lg font-bold">
-                        {actionLoading === fighter.tokenId ? 'Staking...' : 'Stake Fighter'}
-                      </button>
-                    )}
-                    {canUnstake(fighter) && (
-                      <button onClick={() => unstakeFighter(fighter.tokenId)} disabled={actionLoading === fighter.tokenId}
-                        className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 py-2 rounded-lg font-bold">
-                        {actionLoading === fighter.tokenId ? 'Unstaking...' : 'Unstake Fighter'}
-                      </button>
-                    )}
-                    {canRefuel(fighter) && (
-                      <button onClick={() => startRefuel(fighter.tokenId)} disabled={actionLoading === fighter.tokenId || foodBalance < refuelCost}
-                        className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 py-2 rounded-lg font-bold">
-                        {actionLoading === fighter.tokenId ? 'Starting...' : `Refuel (${refuelCost} FOOD)`}
-                      </button>
-                    )}
-                    {canCompleteRefuel(fighter) && (
-                      <button onClick={() => completeRefuel(fighter.tokenId)} disabled={actionLoading === fighter.tokenId}
-                        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 py-2 rounded-lg font-bold animate-pulse">
-                        {actionLoading === fighter.tokenId ? 'Completing...' : 'Complete Refuel'}
-                      </button>
-                    )}
-                    {fighter.inBattle && (
-                      <div className="w-full bg-red-900/30 border border-red-500 py-2 rounded-lg text-center">
-                        <p className="text-red-400 font-bold text-sm">In Active Battle</p>
-                      </div>
-                    )}
+                          {/* Action Buttons */}
+                          {canRefuel(stakedFighter) && (
+                            <button onClick={() => startRefuel(stakedFighter.tokenId)}
+                              disabled={actionLoading === stakedFighter.tokenId || foodBalance < refuelCost}
+                              className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 py-2 rounded text-sm font-bold">
+                              {actionLoading === stakedFighter.tokenId ? 'Starting...' : `Refuel (${refuelCost} FOOD)`}
+                            </button>
+                          )}
+
+                          {canCompleteRefuel(stakedFighter) && (
+                            <button onClick={() => completeRefuel(stakedFighter.tokenId)}
+                              disabled={actionLoading === stakedFighter.tokenId}
+                              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 py-2 rounded text-sm font-bold animate-pulse">
+                              {actionLoading === stakedFighter.tokenId ? 'Completing...' : '✅ Complete Refuel'}
+                            </button>
+                          )}
+
+                          {canUnstake(stakedFighter) && (
+                            <button onClick={() => unstakeFighter(stakedFighter.tokenId)}
+                              disabled={actionLoading === stakedFighter.tokenId}
+                              className="w-full bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600 py-2 rounded text-sm">
+                              {actionLoading === stakedFighter.tokenId ? 'Unstaking...' : 'Unstake'}
+                            </button>
+                          )}
+
+                          {stakedFighter.inBattle && (
+                            <div className="w-full bg-red-900/30 border border-red-500 py-2 rounded text-center">
+                              <span className="text-red-400 text-sm font-bold">⚔️ In Battle</span>
+                            </div>
+                          )}
+
+                          {!canUnstake(stakedFighter) && !canRefuel(stakedFighter) && !canCompleteRefuel(stakedFighter) && !stakedFighter.inBattle && stakedFighter.energy > 0 && stakedFighter.energy < maxEnergy && (
+                            <p className="text-xs text-gray-500 text-center">{Math.floor(stakedFighter.energy / 20)} battles remaining</p>
+                          )}
+
+                          <p className="text-xs text-center text-gray-500">Fighter #{stakedFighter.tokenId}</p>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => { setSelectedClan(clanId); setShowStakeModal(true); }}
+                          disabled={availableFighters.length === 0}
+                          className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed py-2 rounded text-sm font-bold">
+                          {availableFighters.length === 0 ? 'No Fighters' : `Stake Fighter (${availableFighters.length})`}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+
+          {/* Unstaked Fighters Summary */}
+          {Object.values(unstakedByClans).flat().length > 0 && (
+            <div className="mt-8 p-4 bg-purple-900/20 border border-purple-800/50 rounded-lg">
+              <h3 className="font-bold text-purple-300 mb-2">
+                Your Unstaked Fighters ({Object.values(unstakedByClans).flat().length})
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {Object.values(unstakedByClans).flat().map(f => (
+                  <span key={f.tokenId} className={`px-3 py-1 rounded text-sm ${CLAN_COLORS[f.clan].replace('from-', 'bg-').split(' ')[0]}`}>
+                    #{f.tokenId} - {RARITY_NAMES[f.rarity]} {CLAN_NAMES[f.clan]}
+                  </span>
+                ))}
               </div>
-            );
-          })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Stake Modal */}
+      {showStakeModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold">
+                  Stake {CLAN_NAMES[selectedClan]} Fighter
+                </h2>
+                <button onClick={() => setShowStakeModal(false)} className="text-gray-400 hover:text-white text-2xl">×</button>
+              </div>
+
+              {(unstakedByClans[selectedClan] || []).length === 0 ? (
+                <div className="text-center py-12">
+                  <AlertCircle className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-400">You don't have any {CLAN_NAMES[selectedClan]} Fighters to stake</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {(unstakedByClans[selectedClan] || []).map((fighter) => (
+                    <div key={fighter.tokenId} className={`bg-gradient-to-br ${CLAN_COLORS[fighter.clan]} p-0.5 rounded-lg`}>
+                      <div className="bg-gray-800 rounded-lg overflow-hidden">
+                        <div className="aspect-square relative">
+                          <FighterImage fighter={fighter} className="w-full h-full" />
+                          <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded text-xs">
+                            <span className={RARITY_COLORS[fighter.rarity]}>{RARITY_NAMES[fighter.rarity]}</span>
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <p className="font-bold text-center mb-1">Fighter #{fighter.tokenId}</p>
+                          <p className="text-sm text-center text-gray-400 mb-1">{HIT_CHANCES[fighter.rarity]} Hit Chance</p>
+                          <p className="text-xs text-center text-gray-500 mb-3">Energy: {fighter.energy}/{maxEnergy}</p>
+                          <button onClick={() => stakeFighter(fighter.tokenId)} 
+                            disabled={actionLoading === fighter.tokenId}
+                            className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 px-4 py-2 rounded font-semibold">
+                            {actionLoading === fighter.tokenId ? (
+                              <Loader className="w-5 h-5 animate-spin mx-auto" />
+                            ) : (
+                              'Stake This Fighter'
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
