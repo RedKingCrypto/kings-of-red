@@ -5,12 +5,25 @@ import {
   HERALD_ADDRESS,
   HERALD_STAKING_ADDRESS,
   CLAN_NAMES,
-  RARITY_NAMES,
-  getHeraldImageUrl
+  RARITY_NAMES
 } from './contractConfig';
 
 // ============================================
-// HERALD ABI - Note: tokenOfOwnerByIndex may NOT work
+// HERALD IMAGE CONFIGURATION - UPDATED JAN 24, 2026
+// ============================================
+// New Herald images CID with JPG format
+const HERALD_IMAGES_CID = 'bafybeifxakdinrqr5jphpvuy7j5yqjrktmj5c7kallitxwpt6xvlyolhy4';
+const PINATA_GATEWAY = 'https://emerald-adequate-eagle-845.mypinata.cloud/ipfs';
+
+// Get Herald image URL - uses Pinata gateway for reliability
+const getHeraldImageUrl = (clan, rarity) => {
+  const clanName = (CLAN_NAMES[clan] || 'smizfume').toLowerCase();
+  const rarityName = (RARITY_NAMES[rarity] || 'bronze').toLowerCase();
+  return `${PINATA_GATEWAY}/${HERALD_IMAGES_CID}/${clanName}_${rarityName}.jpg`;
+};
+
+// ============================================
+// HERALD ABI - Note: NOT ERC721Enumerable
 // ============================================
 const HERALD_ABI_COMPLETE = [
   "function balanceOf(address owner) view returns (uint256)",
@@ -19,13 +32,8 @@ const HERALD_ABI_COMPLETE = [
   "function approve(address to, uint256 tokenId)",
   "function getApproved(uint256 tokenId) view returns (address)",
   "function totalSupply() view returns (uint256)",
-  // May not be supported:
-  "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
-  "function tokenByIndex(uint256 index) view returns (uint256)",
-  // Herald specific
   "function getHerald(uint256 tokenId) view returns (uint8 rarity, uint8 clan)",
   "function heralds(uint256 tokenId) view returns (uint8 rarity, uint8 clan)",
-  // Events
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
   "event HeraldMinted(uint256 indexed tokenId, address indexed minter, uint8 rarity, uint8 clan)"
 ];
@@ -38,15 +46,20 @@ const HERALD_STAKING_ABI_COMPLETE = [
   "function getStakedHeralds(address user) view returns (uint256[])",
   "function getStakeInfo(uint256 tokenId) view returns (address owner, uint256 stakedAt, uint256 lastClaim, uint8 clan, uint8 rarity, bool canClaim)",
   "function getTimeUntilClaim(uint256 tokenId) view returns (uint256)",
+  "function hasClanStaked(address user, uint8 clan) view returns (bool)",
   "function userStakeCount(address user) view returns (uint256)",
   "event HeraldStaked(uint256 indexed tokenId, address indexed owner)",
   "event HeraldUnstaked(uint256 indexed tokenId, address indexed owner)"
 ];
 
 const CLAN_COLORS = [
-  'from-red-600 to-orange-500', 'from-gray-600 to-slate-400', 'from-purple-600 to-indigo-500',
-  'from-blue-600 to-cyan-500', 'from-green-600 to-emerald-500', 'from-yellow-500 to-amber-400',
-  'from-rose-600 to-red-700'
+  'from-red-600 to-orange-500',      // Smizfume
+  'from-gray-600 to-slate-400',      // Coalheart
+  'from-purple-600 to-indigo-500',   // Warmdice
+  'from-blue-600 to-cyan-500',       // Bervation
+  'from-green-600 to-emerald-500',   // Konfisof
+  'from-yellow-500 to-amber-400',    // Witkastle
+  'from-rose-600 to-red-700'         // Bowkin
 ];
 
 const RARITY_COLORS = ['text-orange-400', 'text-gray-300', 'text-yellow-400'];
@@ -137,7 +150,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
       setStakedByClans(stakedData);
       
       // ============================================
-      // Load owned Heralds - USE TRANSFER EVENTS (since tokenOfOwnerByIndex doesn't work)
+      // Load owned Heralds - USE TRANSFER EVENTS (NOT ERC721Enumerable)
       // ============================================
       const userHeralds = [];
       
@@ -148,7 +161,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
         console.log(`User owns ${expectedCount} Heralds total`);
         
         if (expectedCount > 0) {
-          // Method 1: Try Transfer events (this is the primary method since tokenOfOwnerByIndex fails)
+          // Primary method: Transfer events
           console.log('Using Transfer events to find Heralds...');
           
           const filter = heraldContract.filters.Transfer(null, walletAddress);
@@ -197,7 +210,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
             }
           }
           
-          // Method 2: If we didn't find enough, also check HeraldMinted events
+          // Secondary method: HeraldMinted events
           if (userHeralds.length < expectedCount - stakedIds.length) {
             console.log('Checking HeraldMinted events...');
             try {
@@ -233,7 +246,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
             }
           }
           
-          // Method 3: Brute force if still missing
+          // Fallback: Brute force if still missing
           if (userHeralds.length < expectedCount - stakedIds.length) {
             console.log('Trying brute force search...');
             try {
@@ -241,7 +254,6 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
               const total = Number(totalSupply);
               
               for (let i = 1; i <= Math.min(total, 200); i++) {
-                // Skip if already found
                 const idStr = i.toString();
                 if (userHeralds.some(h => h.tokenId === idStr)) continue;
                 if (stakedIds.some(id => id.toString() === idStr)) continue;
@@ -515,7 +527,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
                 <p className="font-semibold mb-1">How It Works</p>
                 <ul className="list-disc ml-4 space-y-1 text-yellow-400/80">
                   <li>Stake one Herald per clan (max 7 total)</li>
-                  <li>Each Herald produces 20/65/100 FOOD per day</li>
+                  <li>Each Herald produces 20/65/100 FOOD per day (Bronze/Silver/Gold)</li>
                   <li>Claim costs 7 GOLD (from in-game balance)</li>
                   <li>24-hour cooldown between claims</li>
                   <li>Need GOLD? <button onClick={() => onNavigate('exchange')} className="underline">Visit Exchange</button></li>
