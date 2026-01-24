@@ -113,7 +113,7 @@ export const GENESIS_GOLD = 49;
 // ==================== HELPER FUNCTIONS ====================
 
 // IPFS CID for Herald images
-const HERALD_IMAGES_CID = 'bafybeibxmhmnfckv7vycd3wy6btmtzqh5hshk6vb7c6y2tvi2ohh3qnhsi';
+const HERALD_IMAGES_CID = 'bafybeifxakdinrqr5jphpvuy7j5yqjrktmj5c7kallitxwpt6xvlyolhy4';
 
 // IPFS CID for Fighter metadata
 const FIGHTER_METADATA_CID = 'bafybeia2alwupvq4ffp6pexcc4ekxz5nmtj4fguk7goxaddd7dcp7w2vbm';
@@ -124,10 +124,16 @@ const FIGHTER_METADATA_CID = 'bafybeia2alwupvq4ffp6pexcc4ekxz5nmtj4fguk7goxaddd7
  * @param {number} clan - 0-6 clan index
  * @returns {string} IPFS URL for the Herald image
  */
-export const getHeraldImageUrl = (rarity, clan) => {
-  const rarityName = RARITY_NAMES[rarity]?.toLowerCase() || 'bronze';
-  const clanName = CLAN_NAMES[clan]?.toLowerCase() || 'smizfume';
-  return `https://ipfs.io/ipfs/${HERALD_IMAGES_CID}/${rarityName}_${clanName}.png`;
+// ============================================
+// HERALD IMAGE CONFIGURATION - UPDATED JAN 24, 2026
+// ============================================
+const HERALD_IMAGES_CID = 'bafybeifxakdinrqr5jphpvuy7j5yqjrktmj5c7kallitxwpt6xvlyolhy4';
+const PINATA_GATEWAY = 'https://emerald-adequate-eagle-845.mypinata.cloud/ipfs';
+
+export const getHeraldImageUrl = (clan, rarity) => {
+  const clanName = (CLAN_NAMES[clan] || 'smizfume').toLowerCase();
+  const rarityName = (RARITY_NAMES[rarity] || 'bronze').toLowerCase();
+  return `${PINATA_GATEWAY}/${HERALD_IMAGES_CID}/${clanName}_${rarityName}.jpg`;
 };
 
 /**
