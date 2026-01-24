@@ -112,24 +112,19 @@ export const GENESIS_GOLD = 49;
 
 // ==================== HELPER FUNCTIONS ====================
 
-// IPFS CID for Herald images
+// ============================================
+// IMAGE CONFIGURATION - UPDATED JAN 24, 2026
+// ============================================
 const HERALD_IMAGES_CID = 'bafybeifxakdinrqr5jphpvuy7j5yqjrktmj5c7kallitxwpt6xvlyolhy4';
-
-// IPFS CID for Fighter metadata
 const FIGHTER_METADATA_CID = 'bafybeia2alwupvq4ffp6pexcc4ekxz5nmtj4fguk7goxaddd7dcp7w2vbm';
-
-/**
- * Get Herald image URL based on rarity and clan
- * @param {number} rarity - 0=Bronze, 1=Silver, 2=Gold
- * @param {number} clan - 0-6 clan index
- * @returns {string} IPFS URL for the Herald image
- */
-// ============================================
-// HERALD IMAGE CONFIGURATION - UPDATED JAN 24, 2026
-// ============================================
-const HERALD_IMAGES_CID = 'bafybeifxakdinrqr5jphpvuy7j5yqjrktmj5c7kallitxwpt6xvlyolhy4';
 const PINATA_GATEWAY = 'https://emerald-adequate-eagle-845.mypinata.cloud/ipfs';
 
+/**
+ * Get Herald image URL based on clan and rarity
+ * @param {number} clan - 0-6 clan index
+ * @param {number} rarity - 0=Bronze, 1=Silver, 2=Gold
+ * @returns {string} Pinata gateway URL for the Herald image
+ */
 export const getHeraldImageUrl = (clan, rarity) => {
   const clanName = (CLAN_NAMES[clan] || 'smizfume').toLowerCase();
   const rarityName = (RARITY_NAMES[rarity] || 'bronze').toLowerCase();
