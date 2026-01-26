@@ -6,7 +6,7 @@ import {
   GAMEBALANCE_ADDRESS,
   CLAN_NAMES,
   RARITY_NAMES
-} from './contractConfig';
+} from '../contractConfig';
 
 // ============================================
 // FIGHTER IMAGE CONFIGURATION
