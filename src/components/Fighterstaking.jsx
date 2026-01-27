@@ -51,6 +51,7 @@ const FighterImage = ({ rarity, clan, className, alt }) => {
 
 // ============================================
 // FIGHTER ABI - V4
+// CORRECT STRUCT ORDER: rarity, clan, energy, refuelStartTime, wins, losses, pvpWins, pvpLosses, isStaked, inBattle
 // ============================================
 const FIGHTER_ABI_COMPLETE = [
   // ERC721Enumerable (Fighter V4 supports this!)
@@ -67,24 +68,30 @@ const FIGHTER_ABI_COMPLETE = [
   "function setApprovalForAll(address operator, bool approved)",
   "function isApprovedForAll(address owner, address operator) view returns (bool)",
   
-  // Fighter-specific data
-  "function fighters(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint8 energy, bool isStaked, bool inBattle, uint256 refuelStartTime, uint256 wins, uint256 losses, uint256 pvpWins, uint256 pvpLosses)",
-  "function getFighterStats(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint8 energy, bool isStaked, bool inBattle, uint256 refuelStartTime, uint256 wins, uint256 losses, uint256 pvpWins, uint256 pvpLosses)",
+  // Fighter-specific data - CORRECT ORDER!
+  "function fighters(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint64 energy, uint64 refuelStartTime, uint32 wins, uint32 losses, uint32 pvpWins, uint32 pvpLosses, bool isStaked, bool inBattle)",
   
   // Staking functions
-  "function stake(uint256 tokenId)",
-  "function unstake(uint256 tokenId)",
   "function stakeFighter(uint256 tokenId)",
   "function unstakeFighter(uint256 tokenId)",
+  "function stake(uint256 tokenId)",
+  "function unstake(uint256 tokenId)",
   
   // Refuel
   "function startRefuel(uint256 tokenId)",
   "function completeRefuel(uint256 tokenId)",
   "function refuel(uint256 tokenId)",
   
+  // State
+  "function stakingPaused() view returns (bool)",
+  "function mintingPaused() view returns (bool)",
+  "function maxStaked() view returns (uint256)",
+  
   // Events
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
-  "event FighterMinted(uint256 indexed tokenId, address indexed minter, uint8 rarity, uint8 clan)"
+  "event FighterMinted(uint256 indexed tokenId, address indexed minter, uint8 rarity, uint8 clan)",
+  "event FighterStaked(uint256 indexed tokenId, address indexed owner)",
+  "event FighterUnstaked(uint256 indexed tokenId, address indexed owner)"
 ];
 
 const GAMEBALANCE_ABI = [
@@ -314,16 +321,19 @@ export default function FighterStakingPage({ connected, walletAddress, onNavigat
       
       if (!fighterData) return null;
       
+      // CORRECT STRUCT ORDER FROM CONTRACT:
+      // rarity (0), clan (1), energy (2), refuelStartTime (3), wins (4), losses (5), 
+      // pvpWins (6), pvpLosses (7), isStaked (8), inBattle (9)
       const rarity = Number(fighterData.rarity ?? fighterData[0]);
       const clan = Number(fighterData.clan ?? fighterData[1]);
       const energy = Number(fighterData.energy ?? fighterData[2]);
-      const isStaked = Boolean(fighterData.isStaked ?? fighterData[3]);
-      const inBattle = Boolean(fighterData.inBattle ?? fighterData[4]);
-      const refuelStartTime = Number(fighterData.refuelStartTime ?? fighterData[5]);
-      const wins = Number(fighterData.wins ?? fighterData[6]);
-      const losses = Number(fighterData.losses ?? fighterData[7]);
-      const pvpWins = Number(fighterData.pvpWins ?? fighterData[8] ?? 0);
-      const pvpLosses = Number(fighterData.pvpLosses ?? fighterData[9] ?? 0);
+      const refuelStartTime = Number(fighterData.refuelStartTime ?? fighterData[3]);
+      const wins = Number(fighterData.wins ?? fighterData[4]);
+      const losses = Number(fighterData.losses ?? fighterData[5]);
+      const pvpWins = Number(fighterData.pvpWins ?? fighterData[6] ?? 0);
+      const pvpLosses = Number(fighterData.pvpLosses ?? fighterData[7] ?? 0);
+      const isStaked = Boolean(fighterData.isStaked ?? fighterData[8]);
+      const inBattle = Boolean(fighterData.inBattle ?? fighterData[9]);
       
       // Calculate refuel status
       let isRefueling = false;
@@ -388,15 +398,18 @@ export default function FighterStakingPage({ connected, walletAddress, onNavigat
       
       showMessageFunc('info', 'Staking Fighter...');
       
-      // Try different stake function names
+      // Try stakeFighter() first (correct function name for this contract)
       let tx;
       try {
-        tx = await fighterContract.stake(tokenId);
-      } catch {
+        tx = await fighterContract.stakeFighter(tokenId);
+      } catch (e1) {
+        console.log('stakeFighter() failed, trying stake():', e1.message);
         try {
-          tx = await fighterContract.stakeFighter(tokenId);
-        } catch (e) {
-          throw new Error('Staking function not found: ' + e.message);
+          tx = await fighterContract.stake(tokenId);
+        } catch (e2) {
+          // Get the actual error
+          const errorMsg = e2.reason || e1.reason || e2.message || e1.message;
+          throw new Error(errorMsg);
         }
       }
       
@@ -428,14 +441,17 @@ export default function FighterStakingPage({ connected, walletAddress, onNavigat
       
       showMessageFunc('info', 'Unstaking Fighter...');
       
+      // Try unstakeFighter() first (correct function name for this contract)
       let tx;
       try {
-        tx = await fighterContract.unstake(tokenId);
-      } catch {
+        tx = await fighterContract.unstakeFighter(tokenId);
+      } catch (e1) {
+        console.log('unstakeFighter() failed, trying unstake():', e1.message);
         try {
-          tx = await fighterContract.unstakeFighter(tokenId);
-        } catch (e) {
-          throw new Error('Unstaking function not found: ' + e.message);
+          tx = await fighterContract.unstake(tokenId);
+        } catch (e2) {
+          const errorMsg = e2.reason || e1.reason || e2.message || e1.message;
+          throw new Error(errorMsg);
         }
       }
       
