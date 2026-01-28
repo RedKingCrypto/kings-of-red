@@ -7,7 +7,7 @@ import {
   HERALD_STAKING_ADDRESS,
   GAMEBALANCE_ADDRESS,
   CLAN_NAMES
-} from '../contractConfig';
+} from './contractConfig';
 
 // ==================== CONTRACT ABIs ====================
 
