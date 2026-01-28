@@ -3,15 +3,49 @@ import { ethers } from 'ethers';
 import { Swords, Shield, Heart, Zap, Trophy, Skull, Clock, Volume2, VolumeX, Play, Target, Flame, Crown } from 'lucide-react';
 import { 
   BATTLE_ADDRESS, 
-  BATTLE_ABI, 
   FIGHTER_ADDRESS, 
-  FIGHTER_ABI,
   HERALD_STAKING_ADDRESS,
-  HERALD_STAKING_ABI,
   GAMEBALANCE_ADDRESS,
-  GAMEBALANCE_ABI,
-  CLANS
-} from './contractConfig';
+  CLAN_NAMES
+} from '../contractConfig';
+
+// ==================== CONTRACT ABIs ====================
+
+// Fighter ABI - CORRECT struct order: rarity, clan, energy, refuelStartTime, wins, losses, pvpWins, pvpLosses, isStaked, inBattle
+const FIGHTER_ABI = [
+  "function balanceOf(address owner) view returns (uint256)",
+  "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
+  "function ownerOf(uint256 tokenId) view returns (address)",
+  "function fighters(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint64 energy, uint64 refuelStartTime, uint32 wins, uint32 losses, uint32 pvpWins, uint32 pvpLosses, bool isStaked, bool inBattle)"
+];
+
+// Herald Staking ABI
+const HERALD_STAKING_ABI = [
+  "function hasClanStaked(address user, uint8 clan) view returns (bool)",
+  "function getUserStakedHeralds(address user) view returns (uint256[])"
+];
+
+// GameBalance ABI - try multiple function signatures
+const GAMEBALANCE_ABI = [
+  "function getAllBalances(address user) view returns (uint256 food, uint256 gold, uint256 wood, uint256 rkt)",
+  "function getBalances(address user) view returns (uint256[] memory)",
+  "function getBalance(address user, uint8 tokenId) view returns (uint256)",
+  "function inGameBalances(address user, uint8 tokenId) view returns (uint256)"
+];
+
+// Battle ABI
+const BATTLE_ABI = [
+  "function enterArena(uint256 fighterId, uint8 arenaId, uint8 enemyId)",
+  "function attack(uint256 fighterId)",
+  "function claimVictory(uint256 fighterId)",
+  "function claimDefeat(uint256 fighterId)",
+  "function getBattleState(uint256 fighterId) view returns (bool inBattle, uint8 arenaId, uint8 enemyId, uint8 enemyHealth, uint8 fighterHealth, uint256 battleStartTime)",
+  "function canClaimVictory(uint256 fighterId) view returns (bool)",
+  "function canClaimDefeat(uint256 fighterId) view returns (bool)",
+  "function entryFee() view returns (uint256)",
+  "event AttackPerformed(uint256 indexed fighterId, bool fighterHit, bool enemyHit, uint8 fighterDamage, uint8 enemyDamage)",
+  "event RewardsDistributed(address indexed player, uint256 food, uint256 gold, uint256 wood, uint256 rkt)"
+];
 
 // ==================== ARENA & ENEMY CONFIGURATION ====================
 
@@ -34,8 +68,6 @@ const ENEMIES = {
 };
 
 // ==================== BATTLE MUSIC CONFIGURATION ====================
-// Music files should be placed in /public/audio/
-// If a music file doesn't exist, the battle continues without music (no error)
 
 const BATTLE_MUSIC = {
   5: { // Witkastle arena
@@ -43,8 +75,6 @@ const BATTLE_MUSIC = {
     2: '/audio/witkastle_enemy2.mp3',
     3: '/audio/witkastle_enemy3.mp3'
   }
-  // Add other arenas as needed:
-  // 0: { 1: '/audio/smizfume_enemy1.mp3', ... }
 };
 
 // ==================== MAIN COMPONENT ====================
@@ -58,7 +88,6 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
   const [battleLog, setBattleLog] = useState([]);
   
   // Data State
-  const [userFighters, setUserFighters] = useState([]);
   const [stakedFighters, setStakedFighters] = useState([]);
   const [userBalances, setUserBalances] = useState({ food: 0, gold: 0, wood: 0, rkt: 0 });
   const [hasClanHeraldStaked, setHasClanHeraldStaked] = useState(false);
@@ -68,6 +97,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
   const [attacking, setAttacking] = useState(false);
   const [error, setError] = useState(null);
   const [view, setView] = useState('select'); // 'select', 'arena', 'battle', 'victory', 'defeat'
+  const [debugInfo, setDebugInfo] = useState('');
   
   // Music State
   const [isMuted, setIsMuted] = useState(false);
@@ -77,46 +107,23 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
   // ==================== MUSIC FUNCTIONS ====================
 
   const startBattleMusic = (arenaId, enemyId) => {
-    // Stop any existing music first
     stopBattleMusic();
-    
-    // Get music path for this arena/enemy
     const musicPath = BATTLE_MUSIC[arenaId]?.[enemyId];
-    
-    if (!musicPath) {
-      console.log('No battle music configured for this enemy');
-      return; // No music for this battle - continue without error
-    }
+    if (!musicPath) return;
     
     try {
       const audio = new Audio(musicPath);
       audio.loop = true;
-      audio.volume = 0.4; // 40% volume
+      audio.volume = 0.4;
       audio.muted = isMuted;
-      
-      // Handle audio load errors gracefully
-      audio.onerror = () => {
-        console.log('Battle music file not found - continuing without music');
-        setMusicPlaying(false);
-      };
-      
+      audio.onerror = () => setMusicPlaying(false);
       audio.oncanplaythrough = () => {
-        audio.play()
-          .then(() => {
-            setMusicPlaying(true);
-          })
-          .catch(e => {
-            console.log('Audio autoplay blocked by browser:', e.message);
-            setMusicPlaying(false);
-          });
+        audio.play().then(() => setMusicPlaying(true)).catch(() => setMusicPlaying(false));
       };
-      
       audioRef.current = audio;
       audio.load();
-      
     } catch (e) {
       console.log('Error initializing audio:', e.message);
-      // Continue battle without music
     }
   };
 
@@ -125,9 +132,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       try {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
-      } catch (e) {
-        // Ignore errors when stopping
-      }
+      } catch (e) {}
       audioRef.current = null;
     }
     setMusicPlaying(false);
@@ -136,18 +141,13 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
   const toggleMute = () => {
     setIsMuted(prev => {
       const newMuted = !prev;
-      if (audioRef.current) {
-        audioRef.current.muted = newMuted;
-      }
+      if (audioRef.current) audioRef.current.muted = newMuted;
       return newMuted;
     });
   };
 
-  // Cleanup music on unmount
   useEffect(() => {
-    return () => {
-      stopBattleMusic();
-    };
+    return () => stopBattleMusic();
   }, []);
 
   // ==================== DATA LOADING ====================
@@ -162,53 +162,139 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
     if (!window.ethereum || !walletAddress) return;
     
     setLoading(true);
+    setDebugInfo('Loading...');
+    
     try {
+      // Use browser provider (MetaMask) - more reliable than public RPCs
       const provider = new ethers.BrowserProvider(window.ethereum);
       
-      // Load fighter data
       const fighterContract = new ethers.Contract(FIGHTER_ADDRESS, FIGHTER_ABI, provider);
       const gameBalanceContract = new ethers.Contract(GAMEBALANCE_ADDRESS, GAMEBALANCE_ABI, provider);
       
-      // Get staked fighters
-      const stakedIds = await fighterContract.stakedFighters(walletAddress);
+      console.log('Loading battle data for:', walletAddress);
+      
+      // ==================== LOAD STAKED FIGHTERS ====================
+      // Use the same method as FighterStaking - get all fighters and filter by isStaked
       const staked = [];
       
-      for (const tokenId of stakedIds) {
-        try {
-          const fighterData = await fighterContract.getFighter(tokenId);
-          staked.push({
-            tokenId: tokenId.toString(),
-            rarity: Number(fighterData[0]),
-            clan: Number(fighterData[1]),
-            energy: Number(fighterData[2]),
-            wins: Number(fighterData[3]),
-            losses: Number(fighterData[4]),
-            isStaked: fighterData[5],
-            lastRefuelTime: Number(fighterData[6])
-          });
-        } catch (e) {
-          console.log('Error loading fighter:', tokenId.toString(), e);
+      try {
+        const balance = await fighterContract.balanceOf(walletAddress);
+        const fighterCount = Number(balance);
+        console.log(`User owns ${fighterCount} fighters`);
+        setDebugInfo(`Found ${fighterCount} fighters...`);
+        
+        for (let i = 0; i < fighterCount; i++) {
+          try {
+            const tokenId = await fighterContract.tokenOfOwnerByIndex(walletAddress, i);
+            const fighterData = await fighterContract.fighters(tokenId);
+            
+            // CORRECT struct order: rarity, clan, energy, refuelStartTime, wins, losses, pvpWins, pvpLosses, isStaked, inBattle
+            const rarity = Number(fighterData[0]);
+            const clan = Number(fighterData[1]);
+            const energy = Number(fighterData[2]);
+            const refuelStartTime = Number(fighterData[3]);
+            const wins = Number(fighterData[4]);
+            const losses = Number(fighterData[5]);
+            const pvpWins = Number(fighterData[6]);
+            const pvpLosses = Number(fighterData[7]);
+            const isStaked = Boolean(fighterData[8]);
+            const inBattle = Boolean(fighterData[9]);
+            
+            console.log(`Fighter #${tokenId}: ${CLAN_NAMES[clan]}, Staked: ${isStaked}, InBattle: ${inBattle}`);
+            
+            if (isStaked) {
+              staked.push({
+                tokenId: tokenId.toString(),
+                rarity,
+                clan,
+                energy,
+                wins,
+                losses,
+                pvpWins,
+                pvpLosses,
+                isStaked,
+                inBattle,
+                lastRefuelTime: refuelStartTime
+              });
+            }
+          } catch (e) {
+            console.log('Error loading fighter at index', i, e.message);
+          }
         }
+      } catch (e) {
+        console.error('Error loading fighters:', e.message);
       }
       
+      console.log(`Found ${staked.length} staked fighters`);
       setStakedFighters(staked);
       
-      // Load game balances
+      // ==================== LOAD GAME BALANCES ====================
       try {
-        const balances = await gameBalanceContract.getAllBalances(walletAddress);
-        setUserBalances({
-          food: Number(ethers.formatEther(balances[0])),
-          gold: Number(ethers.formatEther(balances[1])),
-          wood: Number(ethers.formatEther(balances[2])),
-          rkt: Number(ethers.formatEther(balances[3]))
-        });
+        // Try getAllBalances first
+        let balances = null;
+        
+        try {
+          const result = await gameBalanceContract.getAllBalances(walletAddress);
+          balances = {
+            food: Number(ethers.formatEther(result[0] || result.food || 0)),
+            gold: Number(ethers.formatEther(result[1] || result.gold || 0)),
+            wood: Number(ethers.formatEther(result[2] || result.wood || 0)),
+            rkt: Number(ethers.formatEther(result[3] || result.rkt || 0))
+          };
+          console.log('Loaded balances via getAllBalances:', balances);
+        } catch (e) {
+          console.log('getAllBalances failed, trying individual getBalance calls:', e.message);
+          
+          // Try individual balance calls with uint8 token IDs
+          try {
+            const food = await gameBalanceContract.getBalance(walletAddress, 1);
+            const gold = await gameBalanceContract.getBalance(walletAddress, 2);
+            const wood = await gameBalanceContract.getBalance(walletAddress, 3);
+            const rkt = await gameBalanceContract.getBalance(walletAddress, 4);
+            
+            balances = {
+              food: Number(ethers.formatEther(food)),
+              gold: Number(ethers.formatEther(gold)),
+              wood: Number(ethers.formatEther(wood)),
+              rkt: Number(ethers.formatEther(rkt))
+            };
+            console.log('Loaded balances via getBalance:', balances);
+          } catch (e2) {
+            console.log('getBalance also failed:', e2.message);
+            
+            // Try inGameBalances mapping
+            try {
+              const food = await gameBalanceContract.inGameBalances(walletAddress, 1);
+              const gold = await gameBalanceContract.inGameBalances(walletAddress, 2);
+              const wood = await gameBalanceContract.inGameBalances(walletAddress, 3);
+              const rkt = await gameBalanceContract.inGameBalances(walletAddress, 4);
+              
+              balances = {
+                food: Number(ethers.formatEther(food)),
+                gold: Number(ethers.formatEther(gold)),
+                wood: Number(ethers.formatEther(wood)),
+                rkt: Number(ethers.formatEther(rkt))
+              };
+              console.log('Loaded balances via inGameBalances:', balances);
+            } catch (e3) {
+              console.log('inGameBalances also failed:', e3.message);
+            }
+          }
+        }
+        
+        if (balances) {
+          setUserBalances(balances);
+        }
       } catch (e) {
-        console.log('Error loading balances:', e);
+        console.log('Error loading balances:', e.message);
       }
+      
+      setDebugInfo(`✅ ${staked.length} staked fighters ready for battle`);
       
     } catch (e) {
       console.error('Error loading user data:', e);
       setError('Failed to load data. Please refresh.');
+      setDebugInfo(`Error: ${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -225,7 +311,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       setHasClanHeraldStaked(hasStaked);
       return hasStaked;
     } catch (e) {
-      console.log('Error checking herald staking:', e);
+      console.log('Error checking herald staking:', e.message);
       return false;
     }
   };
@@ -251,7 +337,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       }
       return null;
     } catch (e) {
-      console.log('Error checking battle state:', e);
+      console.log('Error checking battle state:', e.message);
       return null;
     }
   };
@@ -270,8 +356,6 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       setSelectedEnemy(existingBattle.enemyId);
       addBattleLog('Resuming existing battle...');
       setView('battle');
-      
-      // Start music for resumed battle
       startBattleMusic(existingBattle.arenaId, existingBattle.enemyId);
       return;
     }
@@ -279,7 +363,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
     // Check if matching clan Herald is staked
     const hasHerald = await checkClanHeraldStaked(fighter.clan);
     if (!hasHerald) {
-      setError(`You need a ${CLANS[fighter.clan]?.name || 'matching'} Herald staked to battle!`);
+      setError(`You need a ${CLAN_NAMES[fighter.clan] || 'matching'} Herald staked to battle!`);
     }
     
     setView('arena');
@@ -313,7 +397,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
     }
     
     if (!hasClanHeraldStaked) {
-      setError(`You need a ${CLANS[selectedFighter.clan]?.name} Herald staked to battle!`);
+      setError(`You need a ${CLAN_NAMES[selectedFighter.clan]} Herald staked to battle!`);
       return;
     }
     
@@ -349,13 +433,9 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       
       addBattleLog('Battle started! Prepare for combat!', 'success');
       
-      // Get initial battle state
       const state = await checkBattleState(selectedFighter.tokenId);
       setBattleState(state);
-      
-      // Start battle music
       startBattleMusic(selectedArena, selectedEnemy);
-      
       setView('battle');
       
     } catch (e) {
@@ -404,12 +484,9 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
             fighterDamage = Number(parsed.args.fighterDamage);
             enemyDamage = Number(parsed.args.enemyDamage);
           }
-        } catch (e) {
-          // Not our event
-        }
+        } catch (e) {}
       }
       
-      // Log attack results
       if (fighterHit) {
         addBattleLog(`💥 You hit for ${fighterDamage} damage!`, 'success');
       } else {
@@ -422,11 +499,9 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
         addBattleLog('🛡️ Enemy attack missed!', 'success');
       }
       
-      // Update battle state
       const newState = await checkBattleState(selectedFighter.tokenId);
       
       if (!newState || !newState.inBattle) {
-        // Battle ended
         const canVictory = await battleContract.canClaimVictory(selectedFighter.tokenId);
         if (canVictory) {
           addBattleLog('🏆 VICTORY! Enemy defeated!', 'success');
@@ -467,7 +542,6 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       const tx = await battleContract.claimVictory(selectedFighter.tokenId);
       const receipt = await tx.wait();
       
-      // Parse rewards event
       let rewards = { food: 0, gold: 0, wood: 0, rkt: 0 };
       for (const log of receipt.logs) {
         try {
@@ -480,20 +554,13 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
               rkt: Number(ethers.formatEther(parsed.args.rkt))
             };
           }
-        } catch (e) {
-          // Not our event
-        }
+        } catch (e) {}
       }
       
       addBattleLog(`🎁 Rewards: ${rewards.food} FOOD, ${rewards.gold} GOLD, ${rewards.wood} WOOD, ${rewards.rkt} RKT`, 'success');
       
-      // Stop music
       stopBattleMusic();
-      
-      // Refresh data
       await loadUserData();
-      
-      // Reset battle state
       setBattleState(null);
       setSelectedEnemy(null);
       
@@ -522,13 +589,8 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       
       addBattleLog('You live to fight another day...', 'warning');
       
-      // Stop music
       stopBattleMusic();
-      
-      // Refresh data
       await loadUserData();
-      
-      // Reset battle state
       setBattleState(null);
       setSelectedEnemy(null);
       
@@ -553,16 +615,10 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
 
   // ==================== RENDER HELPERS ====================
 
-  const getRarityName = (rarity) => {
-    return ['Bronze', 'Silver', 'Gold'][rarity] || 'Unknown';
-  };
+  const getRarityName = (rarity) => ['Bronze', 'Silver', 'Gold'][rarity] || 'Unknown';
 
   const getRarityColor = (rarity) => {
-    const colors = [
-      'from-orange-600 to-amber-700',  // Bronze
-      'from-gray-400 to-slate-300',     // Silver
-      'from-yellow-500 to-amber-400'    // Gold
-    ];
+    const colors = ['from-orange-600 to-amber-700', 'from-gray-400 to-slate-300', 'from-yellow-500 to-amber-400'];
     return colors[rarity] || 'from-gray-600 to-gray-500';
   };
 
@@ -602,6 +658,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
             <Swords className="w-10 h-10 text-red-500" />
           </h1>
           <p className="text-gray-400">Send your Fighters into battle against arena enemies</p>
+          {debugInfo && <p className="text-xs text-blue-400 mt-1">{debugInfo}</p>}
         </div>
 
         {/* Balances Display */}
@@ -640,11 +697,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
             className="fixed bottom-6 right-6 bg-gray-800/90 hover:bg-gray-700 p-4 rounded-full z-50 border border-gray-600 shadow-lg transition"
             title={isMuted ? "Unmute Music" : "Mute Music"}
           >
-            {isMuted ? (
-              <VolumeX className="w-6 h-6 text-gray-400" />
-            ) : (
-              <Volume2 className="w-6 h-6 text-green-400" />
-            )}
+            {isMuted ? <VolumeX className="w-6 h-6 text-gray-400" /> : <Volume2 className="w-6 h-6 text-green-400" />}
           </button>
         )}
 
@@ -664,10 +717,10 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
                 <h3 className="text-xl font-bold mb-2">No Staked Fighters</h3>
                 <p className="text-gray-400 mb-4">You need to stake a Fighter before battling.</p>
                 <button
-                  onClick={() => onNavigate && onNavigate('fighters')}
+                  onClick={() => onNavigate && onNavigate('stake-fighters')}
                   className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-semibold transition"
                 >
-                  Go to Fighters
+                  Go to Fighter Staking
                 </button>
               </div>
             ) : (
@@ -682,7 +735,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <div className="text-sm text-gray-400">{getRarityName(fighter.rarity)}</div>
-                          <div className="font-bold">{CLANS[fighter.clan]?.name || 'Unknown'}</div>
+                          <div className="font-bold">{CLAN_NAMES[fighter.clan] || 'Unknown'}</div>
                         </div>
                         <div className="text-xs bg-black/50 px-2 py-1 rounded">
                           #{fighter.tokenId}
@@ -700,20 +753,26 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-400 flex items-center gap-1">
-                            <Trophy className="w-4 h-4" /> Wins
+                            <Trophy className="w-4 h-4" /> PvE Wins
                           </span>
                           <span className="text-yellow-400">{fighter.wins}</span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-400 flex items-center gap-1">
-                            <Skull className="w-4 h-4" /> Losses
+                            <Skull className="w-4 h-4" /> PvE Losses
                           </span>
                           <span className="text-red-400">{fighter.losses}</span>
                         </div>
                       </div>
                       
+                      {fighter.inBattle && (
+                        <div className="mt-3 bg-red-600/50 text-center py-1 rounded text-sm font-bold">
+                          IN BATTLE - Resume
+                        </div>
+                      )}
+                      
                       <button className="w-full mt-4 bg-red-600 hover:bg-red-700 py-2 rounded-lg font-semibold transition">
-                        Select Fighter
+                        {fighter.inBattle ? 'Resume Battle' : 'Select Fighter'}
                       </button>
                     </div>
                   </div>
@@ -732,7 +791,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
                 <div>
                   <div className="text-sm text-gray-400">Selected Fighter</div>
                   <div className="font-bold">
-                    {getRarityName(selectedFighter.rarity)} {CLANS[selectedFighter.clan]?.name} #{selectedFighter.tokenId}
+                    {getRarityName(selectedFighter.rarity)} {CLAN_NAMES[selectedFighter.clan]} #{selectedFighter.tokenId}
                   </div>
                 </div>
                 <div className="flex gap-4 text-sm">
@@ -743,10 +802,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={handleReset}
-                  className="text-gray-400 hover:text-white transition"
-                >
+                <button onClick={handleReset} className="text-gray-400 hover:text-white transition">
                   Change Fighter
                 </button>
               </div>
@@ -756,7 +812,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
             {!hasClanHeraldStaked && (
               <div className="bg-yellow-900/50 border border-yellow-500 rounded-lg p-4 mb-6">
                 <p className="text-yellow-300 text-center">
-                  ⚠️ You need a {CLANS[selectedFighter.clan]?.name} Herald staked to battle in this clan's arena!
+                  ⚠️ You need a {CLAN_NAMES[selectedFighter.clan]} Herald staked to battle with this Fighter!
                 </p>
               </div>
             )}
@@ -850,21 +906,18 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
         {/* ==================== VIEW: ACTIVE BATTLE ==================== */}
         {view === 'battle' && battleState && selectedFighter && (
           <div className="max-w-3xl mx-auto">
-            {/* Battle Arena */}
             <div className={`bg-gradient-to-br ${ARENAS[selectedArena]?.color || 'from-gray-800 to-gray-900'} rounded-xl p-6 mb-6`}>
               <div className="text-center mb-4">
                 <h2 className="text-2xl font-bold">{ARENAS[selectedArena]?.name || 'Battle Arena'}</h2>
               </div>
               
-              {/* Combatants */}
               <div className="grid grid-cols-2 gap-8">
-                {/* Fighter */}
                 <div className="text-center">
                   <div className="bg-black/50 rounded-lg p-4">
                     <Shield className="w-16 h-16 mx-auto text-blue-400 mb-2" />
                     <div className="font-bold">Your Fighter</div>
                     <div className="text-sm text-gray-400">
-                      {getRarityName(selectedFighter.rarity)} {CLANS[selectedFighter.clan]?.name}
+                      {getRarityName(selectedFighter.rarity)} {CLAN_NAMES[selectedFighter.clan]}
                     </div>
                     <div className="mt-3">
                       <div className="text-sm text-gray-400 mb-1">Health</div>
@@ -879,7 +932,6 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
                   </div>
                 </div>
                 
-                {/* Enemy */}
                 <div className="text-center">
                   <div className="bg-black/50 rounded-lg p-4">
                     <Skull className="w-16 h-16 mx-auto text-red-500 mb-2" />
@@ -900,7 +952,6 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
               </div>
             </div>
 
-            {/* Battle Log */}
             <div className="bg-gray-800/50 rounded-lg p-4 mb-6 h-48 overflow-y-auto">
               <h3 className="font-bold mb-2 text-gray-400">Battle Log</h3>
               <div className="space-y-1">
@@ -920,7 +971,6 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
               </div>
             </div>
 
-            {/* Attack Button */}
             <div className="text-center">
               <button
                 onClick={handleAttack}
@@ -963,10 +1013,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
                 {loading ? 'Claiming...' : 'Claim Rewards'}
               </button>
               
-              <button
-                onClick={handleReset}
-                className="text-gray-400 hover:text-white transition"
-              >
+              <button onClick={handleReset} className="text-gray-400 hover:text-white transition">
                 Return to Fighter Select
               </button>
             </div>
@@ -989,10 +1036,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
                 {loading ? 'Processing...' : 'Accept Defeat'}
               </button>
               
-              <button
-                onClick={handleReset}
-                className="text-gray-400 hover:text-white transition"
-              >
+              <button onClick={handleReset} className="text-gray-400 hover:text-white transition">
                 Return to Fighter Select
               </button>
             </div>
