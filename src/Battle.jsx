@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ethers } from 'ethers';
-import { Swords, Shield, Heart, Zap, Trophy, Skull, Clock, Volume2, VolumeX, Play, Target, Flame, Crown } from 'lucide-react';
+import { Swords, Shield, Heart, Zap, Trophy, Skull, Clock, Volume2, VolumeX, Play, Target, Flame, Crown, ArrowLeft, Loader } from 'lucide-react';
 import { 
   BATTLE_ADDRESS, 
   FIGHTER_ADDRESS, 
+  HERALD_ADDRESS,
   HERALD_STAKING_ADDRESS,
   GAMEBALANCE_ADDRESS,
   CLAN_NAMES
@@ -19,13 +20,19 @@ const FIGHTER_ABI = [
   "function fighters(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint64 energy, uint64 refuelStartTime, uint32 wins, uint32 losses, uint32 pvpWins, uint32 pvpLosses, bool isStaked, bool inBattle)"
 ];
 
-// Herald Staking ABI
-const HERALD_STAKING_ABI = [
-  "function hasClanStaked(address user, uint8 clan) view returns (bool)",
-  "function getUserStakedHeralds(address user) view returns (uint256[])"
+// Herald Contract ABI - to check rarity
+const HERALD_ABI = [
+  "function getHerald(uint256 tokenId) view returns (uint8 rarity, uint8 clan)"
 ];
 
-// GameBalance ABI - try multiple function signatures
+// Herald Staking ABI - includes getStakeInfo for rarity check
+const HERALD_STAKING_ABI = [
+  "function hasClanStaked(address user, uint8 clan) view returns (bool)",
+  "function getUserStakedHeralds(address user) view returns (uint256[])",
+  "function getStakeInfo(uint256 tokenId) view returns (address owner, uint256 stakedAt, uint256 lastClaim, uint8 clan, uint8 rarity, bool canClaim)"
+];
+
+// GameBalance ABI
 const GAMEBALANCE_ABI = [
   "function getAllBalances(address user) view returns (uint256 food, uint256 gold, uint256 wood, uint256 rkt)",
   "function getBalances(address user) view returns (uint256[] memory)",
@@ -37,35 +44,106 @@ const GAMEBALANCE_ABI = [
 const BATTLE_ABI = [
   "function enterArena(uint256 fighterId, uint8 arenaId, uint8 enemyId)",
   "function attack(uint256 fighterId)",
-  "function claimVictory(uint256 fighterId)",
+  "function claimVictory(uint256 fighterId, uint8 enemyNum)",
   "function claimDefeat(uint256 fighterId)",
-  "function getBattleState(uint256 fighterId) view returns (bool inBattle, uint8 arenaId, uint8 enemyId, uint8 enemyHealth, uint8 fighterHealth, uint256 battleStartTime)",
+  "function getBattleState(uint256 fighterId) view returns (bool inBattle, uint8 arenaId, uint8 currentEnemy, uint8 enemyHealth, uint8 fighterHealth, uint256 battleStartTime)",
   "function canClaimVictory(uint256 fighterId) view returns (bool)",
   "function canClaimDefeat(uint256 fighterId) view returns (bool)",
   "function entryFee() view returns (uint256)",
   "event AttackPerformed(uint256 indexed fighterId, bool fighterHit, bool enemyHit, uint8 fighterDamage, uint8 enemyDamage)",
-  "event RewardsDistributed(address indexed player, uint256 food, uint256 gold, uint256 wood, uint256 rkt)"
+  "event RewardDistributed(address indexed player, uint256 tokenId, uint256 amount)"
 ];
 
-// ==================== ARENA & ENEMY CONFIGURATION ====================
+// ==================== GAME CONSTANTS ====================
+
+// Rarity names
+const RARITY_NAMES = ['Bronze', 'Silver', 'Gold'];
+
+// Fighter → Enemy Hit Chances (from documentation)
+// fighterRarity: [enemy1, enemy2, enemy3]
+const FIGHTER_HIT_CHANCES = {
+  0: [20, 10, 3],   // Bronze: 20% vs E1, 10% vs E2, 3% vs E3
+  1: [30, 20, 10],  // Silver: 30% vs E1, 20% vs E2, 10% vs E3
+  2: [40, 30, 20]   // Gold: 40% vs E1, 30% vs E2, 20% vs E3
+};
+
+// Enemy → Fighter Hit Chances (from documentation)
+// enemyNum: { fighterRarity: hitChance }
+const ENEMY_HIT_CHANCES = {
+  1: { 0: 85, 1: 75, 2: 70 },  // Enemy 1 vs Bronze: 85%, Silver: 75%, Gold: 70%
+  2: { 0: 90, 1: 80, 2: 72 },  // Enemy 2 vs Bronze: 90%, Silver: 80%, Gold: 72%
+  3: { 0: 95, 1: 85, 2: 75 }   // Enemy 3 vs Bronze: 95%, Silver: 85%, Gold: 75%
+};
+
+// Herald Rarity Bonus to Fighter Hit Chance
+const HERALD_RARITY_BONUS = {
+  0: 2,   // Bronze Herald: +2%
+  1: 5,   // Silver Herald: +5%
+  2: 10   // Gold Herald: +10%
+};
+
+// ==================== ARENA CONFIGURATION ====================
+// All 7 clan arenas - only some are active for now
 
 const ARENAS = [
-  { id: 0, name: 'Smizfume Caverns', clan: 'Smizfume', color: 'from-red-900 to-orange-800', active: false },
-  { id: 1, name: 'Coalheart Mines', clan: 'Coalheart', color: 'from-gray-800 to-slate-700', active: false },
-  { id: 2, name: 'Warmdice Casino', clan: 'Warmdice', color: 'from-purple-900 to-indigo-800', active: false },
-  { id: 3, name: 'Bervation Depths', clan: 'Bervation', color: 'from-blue-900 to-cyan-800', active: false },
-  { id: 4, name: 'Konfisof Grove', clan: 'Konfisof', color: 'from-green-900 to-emerald-800', active: false },
-  { id: 5, name: 'Witkastle Fortress', clan: 'Witkastle', color: 'from-yellow-800 to-amber-700', active: true },
-  { id: 6, name: 'Bowkin Hideout', clan: 'Bowkin', color: 'from-rose-900 to-red-800', active: false }
+  { id: 0, name: 'Smizfume Caverns', clan: 'Smizfume', clanId: 0, color: 'from-red-900 to-orange-800', active: false, video: '/videos/smizfume_arena.mp4', image: '/images/smizfume_arena.png' },
+  { id: 1, name: 'Coalheart Mines', clan: 'Coalheart', clanId: 1, color: 'from-gray-800 to-slate-700', active: false, video: '/videos/coalheart_arena.mp4', image: '/images/coalheart_arena.png' },
+  { id: 2, name: 'Warmdice Casino', clan: 'Warmdice', clanId: 2, color: 'from-purple-900 to-indigo-800', active: false, video: '/videos/warmdice_arena.mp4', image: '/images/warmdice_arena.png' },
+  { id: 3, name: 'Bervation Depths', clan: 'Bervation', clanId: 3, color: 'from-blue-900 to-cyan-800', active: false, video: '/videos/bervation_arena.mp4', image: '/images/bervation_arena.png' },
+  { id: 4, name: 'Konfisof Grove', clan: 'Konfisof', clanId: 4, color: 'from-green-900 to-emerald-800', active: false, video: '/videos/konfisof_arena.mp4', image: '/images/konfisof_arena.png' },
+  { id: 5, name: 'The Castle Grounds', clan: 'Witkastle', clanId: 5, color: 'from-yellow-800 to-amber-700', active: true, video: '/videos/castle_grounds_arena.mp4', image: '/images/castle_grounds_arena.png' },
+  { id: 6, name: 'Bowkin Hideout', clan: 'Bowkin', clanId: 6, color: 'from-rose-900 to-red-800', active: false, video: '/videos/bowkin_arena.mp4', image: '/images/bowkin_arena.png' }
 ];
 
+// ==================== ENEMY CONFIGURATION ====================
+// From documentation: Zimrek, Lord Jeroboam, Nebchud Baddon
+// Each enemy has 3 HP (hearts)
+
 const ENEMIES = {
-  5: [ // Witkastle enemies
-    { id: 1, name: 'Lashon the Weak', health: 8, image: '/images/enemies/witkastle_1.png' },
-    { id: 2, name: 'Benji the Brown', health: 12, image: '/images/enemies/witkastle_2.png' },
-    { id: 3, name: 'Andrew the Unbreakable', health: 20, image: '/images/enemies/witkastle_3.png' }
-  ]
+  1: {
+    name: 'Zimrek',
+    title: 'Professional Assassin',
+    description: 'Discreet, lethal, not noble-born but trusted for dirty work',
+    weapon: 'Blunderbuss',
+    hp: 3,
+    weaponVideo: '/videos/blunderbuss_fire.mp4',
+    characterVideo: '/videos/zimrek.mp4',
+    staticImage: '/images/zimrek.png'
+  },
+  2: {
+    name: 'Lord Jeroboam',
+    title: 'Elite Conspirator',
+    description: 'Wealthy, calculated antagonist — educated, dangerous and elite',
+    weapon: 'Flintlock Pistol',
+    hp: 3,
+    weaponVideo: '/videos/flintlock_fire.mp4',
+    characterVideo: '/videos/lord_jeroboam.mp4',
+    staticImage: '/images/lord_jeroboam.png'
+  },
+  3: {
+    name: 'Nebchud Baddon',
+    title: 'Corrupted Ruler',
+    description: 'Intimidating, mythical — a corrupted ruler, not a common brute',
+    weapon: 'Gilded Sceptre',
+    hp: 3,
+    weaponVideo: '/videos/gilded_sceptre_strike.mp4',
+    characterVideo: '/videos/nebchud_baddon.mp4',
+    staticImage: '/images/nebchud_baddon.png'
+  }
 };
+
+// ==================== BATTLE BOOSTS CONFIGURATION ====================
+
+const ALL_BOOSTS = [
+  { id: 'konfisof_minor', name: 'Battle Boost (+15%)', emoji: '🎯', clan: 'Konfisof', effect: '+15% Fighter hit chance', type: 'passive', animation: '/animations/battle_boost_minor.gif' },
+  { id: 'konfisof_major', name: 'Battle Boost (+40%)', emoji: '🎯', clan: 'Konfisof', effect: '+40% Fighter hit chance', type: 'passive', animation: '/animations/battle_boost_major.gif' },
+  { id: 'bervation_prayer', name: 'Holy Prayer', emoji: '🙏', clan: 'Bervation', effect: 'Restore 1 HP', type: 'active', animation: '/animations/holy_prayer.gif' },
+  { id: 'witkastle_morale', name: 'Morale Boost', emoji: '💪', clan: 'Witkastle', effect: '+10% hit, -10% enemy hit', type: 'passive', animation: '/animations/morale_boost.gif' },
+  { id: 'smizfume_poison', name: 'Poison Potion', emoji: '🧪', clan: 'Smizfume', effect: 'Enemy -20% hit (2 attacks)', type: 'active', animation: '/animations/poison_potion.gif' },
+  { id: 'coalheart_freeze', name: 'Freeze', emoji: '❄️', clan: 'Coalheart', effect: 'Enemy skips next turn', type: 'active', animation: '/animations/freeze.gif' },
+  { id: 'warmdice_treasure', name: 'Treasure Chest', emoji: '💰', clan: 'Warmdice', effect: 'Random bonus reward', type: 'instant', animation: '/animations/treasure_chest.gif' },
+  { id: 'bowkin_trap', name: 'Trap', emoji: '🪤', clan: 'Bowkin', effect: 'Enemy loses 1 HP', type: 'active', animation: '/animations/trap.gif' }
+];
 
 // ==================== BATTLE MUSIC CONFIGURATION ====================
 
@@ -80,23 +158,45 @@ const BATTLE_MUSIC = {
 // ==================== MAIN COMPONENT ====================
 
 export default function Battle({ connected, walletAddress, connectWallet, onNavigate }) {
-  // Battle State
+  // ==================== STATE ====================
+  
+  // Fighter & Battle State
   const [selectedFighter, setSelectedFighter] = useState(null);
-  const [selectedArena, setSelectedArena] = useState(null);
-  const [selectedEnemy, setSelectedEnemy] = useState(null);
-  const [battleState, setBattleState] = useState(null);
-  const [battleLog, setBattleLog] = useState([]);
+  const [currentArena, setCurrentArena] = useState(null);
+  const [currentEnemy, setCurrentEnemy] = useState(null);
+  const [enemiesDefeated, setEnemiesDefeated] = useState([]);
+  
+  // HP State (3 hearts each)
+  const [fighterHP, setFighterHP] = useState(3);
+  const [enemyHP, setEnemyHP] = useState(3);
+  
+  // Combat State
+  const [currentTurn, setCurrentTurn] = useState('player');
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [weaponAnimation, setWeaponAnimation] = useState(null);
+  const [outcomeText, setOutcomeText] = useState('');
+  const [round, setRound] = useState(1);
+  
+  // Battle Boosts State
+  const [activeBoosts, setActiveBoosts] = useState([]);
+  const [poisonedAttacksRemaining, setPoisonedAttacksRemaining] = useState(0);
+  const [enemyFrozen, setEnemyFrozen] = useState(false);
+  
+  // Herald Bonus State
+  const [heraldRarityBonus, setHeraldRarityBonus] = useState(0);
+  const [hasClanHeraldStaked, setHasClanHeraldStaked] = useState(false);
   
   // Data State
   const [stakedFighters, setStakedFighters] = useState([]);
   const [userBalances, setUserBalances] = useState({ food: 0, gold: 0, wood: 0, rkt: 0 });
-  const [hasClanHeraldStaked, setHasClanHeraldStaked] = useState(false);
+  const [battleLog, setBattleLog] = useState([]);
+  const [earnedRewards, setEarnedRewards] = useState(null);
   
   // UI State
   const [loading, setLoading] = useState(false);
-  const [attacking, setAttacking] = useState(false);
+  const [txPending, setTxPending] = useState(false);
   const [error, setError] = useState(null);
-  const [view, setView] = useState('select'); // 'select', 'arena', 'battle', 'victory', 'defeat'
+  const [view, setView] = useState('select'); // 'select', 'pre-battle', 'fighting', 'victory', 'defeat', 'arena-complete'
   const [debugInfo, setDebugInfo] = useState('');
   
   // Music State
@@ -106,9 +206,9 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
 
   // ==================== MUSIC FUNCTIONS ====================
 
-  const startBattleMusic = (arenaId, enemyId) => {
+  const startBattleMusic = (arenaId, enemyNum) => {
     stopBattleMusic();
-    const musicPath = BATTLE_MUSIC[arenaId]?.[enemyId];
+    const musicPath = BATTLE_MUSIC[arenaId]?.[enemyNum];
     if (!musicPath) return;
     
     try {
@@ -162,19 +262,16 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
     if (!window.ethereum || !walletAddress) return;
     
     setLoading(true);
-    setDebugInfo('Loading...');
+    setDebugInfo('Loading battle data...');
     
     try {
-      // Use browser provider (MetaMask) - more reliable than public RPCs
       const provider = new ethers.BrowserProvider(window.ethereum);
-      
       const fighterContract = new ethers.Contract(FIGHTER_ADDRESS, FIGHTER_ABI, provider);
       const gameBalanceContract = new ethers.Contract(GAMEBALANCE_ADDRESS, GAMEBALANCE_ABI, provider);
       
       console.log('Loading battle data for:', walletAddress);
       
       // ==================== LOAD STAKED FIGHTERS ====================
-      // Use the same method as FighterStaking - get all fighters and filter by isStaked
       const staked = [];
       
       try {
@@ -200,8 +297,6 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
             const isStaked = Boolean(fighterData[8]);
             const inBattle = Boolean(fighterData[9]);
             
-            console.log(`Fighter #${tokenId}: ${CLAN_NAMES[clan]}, Staked: ${isStaked}, InBattle: ${inBattle}`);
-            
             if (isStaked) {
               staked.push({
                 tokenId: tokenId.toString(),
@@ -214,7 +309,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
                 pvpLosses,
                 isStaked,
                 inBattle,
-                lastRefuelTime: refuelStartTime
+                refuelStartTime
               });
             }
           } catch (e) {
@@ -230,7 +325,6 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       
       // ==================== LOAD GAME BALANCES ====================
       try {
-        // Try getAllBalances first
         let balances = null;
         
         try {
@@ -241,11 +335,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
             wood: Number(ethers.formatEther(result[2] || result.wood || 0)),
             rkt: Number(ethers.formatEther(result[3] || result.rkt || 0))
           };
-          console.log('Loaded balances via getAllBalances:', balances);
         } catch (e) {
-          console.log('getAllBalances failed, trying individual getBalance calls:', e.message);
-          
-          // Try individual balance calls with uint8 token IDs
           try {
             const food = await gameBalanceContract.getBalance(walletAddress, 1);
             const gold = await gameBalanceContract.getBalance(walletAddress, 2);
@@ -258,27 +348,8 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
               wood: Number(ethers.formatEther(wood)),
               rkt: Number(ethers.formatEther(rkt))
             };
-            console.log('Loaded balances via getBalance:', balances);
           } catch (e2) {
-            console.log('getBalance also failed:', e2.message);
-            
-            // Try inGameBalances mapping
-            try {
-              const food = await gameBalanceContract.inGameBalances(walletAddress, 1);
-              const gold = await gameBalanceContract.inGameBalances(walletAddress, 2);
-              const wood = await gameBalanceContract.inGameBalances(walletAddress, 3);
-              const rkt = await gameBalanceContract.inGameBalances(walletAddress, 4);
-              
-              balances = {
-                food: Number(ethers.formatEther(food)),
-                gold: Number(ethers.formatEther(gold)),
-                wood: Number(ethers.formatEther(wood)),
-                rkt: Number(ethers.formatEther(rkt))
-              };
-              console.log('Loaded balances via inGameBalances:', balances);
-            } catch (e3) {
-              console.log('inGameBalances also failed:', e3.message);
-            }
+            console.log('getBalance failed:', e2.message);
           }
         }
         
@@ -300,46 +371,101 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
     }
   };
 
-  // Check if user has matching clan Herald staked
+  // ==================== HERALD CLAN CHECK WITH RARITY BONUS ====================
+
   const checkClanHeraldStaked = async (clanId) => {
-    if (!window.ethereum || !walletAddress) return false;
+    if (!window.ethereum || !walletAddress) return { hasHerald: false, rarityBonus: 0 };
     
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI, provider);
+      const heraldContract = new ethers.Contract(HERALD_ADDRESS, HERALD_ABI, provider);
+      
+      // First check if clan Herald is staked
       const hasStaked = await stakingContract.hasClanStaked(walletAddress, clanId);
-      setHasClanHeraldStaked(hasStaked);
-      return hasStaked;
+      
+      if (!hasStaked) {
+        setHasClanHeraldStaked(false);
+        setHeraldRarityBonus(0);
+        return { hasHerald: false, rarityBonus: 0 };
+      }
+      
+      setHasClanHeraldStaked(true);
+      
+      // Get staked Heralds to find the one matching the clan and get its rarity
+      let rarityBonus = 2; // Default to Bronze bonus
+      
+      try {
+        const stakedHeralds = await stakingContract.getUserStakedHeralds(walletAddress);
+        
+        for (const tokenId of stakedHeralds) {
+          try {
+            const stakeInfo = await stakingContract.getStakeInfo(tokenId);
+            const heraldClan = Number(stakeInfo[3]); // clan is at index 3
+            const heraldRarity = Number(stakeInfo[4]); // rarity is at index 4
+            
+            if (heraldClan === clanId) {
+              rarityBonus = HERALD_RARITY_BONUS[heraldRarity] || 2;
+              console.log(`Found ${RARITY_NAMES[heraldRarity]} Herald of clan ${CLAN_NAMES[clanId]}, bonus: +${rarityBonus}%`);
+              break;
+            }
+          } catch (e) {
+            // If getStakeInfo fails, try getting rarity from Herald contract
+            try {
+              const heraldData = await heraldContract.getHerald(tokenId);
+              const heraldRarity = Number(heraldData[0]);
+              const heraldClan = Number(heraldData[1]);
+              
+              if (heraldClan === clanId) {
+                rarityBonus = HERALD_RARITY_BONUS[heraldRarity] || 2;
+                break;
+              }
+            } catch (e2) {
+              console.log('Error getting herald data:', e2.message);
+            }
+          }
+        }
+      } catch (e) {
+        console.log('Error getting staked heralds:', e.message);
+      }
+      
+      setHeraldRarityBonus(rarityBonus);
+      return { hasHerald: true, rarityBonus };
+      
     } catch (e) {
       console.log('Error checking herald staking:', e.message);
-      return false;
+      return { hasHerald: false, rarityBonus: 0 };
     }
   };
 
-  // Check if fighter is already in battle
-  const checkBattleState = async (fighterId) => {
-    if (!window.ethereum) return null;
+  // ==================== HIT CHANCE CALCULATIONS ====================
+
+  const calculateFighterAccuracy = (fighterRarity, enemyNum) => {
+    let baseAccuracy = FIGHTER_HIT_CHANCES[fighterRarity]?.[enemyNum - 1] || 10;
     
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, provider);
-      const state = await battleContract.getBattleState(fighterId);
-      
-      if (state[0]) { // inBattle
-        return {
-          inBattle: true,
-          arenaId: Number(state[1]),
-          enemyId: Number(state[2]),
-          enemyHealth: Number(state[3]),
-          fighterHealth: Number(state[4]),
-          battleStartTime: Number(state[5])
-        };
-      }
-      return null;
-    } catch (e) {
-      console.log('Error checking battle state:', e.message);
-      return null;
-    }
+    // Add Herald rarity bonus
+    baseAccuracy += heraldRarityBonus;
+    
+    // Add boost bonuses
+    const usedBoosts = activeBoosts.filter(b => b.usedThisBattle);
+    if (usedBoosts.some(b => b.id === 'konfisof_minor')) baseAccuracy += 15;
+    if (usedBoosts.some(b => b.id === 'konfisof_major')) baseAccuracy += 40;
+    if (usedBoosts.some(b => b.id === 'witkastle_morale')) baseAccuracy += 10;
+    
+    return Math.min(baseAccuracy, 95); // Cap at 95%
+  };
+
+  const calculateEnemyAccuracy = (enemyNum, fighterRarity) => {
+    let baseAccuracy = ENEMY_HIT_CHANCES[enemyNum]?.[fighterRarity] || 80;
+    
+    // Apply boost debuffs
+    const usedBoosts = activeBoosts.filter(b => b.usedThisBattle);
+    if (usedBoosts.some(b => b.id === 'witkastle_morale')) baseAccuracy -= 10;
+    
+    // Apply poison debuff
+    if (poisonedAttacksRemaining > 0) baseAccuracy -= 20;
+    
+    return Math.max(baseAccuracy, 5); // Minimum 5%
   };
 
   // ==================== FIGHTER SELECTION ====================
@@ -348,283 +474,454 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
     setSelectedFighter(fighter);
     setError(null);
     
-    // Check if fighter is in battle
-    const existingBattle = await checkBattleState(fighter.tokenId);
-    if (existingBattle) {
-      setBattleState(existingBattle);
-      setSelectedArena(existingBattle.arenaId);
-      setSelectedEnemy(existingBattle.enemyId);
-      addBattleLog('Resuming existing battle...');
-      setView('battle');
-      startBattleMusic(existingBattle.arenaId, existingBattle.enemyId);
+    // Check if fighter is already in battle (resume)
+    if (fighter.inBattle) {
+      addLog('Resuming existing battle...');
+      // TODO: Load existing battle state from contract
       return;
     }
     
-    // Check if matching clan Herald is staked
-    const hasHerald = await checkClanHeraldStaked(fighter.clan);
+    // Check if matching clan Herald is staked and get rarity bonus
+    const { hasHerald, rarityBonus } = await checkClanHeraldStaked(fighter.clan);
+    
     if (!hasHerald) {
-      setError(`You need a ${CLAN_NAMES[fighter.clan] || 'matching'} Herald staked to battle!`);
-    }
-    
-    setView('arena');
-  };
-
-  // ==================== ARENA SELECTION ====================
-
-  const handleSelectArena = (arenaId) => {
-    if (!ARENAS[arenaId]?.active) {
-      setError('This arena is not yet open!');
-      return;
-    }
-    setSelectedArena(arenaId);
-    setSelectedEnemy(null);
-  };
-
-  const handleSelectEnemy = (enemyId) => {
-    setSelectedEnemy(enemyId);
-  };
-
-  // ==================== BATTLE ACTIONS ====================
-
-  const addBattleLog = (message, type = 'info') => {
-    setBattleLog(prev => [...prev, { message, type, timestamp: Date.now() }]);
-  };
-
-  const handleEnterBattle = async () => {
-    if (!selectedFighter || selectedArena === null || !selectedEnemy) {
-      setError('Please select a fighter, arena, and enemy');
+      setError(`You need a ${CLAN_NAMES[fighter.clan]} Herald staked to battle with this Fighter!`);
       return;
     }
     
-    if (!hasClanHeraldStaked) {
-      setError(`You need a ${CLAN_NAMES[selectedFighter.clan]} Herald staked to battle!`);
+    // Check energy
+    if (fighter.energy < 20) {
+      setError('Fighter needs at least 20 energy to enter battle. Refuel first!');
       return;
     }
     
-    if (selectedFighter.energy < 20) {
-      setError('Fighter needs at least 20 energy. Refuel first!');
-      return;
-    }
-    
+    // Check FOOD balance
     if (userBalances.food < 50) {
-      setError('You need at least 50 FOOD for the entry fee!');
+      setError('You need at least 50 FOOD for the battle entry fee!');
       return;
     }
     
-    setLoading(true);
-    setError(null);
-    setBattleLog([]);
+    addLog(`Selected ${RARITY_NAMES[fighter.rarity]} ${CLAN_NAMES[fighter.clan]} Fighter #${fighter.tokenId}`);
+    addLog(`${RARITY_NAMES[rarityBonus === 10 ? 2 : rarityBonus === 5 ? 1 : 0]} Herald bonus: +${rarityBonus}% hit chance`);
     
+    setView('pre-battle');
+  };
+
+  // ==================== BATTLE ENTRY ====================
+
+  const enterBattle = async () => {
+    if (!selectedFighter) {
+      setError('No Fighter selected');
+      return;
+    }
+
+    setTxPending(true);
+    setError(null);
+
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
+
+      // RANDOMIZE ARENA from active arenas
+      const activeArenas = ARENAS.filter(a => a.active);
+      const randomArena = activeArenas[Math.floor(Math.random() * activeArenas.length)];
       
-      addBattleLog(`Entering ${ARENAS[selectedArena].name}...`);
+      addLog(`⏳ Entering battle... (50 FOOD entry fee, -20 energy)`);
       
-      const tx = await battleContract.enterArena(
-        selectedFighter.tokenId,
-        selectedArena,
-        selectedEnemy
-      );
-      
-      addBattleLog('Transaction submitted, waiting for confirmation...');
+      // Enter arena with Enemy 1 (always start at enemy 1)
+      const tx = await battleContract.enterArena(selectedFighter.tokenId, randomArena.id, 1);
       await tx.wait();
       
-      addBattleLog('Battle started! Prepare for combat!', 'success');
+      addLog(`✅ Entered ${randomArena.name}!`);
+      addLog(`⚔️ Prepare to face Zimrek, the Professional Assassin!`);
       
-      const state = await checkBattleState(selectedFighter.tokenId);
-      setBattleState(state);
-      startBattleMusic(selectedArena, selectedEnemy);
-      setView('battle');
+      // Set battle state
+      setCurrentArena(randomArena);
+      setCurrentEnemy(1);
+      setEnemiesDefeated([]);
+      setFighterHP(3);
+      setEnemyHP(3);
+      setRound(1);
+      setCurrentTurn('player');
       
-    } catch (e) {
-      console.error('Error entering battle:', e);
-      if (e.code === 'ACTION_REJECTED') {
+      // Grant test boosts for first enemy (will be NFT-based later)
+      setActiveBoosts(ALL_BOOSTS.map(b => ({ ...b, usedThisBattle: false })));
+      
+      // Start battle music
+      startBattleMusic(randomArena.id, 1);
+      
+      setView('fighting');
+      setTxPending(false);
+      
+    } catch (err) {
+      console.error('Error entering battle:', err);
+      if (err.code === 'ACTION_REJECTED') {
         setError('Transaction cancelled');
-      } else if (e.message?.includes('insufficient')) {
-        setError('Insufficient FOOD balance for entry fee');
-      } else if (e.message?.includes('Herald')) {
-        setError('Matching clan Herald not staked');
       } else {
-        setError('Failed to enter battle: ' + (e.reason || e.message || 'Unknown error'));
+        setError(err.reason || err.message || 'Failed to enter battle');
       }
-    } finally {
-      setLoading(false);
+      setTxPending(false);
     }
   };
 
-  const handleAttack = async () => {
-    if (!selectedFighter || !battleState) return;
+  // ==================== BATTLE LOG ====================
+
+  const addLog = (message) => {
+    setBattleLog(prev => [message, ...prev].slice(0, 10));
+  };
+
+  // ==================== BOOST USAGE ====================
+
+  const useBoost = (boostId) => {
+    if (isAnimating || currentTurn !== 'player') return;
     
-    setAttacking(true);
+    const boost = activeBoosts.find(b => b.id === boostId);
+    if (!boost || boost.usedThisBattle) return;
     
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
-      
-      addBattleLog('Attacking...', 'info');
-      
-      const tx = await battleContract.attack(selectedFighter.tokenId);
-      const receipt = await tx.wait();
-      
-      // Parse attack event
-      let fighterHit = false;
-      let enemyHit = false;
-      let fighterDamage = 0;
-      let enemyDamage = 0;
-      
-      for (const log of receipt.logs) {
-        try {
-          const parsed = battleContract.interface.parseLog(log);
-          if (parsed?.name === 'AttackPerformed') {
-            fighterHit = parsed.args.fighterHit;
-            enemyHit = parsed.args.enemyHit;
-            fighterDamage = Number(parsed.args.fighterDamage);
-            enemyDamage = Number(parsed.args.enemyDamage);
-          }
-        } catch (e) {}
-      }
-      
-      if (fighterHit) {
-        addBattleLog(`💥 You hit for ${fighterDamage} damage!`, 'success');
-      } else {
-        addBattleLog('❌ Your attack missed!', 'warning');
-      }
-      
-      if (enemyHit) {
-        addBattleLog(`🔥 Enemy hit you for ${enemyDamage} damage!`, 'danger');
-      } else {
-        addBattleLog('🛡️ Enemy attack missed!', 'success');
-      }
-      
-      const newState = await checkBattleState(selectedFighter.tokenId);
-      
-      if (!newState || !newState.inBattle) {
-        const canVictory = await battleContract.canClaimVictory(selectedFighter.tokenId);
-        if (canVictory) {
-          addBattleLog('🏆 VICTORY! Enemy defeated!', 'success');
-          setView('victory');
-        } else {
-          addBattleLog('💀 DEFEAT! You have fallen...', 'danger');
-          setView('defeat');
+    switch(boostId) {
+      case 'konfisof_minor':
+        addLog('🎯 Battle Boost (+15%): Fighter accuracy increased!');
+        playBoostAnimation(boost.animation);
+        markBoostUsed(boostId);
+        break;
+        
+      case 'konfisof_major':
+        addLog('🎯 Battle Boost (+40%): Fighter accuracy greatly increased!');
+        playBoostAnimation(boost.animation);
+        markBoostUsed(boostId);
+        break;
+        
+      case 'bervation_prayer':
+        if (fighterHP >= 3) {
+          addLog('🙏 Already at full health!');
+          return;
         }
-        stopBattleMusic();
-      } else {
-        setBattleState(newState);
-      }
-      
-    } catch (e) {
-      console.error('Attack error:', e);
-      if (e.code === 'ACTION_REJECTED') {
-        addBattleLog('Attack cancelled', 'warning');
-      } else {
-        addBattleLog('Attack failed: ' + (e.reason || e.message), 'danger');
-      }
-    } finally {
-      setAttacking(false);
+        setFighterHP(hp => Math.min(hp + 1, 3));
+        addLog('🙏 Holy Prayer: Restored 1 HP!');
+        playBoostAnimation(boost.animation);
+        removeBoost(boostId);
+        break;
+        
+      case 'witkastle_morale':
+        addLog('💪 Morale Boost: +10% hit chance, enemy -10% hit chance!');
+        playBoostAnimation(boost.animation);
+        markBoostUsed(boostId);
+        break;
+        
+      case 'smizfume_poison':
+        setPoisonedAttacksRemaining(2);
+        addLog('🧪 Poison Potion: Enemy accuracy reduced by 20% for 2 attacks!');
+        playBoostAnimation(boost.animation);
+        removeBoost(boostId);
+        break;
+        
+      case 'coalheart_freeze':
+        setEnemyFrozen(true);
+        addLog('❄️ Freeze: Enemy will skip their next turn!');
+        playBoostAnimation(boost.animation);
+        removeBoost(boostId);
+        break;
+        
+      case 'warmdice_treasure':
+        const goldAmount = Math.floor(Math.random() * 8) + 10;
+        const woodAmount = Math.floor(Math.random() * 6) + 5;
+        setOutcomeText(`💰 TREASURE!\n${goldAmount} GOLD + ${woodAmount} WOOD`);
+        addLog(`💰 Treasure Chest: Found ${goldAmount} GOLD + ${woodAmount} WOOD!`);
+        playBoostAnimation(boost.animation);
+        setTimeout(() => setOutcomeText(''), 3000);
+        removeBoost(boostId);
+        break;
+        
+      case 'bowkin_trap':
+        setEnemyHP(hp => Math.max(hp - 1, 0));
+        addLog('🪤 Trap: Enemy loses 1 HP!');
+        playBoostAnimation(boost.animation);
+        removeBoost(boostId);
+        
+        // Check if enemy defeated by trap
+        if (enemyHP <= 1) {
+          setTimeout(() => handleEnemyDefeated(), 1500);
+        }
+        break;
     }
   };
 
-  const handleClaimVictory = async () => {
-    if (!selectedFighter) return;
+  const playBoostAnimation = (animation) => {
+    if (animation) {
+      setWeaponAnimation(animation);
+      setTimeout(() => setWeaponAnimation(null), 2000);
+    }
+  };
+
+  const markBoostUsed = (boostId) => {
+    setActiveBoosts(boosts => boosts.map(b => 
+      b.id === boostId ? { ...b, usedThisBattle: true } : b
+    ));
+  };
+
+  const removeBoost = (boostId) => {
+    setActiveBoosts(boosts => boosts.filter(b => b.id !== boostId));
+  };
+
+  // ==================== COMBAT FUNCTIONS ====================
+
+  const playerAttack = () => {
+    if (isAnimating || currentTurn !== 'player') return;
     
-    setLoading(true);
+    setIsAnimating(true);
+    setOutcomeText('');
     
+    const accuracy = calculateFighterAccuracy(selectedFighter.rarity, currentEnemy);
+    const hitRoll = Math.random() * 100;
+    const didHit = hitRoll <= accuracy;
+    
+    // Play weapon animation
+    setWeaponAnimation('/videos/sailors_dirk.mp4');
+    
+    setTimeout(() => {
+      setWeaponAnimation(null);
+      
+      if (didHit) {
+        setOutcomeText('FIGHTER HITS!');
+        const newHP = enemyHP - 1;
+        setEnemyHP(newHP);
+        addLog(`⚔️ Fighter strikes! HIT! (${ENEMIES[currentEnemy].name}: ${newHP} HP)`);
+        
+        if (newHP <= 0) {
+          setTimeout(() => handleEnemyDefeated(), 1500);
+        } else {
+          setTimeout(() => startEnemyTurn(), 2000);
+        }
+      } else {
+        setOutcomeText('FIGHTER MISSES!');
+        addLog(`⚔️ Fighter attacks... MISS!`);
+        setTimeout(() => startEnemyTurn(), 2000);
+      }
+      
+      setIsAnimating(false);
+    }, 1500);
+  };
+
+  const startEnemyTurn = () => {
+    setCurrentTurn('enemy');
+    setOutcomeText('');
+    
+    // Check if enemy is frozen
+    if (enemyFrozen) {
+      setEnemyFrozen(false);
+      addLog(`❄️ ${ENEMIES[currentEnemy].name} is frozen! Skips turn!`);
+      setTimeout(() => {
+        setRound(r => r + 1);
+        setCurrentTurn('player');
+      }, 1500);
+      return;
+    }
+    
+    setTimeout(() => enemyAttack(), 1000);
+  };
+
+  const enemyAttack = () => {
+    setIsAnimating(true);
+    
+    let accuracy = calculateEnemyAccuracy(currentEnemy, selectedFighter.rarity);
+    
+    // Decrement poison counter
+    if (poisonedAttacksRemaining > 0) {
+      setPoisonedAttacksRemaining(p => p - 1);
+      addLog(`🧪 ${ENEMIES[currentEnemy].name} is poisoned! (${poisonedAttacksRemaining - 1} attacks remaining)`);
+    }
+    
+    const hitRoll = Math.random() * 100;
+    const didHit = hitRoll <= accuracy;
+    
+    // Play enemy weapon animation
+    setWeaponAnimation(ENEMIES[currentEnemy].weaponVideo);
+    
+    setTimeout(() => {
+      setWeaponAnimation(null);
+      
+      if (didHit) {
+        setOutcomeText('ENEMY HITS!');
+        const newHP = fighterHP - 1;
+        setFighterHP(newHP);
+        addLog(`🔥 ${ENEMIES[currentEnemy].name} attacks with ${ENEMIES[currentEnemy].weapon}! HIT! (Fighter: ${newHP} HP)`);
+        
+        if (newHP <= 0) {
+          setTimeout(() => handleFighterDefeated(), 1500);
+        } else {
+          setTimeout(() => {
+            setRound(r => r + 1);
+            setCurrentTurn('player');
+            setOutcomeText('');
+          }, 2000);
+        }
+      } else {
+        setOutcomeText('ENEMY MISSES!');
+        addLog(`🛡️ ${ENEMIES[currentEnemy].name} attacks... MISS!`);
+        setTimeout(() => {
+          setRound(r => r + 1);
+          setCurrentTurn('player');
+          setOutcomeText('');
+        }, 2000);
+      }
+      
+      setIsAnimating(false);
+    }, 1500);
+  };
+
+  // ==================== BATTLE OUTCOME HANDLERS ====================
+
+  const handleEnemyDefeated = async () => {
+    stopBattleMusic();
+    addLog(`🏆 ${ENEMIES[currentEnemy].name} has been defeated!`);
+    
+    // Claim victory on-chain for this enemy
     try {
+      setTxPending(true);
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
       
-      addBattleLog('Claiming rewards...');
-      
-      const tx = await battleContract.claimVictory(selectedFighter.tokenId);
+      addLog('⏳ Claiming rewards...');
+      const tx = await battleContract.claimVictory(selectedFighter.tokenId, currentEnemy);
       const receipt = await tx.wait();
       
-      let rewards = { food: 0, gold: 0, wood: 0, rkt: 0 };
+      // Parse rewards from event
+      const rewards = {};
       for (const log of receipt.logs) {
         try {
           const parsed = battleContract.interface.parseLog(log);
-          if (parsed?.name === 'RewardsDistributed') {
-            rewards = {
-              food: Number(ethers.formatEther(parsed.args.food)),
-              gold: Number(ethers.formatEther(parsed.args.gold)),
-              wood: Number(ethers.formatEther(parsed.args.wood)),
-              rkt: Number(ethers.formatEther(parsed.args.rkt))
-            };
+          if (parsed?.name === 'RewardDistributed') {
+            const tokenId = Number(parsed.args.tokenId);
+            const amount = ethers.formatEther(parsed.args.amount);
+            const tokenNames = { 1: 'FOOD', 2: 'GOLD', 3: 'WOOD', 4: 'RKT' };
+            const tokenName = tokenNames[tokenId];
+            if (tokenName) {
+              rewards[tokenName] = parseFloat(amount).toFixed(2);
+            }
           }
         } catch (e) {}
       }
       
-      addBattleLog(`🎁 Rewards: ${rewards.food} FOOD, ${rewards.gold} GOLD, ${rewards.wood} WOOD, ${rewards.rkt} RKT`, 'success');
+      setEarnedRewards(rewards);
+      addLog(`✅ Rewards claimed!`);
       
-      stopBattleMusic();
-      await loadUserData();
-      setBattleState(null);
-      setSelectedEnemy(null);
+      // Update enemies defeated
+      setEnemiesDefeated(prev => [...prev, currentEnemy]);
       
-    } catch (e) {
-      console.error('Claim victory error:', e);
-      setError('Failed to claim victory: ' + (e.reason || e.message));
-    } finally {
-      setLoading(false);
+      // Check if more enemies to fight
+      if (currentEnemy < 3) {
+        setView('victory');
+      } else {
+        // All 3 enemies defeated - arena complete!
+        setView('arena-complete');
+      }
+      
+      setTxPending(false);
+      
+    } catch (err) {
+      console.error('Error claiming victory:', err);
+      addLog(`❌ Error claiming rewards: ${err.message}`);
+      setView('victory'); // Still show victory screen
+      setTxPending(false);
     }
   };
 
-  const handleClaimDefeat = async () => {
-    if (!selectedFighter) return;
+  const handleFighterDefeated = async () => {
+    stopBattleMusic();
+    addLog(`💀 Fighter #${selectedFighter.tokenId} has fallen...`);
     
-    setLoading(true);
-    
+    // Claim defeat on-chain
     try {
+      setTxPending(true);
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
       
-      addBattleLog('Retreating from battle...');
-      
+      addLog('⏳ Recording defeat...');
       const tx = await battleContract.claimDefeat(selectedFighter.tokenId);
       await tx.wait();
       
-      addBattleLog('You live to fight another day...', 'warning');
+      addLog('Defeat recorded.');
+      setView('defeat');
+      setTxPending(false);
       
-      stopBattleMusic();
-      await loadUserData();
-      setBattleState(null);
-      setSelectedEnemy(null);
-      
-    } catch (e) {
-      console.error('Claim defeat error:', e);
-      setError('Failed to claim defeat: ' + (e.reason || e.message));
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Error claiming defeat:', err);
+      setView('defeat');
+      setTxPending(false);
     }
   };
 
-  const handleReset = () => {
+  // ==================== CONTINUE TO NEXT ENEMY ====================
+
+  const continueToNextEnemy = () => {
+    const nextEnemy = currentEnemy + 1;
+    
+    // Reset battle state for next enemy (NO extra payment, NO extra energy cost)
+    setCurrentEnemy(nextEnemy);
+    setEnemyHP(3);
+    setFighterHP(fighterHP); // Keep current fighter HP
+    setRound(1);
+    setCurrentTurn('player');
+    setOutcomeText('');
+    setEarnedRewards(null);
+    
+    // Reset poison and freeze
+    setPoisonedAttacksRemaining(0);
+    setEnemyFrozen(false);
+    
+    // Clear used passive boosts for new enemy, remove consumed active boosts
+    setActiveBoosts(boosts => boosts.filter(b => {
+      // Remove passive boosts that were used
+      if (b.usedThisBattle && (b.id === 'konfisof_minor' || b.id === 'konfisof_major' || b.id === 'witkastle_morale')) {
+        return false;
+      }
+      return true;
+    }).map(b => ({ ...b, usedThisBattle: false })));
+    
+    addLog(`⚔️ Advancing to ${ENEMIES[nextEnemy].name}, the ${ENEMIES[nextEnemy].title}!`);
+    
+    // Start music for next enemy
+    startBattleMusic(currentArena.id, nextEnemy);
+    
+    setView('fighting');
+  };
+
+  // ==================== EXIT BATTLE ====================
+
+  const exitBattle = async () => {
+    stopBattleMusic();
+    await loadUserData();
+    
+    // Reset all state
     setSelectedFighter(null);
-    setSelectedArena(null);
-    setSelectedEnemy(null);
-    setBattleState(null);
+    setCurrentArena(null);
+    setCurrentEnemy(null);
+    setEnemiesDefeated([]);
+    setFighterHP(3);
+    setEnemyHP(3);
     setBattleLog([]);
+    setActiveBoosts([]);
+    setPoisonedAttacksRemaining(0);
+    setEnemyFrozen(false);
+    setHeraldRarityBonus(0);
+    setEarnedRewards(null);
     setError(null);
     setView('select');
-    stopBattleMusic();
   };
 
   // ==================== RENDER HELPERS ====================
-
-  const getRarityName = (rarity) => ['Bronze', 'Silver', 'Gold'][rarity] || 'Unknown';
 
   const getRarityColor = (rarity) => {
     const colors = ['from-orange-600 to-amber-700', 'from-gray-400 to-slate-300', 'from-yellow-500 to-amber-400'];
     return colors[rarity] || 'from-gray-600 to-gray-500';
   };
 
-  const getEnemyData = () => {
-    if (selectedArena === null || !selectedEnemy) return null;
-    return ENEMIES[selectedArena]?.find(e => e.id === selectedEnemy);
+  const getRarityBorderColor = (rarity) => {
+    const colors = ['#CD7F32', '#C0C0C0', '#FFD700'];
+    return colors[rarity] || '#666';
   };
 
   // ==================== RENDER ====================
@@ -687,10 +984,24 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
         {error && (
           <div className="bg-red-900/50 border border-red-500 rounded-lg p-4 mb-6 max-w-2xl mx-auto">
             <p className="text-red-300 text-center">{error}</p>
+            <button onClick={() => setError(null)} className="text-xs text-red-400 underline mt-2 block mx-auto">
+              Dismiss
+            </button>
           </div>
         )}
 
-        {/* Music Control Button */}
+        {/* Transaction Pending Overlay */}
+        {txPending && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+            <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 text-center">
+              <Loader className="w-16 h-16 text-red-500 mx-auto mb-4 animate-spin" />
+              <h3 className="text-xl font-bold mb-2">Transaction Pending</h3>
+              <p className="text-gray-400">Please confirm in your wallet...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Music Control */}
         {musicPlaying && (
           <button
             onClick={toggleMute}
@@ -725,321 +1036,431 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {stakedFighters.map(fighter => (
-                  <div
-                    key={fighter.tokenId}
-                    onClick={() => handleSelectFighter(fighter)}
-                    className={`bg-gradient-to-br ${getRarityColor(fighter.rarity)} p-0.5 rounded-xl cursor-pointer hover:scale-105 transition`}
-                  >
-                    <div className="bg-gray-900 rounded-xl p-4">
+                {stakedFighters.map(fighter => {
+                  const canFight = fighter.energy >= 20 && !fighter.inBattle && fighter.refuelStartTime === 0;
+                  
+                  return (
+                    <div
+                      key={fighter.tokenId}
+                      onClick={() => canFight && handleSelectFighter(fighter)}
+                      className={`bg-gray-800/50 border-2 rounded-xl p-4 transition ${
+                        canFight ? 'cursor-pointer hover:scale-105 hover:border-red-500' : 'opacity-50 cursor-not-allowed'
+                      }`}
+                      style={{ borderColor: canFight ? getRarityBorderColor(fighter.rarity) : '#374151' }}
+                    >
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <div className="text-sm text-gray-400">{getRarityName(fighter.rarity)}</div>
-                          <div className="font-bold">{CLAN_NAMES[fighter.clan] || 'Unknown'}</div>
+                          <div className="text-sm" style={{ color: getRarityBorderColor(fighter.rarity) }}>
+                            {RARITY_NAMES[fighter.rarity]}
+                          </div>
+                          <div className="font-bold">{CLAN_NAMES[fighter.clan]}</div>
                         </div>
                         <div className="text-xs bg-black/50 px-2 py-1 rounded">
                           #{fighter.tokenId}
                         </div>
                       </div>
                       
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between">
                           <span className="text-gray-400 flex items-center gap-1">
                             <Zap className="w-4 h-4" /> Energy
                           </span>
-                          <span className={fighter.energy >= 20 ? 'text-green-400' : 'text-red-400'}>
+                          <span className={fighter.energy >= 20 ? 'text-green-400 font-bold' : 'text-red-400 font-bold'}>
                             {fighter.energy}/100
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center justify-between">
                           <span className="text-gray-400 flex items-center gap-1">
-                            <Trophy className="w-4 h-4" /> PvE Wins
+                            <Trophy className="w-4 h-4" /> Record
                           </span>
-                          <span className="text-yellow-400">{fighter.wins}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-400 flex items-center gap-1">
-                            <Skull className="w-4 h-4" /> PvE Losses
-                          </span>
-                          <span className="text-red-400">{fighter.losses}</span>
+                          <span className="font-bold">{fighter.wins}W - {fighter.losses}L</span>
                         </div>
                       </div>
                       
-                      {fighter.inBattle && (
-                        <div className="mt-3 bg-red-600/50 text-center py-1 rounded text-sm font-bold">
+                      {fighter.inBattle ? (
+                        <div className="mt-3 bg-red-600/50 text-center py-2 rounded text-sm font-bold">
                           IN BATTLE - Resume
                         </div>
+                      ) : fighter.refuelStartTime > 0 ? (
+                        <div className="mt-3 bg-yellow-600/50 text-center py-2 rounded text-sm font-bold">
+                          REFUELING
+                        </div>
+                      ) : fighter.energy < 20 ? (
+                        <div className="mt-3 bg-gray-700 text-center py-2 rounded text-sm text-gray-400">
+                          LOW ENERGY
+                        </div>
+                      ) : (
+                        <button className="w-full mt-3 bg-red-600 hover:bg-red-700 py-2 rounded-lg font-semibold transition">
+                          Select Fighter
+                        </button>
                       )}
-                      
-                      <button className="w-full mt-4 bg-red-600 hover:bg-red-700 py-2 rounded-lg font-semibold transition">
-                        {fighter.inBattle ? 'Resume Battle' : 'Select Fighter'}
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
-        {/* ==================== VIEW: SELECT ARENA & ENEMY ==================== */}
-        {view === 'arena' && selectedFighter && (
-          <div className="max-w-4xl mx-auto">
-            {/* Selected Fighter Info */}
-            <div className="bg-gray-800/50 rounded-lg p-4 mb-6">
-              <div className="flex items-center justify-between">
+        {/* ==================== VIEW: PRE-BATTLE ==================== */}
+        {view === 'pre-battle' && selectedFighter && (
+          <div className="max-w-2xl mx-auto text-center">
+            <h2 className="text-3xl font-bold mb-6">Prepare for Battle</h2>
+            
+            {/* Selected Fighter Card */}
+            <div className="bg-gray-800/50 border-2 rounded-xl p-6 mb-6" style={{ borderColor: getRarityBorderColor(selectedFighter.rarity) }}>
+              <h3 className="text-xl font-bold mb-2">
+                {RARITY_NAMES[selectedFighter.rarity]} {CLAN_NAMES[selectedFighter.clan]} Fighter #{selectedFighter.tokenId}
+              </h3>
+              <div className="grid grid-cols-3 gap-4 text-sm mt-4">
                 <div>
-                  <div className="text-sm text-gray-400">Selected Fighter</div>
-                  <div className="font-bold">
-                    {getRarityName(selectedFighter.rarity)} {CLAN_NAMES[selectedFighter.clan]} #{selectedFighter.tokenId}
-                  </div>
+                  <div className="text-gray-400">Energy</div>
+                  <div className="font-bold text-green-400">{selectedFighter.energy}/100</div>
                 </div>
-                <div className="flex gap-4 text-sm">
-                  <div className="text-center">
-                    <div className="text-gray-400">Energy</div>
-                    <div className={selectedFighter.energy >= 20 ? 'text-green-400 font-bold' : 'text-red-400 font-bold'}>
-                      {selectedFighter.energy}
-                    </div>
-                  </div>
+                <div>
+                  <div className="text-gray-400">Herald Bonus</div>
+                  <div className="font-bold text-yellow-400">+{heraldRarityBonus}%</div>
                 </div>
-                <button onClick={handleReset} className="text-gray-400 hover:text-white transition">
-                  Change Fighter
-                </button>
+                <div>
+                  <div className="text-gray-400">Entry Cost</div>
+                  <div className="font-bold text-orange-400">50 FOOD</div>
+                </div>
               </div>
             </div>
+            
+            {/* Battle Info */}
+            <div className="bg-gray-900/50 rounded-lg p-4 mb-6 text-left">
+              <h4 className="font-bold text-gray-300 mb-2">Battle Rules:</h4>
+              <ul className="text-sm text-gray-400 space-y-1">
+                <li>• You will be sent to a <span className="text-yellow-400">random arena</span></li>
+                <li>• Face 3 enemies: <span className="text-red-400">Zimrek → Lord Jeroboam → Nebchud Baddon</span></li>
+                <li>• Each fighter and enemy has <span className="text-red-400">3 hearts (HP)</span></li>
+                <li>• Defeat an enemy to progress (no extra cost)</li>
+                <li>• Lose to any enemy and you return home</li>
+                <li>• Entry costs <span className="text-orange-400">50 FOOD</span> and <span className="text-yellow-400">20 Energy</span> (once)</li>
+              </ul>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={() => { setSelectedFighter(null); setView('select'); }}
+                className="bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded-lg font-semibold transition"
+              >
+                <ArrowLeft className="w-4 h-4 inline mr-2" />
+                Back
+              </button>
+              <button
+                onClick={enterBattle}
+                disabled={txPending}
+                className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-bold text-xl transition disabled:opacity-50"
+              >
+                <Swords className="w-5 h-5 inline mr-2" />
+                {txPending ? 'Entering...' : 'ENTER BATTLE'}
+              </button>
+            </div>
+          </div>
+        )}
 
-            {/* Herald Warning */}
-            {!hasClanHeraldStaked && (
-              <div className="bg-yellow-900/50 border border-yellow-500 rounded-lg p-4 mb-6">
-                <p className="text-yellow-300 text-center">
-                  ⚠️ You need a {CLAN_NAMES[selectedFighter.clan]} Herald staked to battle with this Fighter!
-                </p>
+        {/* ==================== VIEW: FIGHTING ==================== */}
+        {view === 'fighting' && currentEnemy && selectedFighter && currentArena && (
+          <div className="max-w-4xl mx-auto">
+            
+            {/* Battle Boosts Bar */}
+            {activeBoosts.length > 0 && (
+              <div className="mb-4 p-3 bg-purple-900/20 border border-purple-600 rounded-lg">
+                <p className="text-xs text-purple-400 mb-2 text-center font-bold">Battle Boosts (Click to Use):</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {activeBoosts.map(boost => {
+                    const isUsed = boost.usedThisBattle;
+                    const canUse = currentTurn === 'player' && !isAnimating && !isUsed;
+                    
+                    return (
+                      <button
+                        key={boost.id}
+                        onClick={() => canUse && useBoost(boost.id)}
+                        disabled={!canUse}
+                        className={`px-3 py-2 rounded border text-xs transition ${
+                          isUsed
+                            ? 'bg-gray-900/50 border-gray-700 text-gray-600 cursor-not-allowed'
+                            : canUse
+                            ? 'bg-purple-900/50 border-purple-500 text-purple-200 hover:bg-purple-800/70 cursor-pointer'
+                            : 'bg-purple-900/30 border-purple-700 text-purple-400 cursor-wait'
+                        }`}
+                        title={boost.effect}
+                      >
+                        <span className="text-lg">{boost.emoji}</span>
+                        <span className="ml-1 font-bold">{boost.name}</span>
+                        {isUsed && <span className="ml-1 text-green-400">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
-            {/* Arena Selection */}
-            <h2 className="text-2xl font-bold mb-4 text-center">Select Arena</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-              {ARENAS.map(arena => (
-                <button
-                  key={arena.id}
-                  onClick={() => handleSelectArena(arena.id)}
-                  disabled={!arena.active}
-                  className={`p-4 rounded-lg border-2 transition ${
-                    selectedArena === arena.id
-                      ? 'border-yellow-500 bg-yellow-500/20'
-                      : arena.active
-                      ? 'border-gray-600 hover:border-gray-400 bg-gray-800/50'
-                      : 'border-gray-800 bg-gray-900/50 opacity-50 cursor-not-allowed'
-                  }`}
-                >
-                  <div className={`text-sm font-bold ${arena.active ? 'text-white' : 'text-gray-500'}`}>
-                    {arena.name}
-                  </div>
-                  <div className={`text-xs ${arena.active ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {arena.active ? 'OPEN' : 'COMING SOON'}
-                  </div>
-                </button>
-              ))}
+            {/* Arena Header */}
+            <div className={`bg-gradient-to-br ${currentArena.color} rounded-xl p-4 mb-4`}>
+              <div className="text-center">
+                <h2 className="text-2xl font-bold">{currentArena.name}</h2>
+                <p className="text-sm text-gray-300">Round {round} • Enemy {currentEnemy}/3</p>
+              </div>
             </div>
 
-            {/* Enemy Selection */}
-            {selectedArena !== null && ENEMIES[selectedArena] && (
-              <>
-                <h2 className="text-2xl font-bold mb-4 text-center">Select Enemy</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                  {ENEMIES[selectedArena].map(enemy => (
+            {/* Battle Area */}
+            <div className="bg-gray-900/50 rounded-lg p-4 mb-4">
+              <div className="grid grid-cols-7 gap-3 items-center">
+                
+                {/* Fighter Side */}
+                <div className="col-span-2 text-center">
+                  <h3 className="text-lg font-bold mb-2">Fighter #{selectedFighter.tokenId}</h3>
+                  <p className="text-xs text-gray-400 mb-2">{RARITY_NAMES[selectedFighter.rarity]} {CLAN_NAMES[selectedFighter.clan]}</p>
+                  <div className="flex justify-center gap-1 mb-2">
+                    {[...Array(3)].map((_, i) => (
+                      <Heart
+                        key={i}
+                        className={`w-6 h-6 ${i < fighterHP ? 'text-red-500 fill-current' : 'text-gray-600'}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="text-sm mb-2">
+                    <span className="text-yellow-400">Hit: </span>
+                    <span className="font-bold text-yellow-400">
+                      {calculateFighterAccuracy(selectedFighter.rarity, currentEnemy)}%
+                    </span>
+                    {heraldRarityBonus > 0 && (
+                      <span className="text-xs text-green-400 ml-1">(+{heraldRarityBonus}%)</span>
+                    )}
+                  </div>
+                  <div className="w-full h-32 bg-gray-900 rounded-lg overflow-hidden">
+                    <img 
+                      src="/images/pirate_fighter.png" 
+                      alt="Fighter" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+
+                {/* Center - Actions/Animation */}
+                <div className="col-span-3 flex flex-col justify-center items-center">
+                  {weaponAnimation ? (
+                    <div className="w-full h-32 bg-black rounded-lg overflow-hidden mb-2">
+                      {weaponAnimation.endsWith('.gif') ? (
+                        <img src={weaponAnimation} alt="Animation" className="w-full h-full object-contain" />
+                      ) : (
+                        <video autoPlay muted playsInline className="w-full h-full object-contain">
+                          <source src={weaponAnimation} type="video/mp4" />
+                        </video>
+                      )}
+                    </div>
+                  ) : outcomeText ? (
+                    <div className={`text-2xl font-bold mb-2 p-3 rounded-lg whitespace-pre-line ${
+                      outcomeText.includes('FIGHTER') 
+                        ? outcomeText.includes('HITS') ? 'bg-green-900/50 text-green-400' : 'bg-gray-900/50 text-gray-400'
+                        : outcomeText.includes('TREASURE')
+                        ? 'bg-yellow-900/50 text-yellow-400'
+                        : outcomeText.includes('HITS') ? 'bg-red-900/50 text-red-400' : 'bg-gray-900/50 text-gray-400'
+                    }`}>
+                      {outcomeText}
+                    </div>
+                  ) : (
+                    <div className="h-24 flex items-center justify-center">
+                      <Swords className="w-12 h-12 text-gray-600" />
+                    </div>
+                  )}
+
+                  {currentTurn === 'player' && !isAnimating && (
                     <button
-                      key={enemy.id}
-                      onClick={() => handleSelectEnemy(enemy.id)}
-                      className={`p-6 rounded-lg border-2 transition ${
-                        selectedEnemy === enemy.id
-                          ? 'border-red-500 bg-red-500/20'
-                          : 'border-gray-600 hover:border-gray-400 bg-gray-800/50'
-                      }`}
+                      onClick={playerAttack}
+                      className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-bold transition w-full"
                     >
-                      <Target className="w-12 h-12 mx-auto mb-3 text-red-500" />
-                      <div className="font-bold text-lg">{enemy.name}</div>
-                      <div className="flex items-center justify-center gap-2 text-sm text-gray-400 mt-2">
-                        <Heart className="w-4 h-4 text-red-500" />
-                        {enemy.health} HP
-                      </div>
-                      <div className="text-xs text-gray-500 mt-2">
-                        Difficulty: {enemy.id === 1 ? 'Easy' : enemy.id === 2 ? 'Medium' : 'Hard'}
-                      </div>
+                      <Swords className="w-5 h-5 inline mr-2" />
+                      ATTACK
                     </button>
+                  )}
+
+                  {currentTurn === 'enemy' && !isAnimating && (
+                    <div className="text-center py-2 px-4 bg-red-900/50 rounded-lg w-full">
+                      <p className="text-red-400 font-bold">Enemy's Turn...</p>
+                    </div>
+                  )}
+
+                  {isAnimating && (
+                    <div className="text-center py-2 w-full">
+                      <div className="animate-spin w-6 h-6 border-4 border-gray-600 border-t-red-500 rounded-full mx-auto"></div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Enemy Side */}
+                <div className="col-span-2 text-center">
+                  <h3 className="text-lg font-bold mb-2">{ENEMIES[currentEnemy].name}</h3>
+                  <p className="text-xs text-gray-400 mb-2">{ENEMIES[currentEnemy].title}</p>
+                  <div className="flex justify-center gap-1 mb-2">
+                    {[...Array(3)].map((_, i) => (
+                      <Heart
+                        key={i}
+                        className={`w-6 h-6 ${i < enemyHP ? 'text-red-500 fill-current' : 'text-gray-600'}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="text-sm mb-2">
+                    <span className="text-red-400">Hit: </span>
+                    <span className="font-bold text-red-400">
+                      {calculateEnemyAccuracy(currentEnemy, selectedFighter.rarity)}%
+                    </span>
+                    {poisonedAttacksRemaining > 0 && (
+                      <span className="text-xs text-purple-400 ml-1">🧪</span>
+                    )}
+                    {enemyFrozen && (
+                      <span className="text-xs text-blue-400 ml-1">❄️</span>
+                    )}
+                  </div>
+                  <div className="w-full h-32 bg-gray-900 rounded-lg overflow-hidden">
+                    <img 
+                      src={ENEMIES[currentEnemy].staticImage} 
+                      alt={ENEMIES[currentEnemy].name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Battle Log */}
+            <div className="bg-gray-900/50 rounded-lg p-3">
+              <h3 className="text-sm font-bold mb-2 text-gray-400">Battle Log:</h3>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {battleLog.map((log, idx) => (
+                  <p key={idx} className="text-xs text-gray-400">{log}</p>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== VIEW: VICTORY (Enemy Defeated) ==================== */}
+        {view === 'victory' && currentEnemy && earnedRewards && (
+          <div className="max-w-lg mx-auto text-center">
+            <Trophy className="w-20 h-20 text-yellow-400 mx-auto mb-4 animate-bounce" />
+            <h2 className="text-4xl font-bold mb-2 text-yellow-400">VICTORY!</h2>
+            <p className="text-xl mb-6">{ENEMIES[currentEnemy].name} has been defeated!</p>
+
+            {/* Rewards */}
+            <div className="bg-green-900/20 border border-green-600 rounded-lg p-6 mb-6">
+              <h3 className="font-bold mb-4">Rewards Earned:</h3>
+              <div className="flex justify-center gap-4">
+                {Object.entries(earnedRewards).map(([token, amount]) => (
+                  <div key={token} className="text-center">
+                    <div className="text-2xl">
+                      {token === 'FOOD' && '🍖'}
+                      {token === 'GOLD' && '🪙'}
+                      {token === 'WOOD' && '🪵'}
+                      {token === 'RKT' && '👑'}
+                    </div>
+                    <div className="font-bold">{amount}</div>
+                    <div className="text-xs text-gray-400">{token}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Continue or Exit */}
+            {currentEnemy < 3 ? (
+              <div className="space-y-4">
+                <p className="text-gray-400">
+                  Next: <span className="text-red-400 font-bold">{ENEMIES[currentEnemy + 1].name}</span>
+                  <span className="text-gray-500"> - {ENEMIES[currentEnemy + 1].title}</span>
+                </p>
+                <p className="text-sm text-gray-500">
+                  (No extra cost to continue - same battle session)
+                </p>
+                <button
+                  onClick={continueToNextEnemy}
+                  className="bg-red-600 hover:bg-red-700 px-8 py-4 rounded-lg font-bold text-xl transition"
+                >
+                  <Swords className="w-5 h-5 inline mr-2" />
+                  Fight Next Enemy
+                </button>
+                <button
+                  onClick={exitBattle}
+                  className="block mx-auto text-gray-400 hover:text-white text-sm transition"
+                >
+                  Exit with current rewards
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={exitBattle}
+                className="bg-green-600 hover:bg-green-700 px-8 py-4 rounded-lg font-bold text-xl transition"
+              >
+                Claim Victory & Exit
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ==================== VIEW: ARENA COMPLETE ==================== */}
+        {view === 'arena-complete' && (
+          <div className="max-w-lg mx-auto text-center">
+            <Crown className="w-24 h-24 text-yellow-400 mx-auto mb-4 animate-bounce" />
+            <h2 className="text-4xl font-bold mb-2 text-yellow-400">ARENA CONQUERED!</h2>
+            <p className="text-xl mb-6">You have defeated all three enemies!</p>
+
+            {earnedRewards && (
+              <div className="bg-green-900/20 border border-green-600 rounded-lg p-6 mb-6">
+                <h3 className="font-bold mb-4">Final Rewards:</h3>
+                <div className="flex justify-center gap-4">
+                  {Object.entries(earnedRewards).map(([token, amount]) => (
+                    <div key={token} className="text-center">
+                      <div className="text-2xl">
+                        {token === 'FOOD' && '🍖'}
+                        {token === 'GOLD' && '🪙'}
+                        {token === 'WOOD' && '🪵'}
+                        {token === 'RKT' && '👑'}
+                      </div>
+                      <div className="font-bold">{amount}</div>
+                      <div className="text-xs text-gray-400">{token}</div>
+                    </div>
                   ))}
                 </div>
-              </>
-            )}
-
-            {/* Enter Battle Button */}
-            {selectedArena !== null && selectedEnemy && (
-              <div className="text-center">
-                <button
-                  onClick={handleEnterBattle}
-                  disabled={loading || !hasClanHeraldStaked || selectedFighter.energy < 20}
-                  className={`px-8 py-4 rounded-lg font-bold text-xl transition ${
-                    loading || !hasClanHeraldStaked || selectedFighter.energy < 20
-                      ? 'bg-gray-700 cursor-not-allowed text-gray-500'
-                      : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700'
-                  }`}
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
-                      Entering Battle...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <Swords className="w-6 h-6" />
-                      Enter Battle (50 FOOD)
-                    </span>
-                  )}
-                </button>
-                <p className="text-gray-500 text-sm mt-2">Entry fee: 50 FOOD | Uses 20 Energy</p>
               </div>
             )}
-          </div>
-        )}
 
-        {/* ==================== VIEW: ACTIVE BATTLE ==================== */}
-        {view === 'battle' && battleState && selectedFighter && (
-          <div className="max-w-3xl mx-auto">
-            <div className={`bg-gradient-to-br ${ARENAS[selectedArena]?.color || 'from-gray-800 to-gray-900'} rounded-xl p-6 mb-6`}>
-              <div className="text-center mb-4">
-                <h2 className="text-2xl font-bold">{ARENAS[selectedArena]?.name || 'Battle Arena'}</h2>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-8">
-                <div className="text-center">
-                  <div className="bg-black/50 rounded-lg p-4">
-                    <Shield className="w-16 h-16 mx-auto text-blue-400 mb-2" />
-                    <div className="font-bold">Your Fighter</div>
-                    <div className="text-sm text-gray-400">
-                      {getRarityName(selectedFighter.rarity)} {CLAN_NAMES[selectedFighter.clan]}
-                    </div>
-                    <div className="mt-3">
-                      <div className="text-sm text-gray-400 mb-1">Health</div>
-                      <div className="w-full bg-gray-700 rounded-full h-4">
-                        <div
-                          className="bg-green-500 h-4 rounded-full transition-all"
-                          style={{ width: `${(battleState.fighterHealth / 100) * 100}%` }}
-                        />
-                      </div>
-                      <div className="text-sm mt-1">{battleState.fighterHealth} HP</div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="text-center">
-                  <div className="bg-black/50 rounded-lg p-4">
-                    <Skull className="w-16 h-16 mx-auto text-red-500 mb-2" />
-                    <div className="font-bold">{getEnemyData()?.name || 'Enemy'}</div>
-                    <div className="text-sm text-gray-400">Enemy {selectedEnemy}</div>
-                    <div className="mt-3">
-                      <div className="text-sm text-gray-400 mb-1">Health</div>
-                      <div className="w-full bg-gray-700 rounded-full h-4">
-                        <div
-                          className="bg-red-500 h-4 rounded-full transition-all"
-                          style={{ width: `${(battleState.enemyHealth / (getEnemyData()?.health || 8)) * 100}%` }}
-                        />
-                      </div>
-                      <div className="text-sm mt-1">{battleState.enemyHealth} HP</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-800/50 rounded-lg p-4 mb-6 h-48 overflow-y-auto">
-              <h3 className="font-bold mb-2 text-gray-400">Battle Log</h3>
-              <div className="space-y-1">
-                {battleLog.map((log, i) => (
-                  <div
-                    key={i}
-                    className={`text-sm ${
-                      log.type === 'success' ? 'text-green-400' :
-                      log.type === 'danger' ? 'text-red-400' :
-                      log.type === 'warning' ? 'text-yellow-400' :
-                      'text-gray-300'
-                    }`}
-                  >
-                    {log.message}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="text-center">
-              <button
-                onClick={handleAttack}
-                disabled={attacking}
-                className={`px-12 py-4 rounded-lg font-bold text-xl transition ${
-                  attacking
-                    ? 'bg-gray-700 cursor-wait'
-                    : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 animate-pulse'
-                }`}
-              >
-                {attacking ? (
-                  <span className="flex items-center gap-2">
-                    <div className="animate-spin w-6 h-6 border-3 border-white border-t-transparent rounded-full"></div>
-                    Attacking...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Swords className="w-6 h-6" />
-                    ATTACK!
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ==================== VIEW: VICTORY ==================== */}
-        {view === 'victory' && (
-          <div className="max-w-lg mx-auto text-center">
-            <div className="bg-gradient-to-br from-yellow-900/50 to-amber-900/50 border border-yellow-500 rounded-xl p-8">
-              <Trophy className="w-24 h-24 mx-auto text-yellow-400 mb-4 animate-bounce" />
-              <h2 className="text-3xl font-bold mb-2">VICTORY!</h2>
-              <p className="text-gray-300 mb-6">You have defeated the enemy!</p>
-              
-              <button
-                onClick={handleClaimVictory}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-700 hover:to-amber-700 py-4 rounded-lg font-bold text-xl transition mb-4"
-              >
-                {loading ? 'Claiming...' : 'Claim Rewards'}
-              </button>
-              
-              <button onClick={handleReset} className="text-gray-400 hover:text-white transition">
-                Return to Fighter Select
-              </button>
-            </div>
+            <button
+              onClick={exitBattle}
+              className="bg-green-600 hover:bg-green-700 px-12 py-4 rounded-lg font-bold text-xl transition"
+            >
+              <Trophy className="w-5 h-5 inline mr-2" />
+              Return Victorious
+            </button>
           </div>
         )}
 
         {/* ==================== VIEW: DEFEAT ==================== */}
         {view === 'defeat' && (
           <div className="max-w-lg mx-auto text-center">
-            <div className="bg-gradient-to-br from-red-900/50 to-gray-900/50 border border-red-500 rounded-xl p-8">
-              <Skull className="w-24 h-24 mx-auto text-red-500 mb-4" />
-              <h2 className="text-3xl font-bold mb-2">DEFEAT</h2>
-              <p className="text-gray-300 mb-6">Your fighter has fallen in battle...</p>
-              
-              <button
-                onClick={handleClaimDefeat}
-                disabled={loading}
-                className="w-full bg-gray-700 hover:bg-gray-600 py-4 rounded-lg font-bold text-xl transition mb-4"
-              >
-                {loading ? 'Processing...' : 'Accept Defeat'}
-              </button>
-              
-              <button onClick={handleReset} className="text-gray-400 hover:text-white transition">
-                Return to Fighter Select
-              </button>
-            </div>
+            <Skull className="w-20 h-20 text-red-500 mx-auto mb-4" />
+            <h2 className="text-4xl font-bold mb-2 text-red-500">DEFEATED</h2>
+            <p className="text-xl mb-6">Your Fighter has fallen in battle...</p>
+
+            {enemiesDefeated.length > 0 && (
+              <div className="bg-gray-800/50 rounded-lg p-4 mb-6">
+                <p className="text-gray-400">
+                  Enemies defeated before falling: <span className="text-yellow-400 font-bold">{enemiesDefeated.length}</span>
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  You kept rewards from enemies {enemiesDefeated.join(', ')}
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={exitBattle}
+              className="bg-gray-700 hover:bg-gray-600 px-8 py-4 rounded-lg font-bold text-xl transition"
+            >
+              Return to Dashboard
+            </button>
           </div>
         )}
 
