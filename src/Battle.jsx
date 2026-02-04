@@ -128,23 +128,30 @@ export default function Battle({ walletAddress }) {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const fighterContract = new ethers.Contract(FIGHTER_ADDRESS, FIGHTER_ABI, provider);
 
-      const balance = await fighterContract.balanceOf(walletAddress);
-      console.log('User owns', balance.toString(), 'fighters');
+      // Get Transfer events to find user's fighters
+      const filter = fighterContract.filters.Transfer(null, walletAddress);
+      const events = await fighterContract.queryFilter(filter, 0, 'latest');
+      const potentialIds = [...new Set(events.map(e => e.args.tokenId.toString()))];
+      
+      console.log('User owns', potentialIds.length, 'potential fighters');
       
       const fighters = [];
-      for (let i = 0; i < Number(balance); i++) {
+      for (const tokenId of potentialIds) {
         try {
-          const tokenId = await fighterContract.tokenOfOwnerByIndex(walletAddress, i);
-          const data = await fighterContract.fighters(tokenId);
-          
-          fighters.push({
-            tokenId: tokenId.toString(),
-            rarity: Number(data[0]),
-            clan: Number(data[1]),
-            energy: Number(data[2]),
-            isStaked: data[8],
-            inBattle: data[9]
-          });
+          // Verify current ownership
+          const owner = await fighterContract.ownerOf(tokenId);
+          if (owner.toLowerCase() === walletAddress.toLowerCase()) {
+            const data = await fighterContract.fighters(tokenId);
+            
+            fighters.push({
+              tokenId: tokenId.toString(),
+              rarity: Number(data[0]),
+              clan: Number(data[1]),
+              energy: Number(data[2]),
+              isStaked: data[8],
+              inBattle: data[9]
+            });
+          }
         } catch (e) {
           console.warn('Error loading fighter:', e);
         }
