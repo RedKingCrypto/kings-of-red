@@ -13,7 +13,7 @@ import {
 // ==================== CONTRACT ABIs ====================
 
 // Fighter ABI - CORRECT struct order: rarity, clan, energy, refuelStartTime, wins, losses, pvpWins, pvpLosses, isStaked, inBattle
-// When a fighter is staked, the NFT is owned by the Fighter contract. Enter battle via Fighter contract so msg.sender at Battle is the Fighter (authorized).
+// Staked fighters are owned by the Fighter contract; Battle.enterArena requires the caller to be owner. So we unstake first, then call Battle.enterArena.
 const FIGHTER_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
@@ -21,8 +21,8 @@ const FIGHTER_ABI = [
   "function fighters(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint64 energy, uint64 refuelStartTime, uint32 wins, uint32 losses, uint32 pvpWins, uint32 pvpLosses, bool isStaked, bool inBattle)",
   "function getApproved(uint256 tokenId) view returns (address)",
   "function approve(address to, uint256 tokenId)",
-  "function enterBattle(uint256 fighterId, uint8 arenaId, uint8 enemyId)",
-  "function enterArena(uint256 fighterId, uint8 arenaId, uint8 enemyId)"
+  "function unstakeFighter(uint256 tokenId)",
+  "function unstake(uint256 tokenId)"
 ];
 
 // Herald Contract ABI - to check rarity
@@ -533,32 +533,37 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const fighterContract = new ethers.Contract(FIGHTER_ADDRESS, FIGHTER_ABI, signer);
+      const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
 
-      // RANDOMIZE ARENA from active arenas
       const activeArenas = ARENAS.filter(a => a.active);
       const randomArena = activeArenas[Math.floor(Math.random() * activeArenas.length)];
       const arenaId = randomArena.id;
       const enemyId = 1;
 
-      addLog(`⏳ Entering battle... (50 FOOD entry fee, -20 energy)`);
-
-      // Staked fighters are owned by the Fighter contract. Battle.enterArena checks "authorized to use fighter"
-      // (owner or approved). So we must call via the Fighter contract, which then calls Battle.enterArena;
-      // that way msg.sender at Battle is the Fighter contract (the owner of the token).
-      let tx;
-      try {
-        tx = await fighterContract.enterBattle(selectedFighter.tokenId, arenaId, enemyId);
-      } catch (e1) {
-        if (e1?.message?.includes('enterBattle') || e1?.code === 'CALL_EXCEPTION') {
+      // Staked fighters are owned by the Fighter contract; Battle.enterArena only accepts the NFT owner.
+      // The Fighter contract does not expose enterBattle/enterArena (per its 49 write functions). So we
+      // unstake first (NFT returns to user), then call Battle.enterArena.
+      if (selectedFighter.isStaked) {
+        addLog(`⏳ Unstaking Fighter #${selectedFighter.tokenId}...`);
+        let unstakeTx;
+        try {
+          unstakeTx = await fighterContract.unstakeFighter(selectedFighter.tokenId);
+        } catch (e1) {
           try {
-            tx = await fighterContract.enterArena(selectedFighter.tokenId, arenaId, enemyId);
+            unstakeTx = await fighterContract.unstake(selectedFighter.tokenId);
           } catch (e2) {
             throw e2?.reason ? new Error(e2.reason) : e2;
           }
-        } else {
-          throw e1?.reason ? new Error(e1.reason) : e1;
         }
+        await unstakeTx.wait();
+        addLog(`✅ Unstaked. Entering battle... (50 FOOD, -20 energy)`);
+        // Refresh selected fighter so isStaked is false for any follow-up logic
+        setSelectedFighter(prev => prev ? { ...prev, isStaked: false } : null);
+      } else {
+        addLog(`⏳ Entering battle... (50 FOOD entry fee, -20 energy)`);
       }
+
+      const tx = await battleContract.enterArena(selectedFighter.tokenId, arenaId, enemyId);
       await tx.wait();
       
       addLog(`✅ Entered ${randomArena.name}!`);
@@ -623,7 +628,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
             if (s.includes('missing revert data') || s.includes('CALL_EXCEPTION')) userMsg = 'Contract reverted (reason not decoded). Check: Fighter staked, 20+ energy, 50+ FOOD, and not already in a battle.';
           }
         } else {
-          if (s.includes('Not authorized') || s.includes('authorized to use fighter')) userMsg = 'Fighter not authorized. For staked fighters, battle entry goes through the Fighter contract—if this persists, the Fighter contract may not expose enterBattle/enterArena.';
+          if (s.includes('Not authorized') || s.includes('authorized to use fighter')) userMsg = 'Staked fighters are owned by the Fighter contract; we unstake first then enter battle. If you still see this, unstake failed or the Fighter contract rejected the call.';
           else if (s.includes('already in battle') || s.includes('in battle')) userMsg = 'This Fighter is already in a battle. Finish or claim it first.';
           else if (s.includes('energy') || s.includes('Energy')) userMsg = 'Not enough energy. Fighter needs at least 20 energy.';
           else if (s.includes('balance') || s.includes('fee') || s.includes('FOOD')) userMsg = 'Insufficient FOOD (50 required) or allowance for the Battle contract.';
@@ -1228,11 +1233,13 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
                   className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-bold text-xl transition disabled:opacity-50"
                 >
                   <Swords className="w-5 h-5 inline mr-2" />
-                  {txPending ? 'Entering...' : 'ENTER BATTLE'}
+                  {txPending ? (selectedFighter?.isStaked ? 'Unstaking & entering...' : 'Entering...') : (selectedFighter?.isStaked ? 'UNSTAKE & ENTER BATTLE' : 'ENTER BATTLE')}
                 </button>
               </div>
               <p className="text-xs text-gray-500 max-w-md">
-                Entering battle requires one wallet signature: the contract records your 50 FOOD entry fee and battle state on-chain so rewards and stats are secure.
+                {selectedFighter?.isStaked
+                  ? 'Staked fighters are temporarily unstaked (one tx), then you enter battle (second tx). You can stake again after the battle.'
+                  : 'Entering battle requires a wallet signature; the contract records your 50 FOOD entry fee and battle state on-chain.'}
               </p>
             </div>
           </div>
