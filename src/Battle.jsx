@@ -42,7 +42,7 @@ const GAMEBALANCE_ABI = [
   "function inGameBalances(address user, uint8 tokenId) view returns (uint256)"
 ];
 
-// Battle ABI
+// Battle ABI (include common custom errors so we can decode revert reasons)
 const BATTLE_ABI = [
   "function enterArena(uint256 fighterId, uint8 arenaId, uint8 enemyId)",
   "function attack(uint256 fighterId)",
@@ -53,7 +53,15 @@ const BATTLE_ABI = [
   "function canClaimDefeat(uint256 fighterId) view returns (bool)",
   "function entryFee() view returns (uint256)",
   "event AttackPerformed(uint256 indexed fighterId, bool fighterHit, bool enemyHit, uint8 fighterDamage, uint8 enemyDamage)",
-  "event RewardDistributed(address indexed player, uint256 tokenId, uint256 amount)"
+  "event RewardDistributed(address indexed player, uint256 tokenId, uint256 amount)",
+  "error NotAuthorized()",
+  "error NotStaked()",
+  "error AlreadyInBattle()",
+  "error InsufficientBalance()",
+  "error InsufficientAllowance()",
+  "error InsufficientEnergy()",
+  "error InvalidArena()",
+  "error InvalidEnemy()"
 ];
 
 // ==================== GAME CONSTANTS ====================
@@ -573,15 +581,49 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       if (err.code === 'ACTION_REJECTED') {
         setError('Transaction cancelled');
       } else {
-        const msg = err?.reason || err?.message || 'Failed to enter battle';
-        const s = typeof msg === 'string' ? msg : '';
-        let userMsg = msg;
-        if (s.includes('Not authorized')) userMsg = 'Fighter not authorized. Approve the Battle contract for this Fighter (you may need to sign an approval first).';
-        else if (s.includes('already in battle') || s.includes('in battle')) userMsg = 'This Fighter is already in a battle. Finish or claim it first.';
-        else if (s.includes('energy') || s.includes('Energy')) userMsg = 'Not enough energy. Fighter needs at least 20 energy.';
-        else if (s.includes('balance') || s.includes('fee') || s.includes('FOOD')) userMsg = 'Insufficient FOOD (50 required) or allowance for the Battle contract.';
-        else if (s.includes('staked') || s.includes('Staked')) userMsg = 'Only staked Fighters can enter battle.';
-        else if (s.includes('missing revert data') || s.includes('CALL_EXCEPTION')) userMsg = 'Contract reverted. Check: Fighter staked, 20+ energy, 50+ FOOD, and not already in a battle.';
+        let userMsg = err?.reason || err?.message || 'Failed to enter battle';
+        const s = typeof userMsg === 'string' ? userMsg : '';
+        let data = err?.data ?? err?.error?.data ?? null;
+        // When estimateGas fails, RPC often returns data=null. Try a read-only call to fetch revert data.
+        if ((!data || data === '0x') && (s.includes('missing revert data') || s.includes('CALL_EXCEPTION')) && window.ethereum) {
+          try {
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const activeArenas = ARENAS.filter(a => a.active);
+            const randomArena = activeArenas[Math.floor(Math.random() * activeArenas.length)];
+            const iface = new ethers.Interface(BATTLE_ABI);
+            const calldata = iface.encodeFunctionData('enterArena', [selectedFighter.tokenId, randomArena.id, 1]);
+            await provider.call({ to: BATTLE_ADDRESS, data: calldata });
+          } catch (callErr) {
+            data = callErr?.data ?? callErr?.error?.data ?? null;
+            if (data && typeof data === 'string') console.log('Revert data from eth_call:', data);
+          }
+        }
+        if (data && typeof data === 'string' && data.length >= 10) {
+          try {
+            const iface = new ethers.Interface(BATTLE_ABI);
+            const decoded = iface.parseError(data);
+            if (decoded) {
+              const name = decoded.name || decoded.signature?.split('(')[0];
+              console.log('Battle revert reason:', name, decoded.args);
+              if (name === 'NotAuthorized') userMsg = 'Fighter not authorized for battle. The Battle contract must be approved for this Fighter (sign the approval tx if prompted).';
+              else if (name === 'NotStaked') userMsg = 'Only staked Fighters can enter battle. This Fighter is not staked.';
+              else if (name === 'AlreadyInBattle') userMsg = 'This Fighter is already in a battle. Finish or claim it first.';
+              else if (name === 'InsufficientBalance' || name === 'InsufficientAllowance') userMsg = 'Insufficient FOOD (50 required) or the game balance contract may need to allow the Battle contract to deduct your entry fee.';
+              else if (name === 'InsufficientEnergy') userMsg = 'Not enough energy. Fighter needs at least 20 energy.';
+              else if (name === 'InvalidArena' || name === 'InvalidEnemy') userMsg = 'Arena or enemy not available on-chain. Try again or check contract config.';
+              else userMsg = `Contract reverted: ${name}.`;
+            }
+          } catch (_) {
+            if (s.includes('missing revert data') || s.includes('CALL_EXCEPTION')) userMsg = 'Contract reverted (reason not decoded). Check: Fighter staked, 20+ energy, 50+ FOOD, and not already in a battle.';
+          }
+        } else {
+          if (s.includes('Not authorized')) userMsg = 'Fighter not authorized. Approve the Battle contract for this Fighter (you may need to sign an approval first).';
+          else if (s.includes('already in battle') || s.includes('in battle')) userMsg = 'This Fighter is already in a battle. Finish or claim it first.';
+          else if (s.includes('energy') || s.includes('Energy')) userMsg = 'Not enough energy. Fighter needs at least 20 energy.';
+          else if (s.includes('balance') || s.includes('fee') || s.includes('FOOD')) userMsg = 'Insufficient FOOD (50 required) or allowance for the Battle contract.';
+          else if (s.includes('staked') || s.includes('Staked')) userMsg = 'Only staked Fighters can enter battle.';
+          else if (s.includes('missing revert data') || s.includes('CALL_EXCEPTION')) userMsg = 'Contract reverted. Check: Fighter staked, 20+ energy, 50+ FOOD, and not already in a battle.';
+        }
         setError(userMsg);
       }
       setTxPending(false);
