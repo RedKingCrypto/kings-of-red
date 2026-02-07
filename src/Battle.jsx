@@ -541,46 +541,9 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
 
       addLog(`⏳ Entering battle... (50 FOOD entry fee, -20 energy)`);
 
-      // Pre-check: avoid entering if already in a battle (clear UX and avoids revert)
-      try {
-        const state = await battleContract.getBattleState(selectedFighter.tokenId);
-        const inBattle = state?.inBattle ?? state?.[0];
-        if (inBattle) {
-          setError('This Fighter is already in a battle. Finish or claim the current battle first.');
-          setTxPending(false);
-          return;
-        }
-      } catch (e) {
-        // getBattleState might not exist or fail; continue and let staticCall catch
-      }
-
-      // Simulate first to get a clear revert reason if the call would fail
-      try {
-        await battleContract.enterArena.staticCall(selectedFighter.tokenId, arenaId, enemyId);
-      } catch (simErr) {
-        const msg = simErr?.reason ?? simErr?.message ?? String(simErr);
-        const data = simErr?.data;
-        let userMsg = msg;
-        if (typeof msg === 'string') {
-          if (msg.includes('Not authorized') || (data && String(data).includes('Not authorized')))
-            userMsg = 'Fighter not authorized for battle. Try approving the Battle contract for this Fighter.';
-          else if (msg.includes('already in battle') || msg.includes('in battle'))
-            userMsg = 'This Fighter is already in a battle. Finish or claim the current battle first.';
-          else if (msg.includes('energy') || msg.includes('Energy'))
-            userMsg = 'Not enough energy. Fighter needs at least 20 energy.';
-          else if (msg.includes('balance') || msg.includes('fee') || msg.includes('FOOD'))
-            userMsg = 'Insufficient FOOD for entry fee (50 FOOD required) or allowance for Battle contract.';
-          else if (msg.includes('staked') || msg.includes('Staked'))
-            userMsg = 'Only staked Fighters can enter battle.';
-          else if (msg.includes('arena') || msg.includes('Arena') || msg.includes('inactive'))
-            userMsg = 'Arena or enemy not available.';
-        }
-        setError(userMsg);
-        setTxPending(false);
-        return;
-      }
-
-      // Enter arena with Enemy 1 (always start at enemy 1)
+      // Send the transaction so MetaMask opens for signing. We do not pre-call getBattleState
+      // or staticCall here because this Battle contract reverts on those when not in battle,
+      // which would block the user from ever reaching the sign step.
       const tx = await battleContract.enterArena(selectedFighter.tokenId, arenaId, enemyId);
       await tx.wait();
       
@@ -611,11 +574,15 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
         setError('Transaction cancelled');
       } else {
         const msg = err?.reason || err?.message || 'Failed to enter battle';
-        const isMissingRevert = typeof msg === 'string' && (msg.includes('missing revert data') || msg.includes('CALL_EXCEPTION'));
-        const hint = isMissingRevert
-          ? ' Contract reverted (no reason returned). Check: Fighter is staked, has 20+ energy, you have 50+ FOOD, and Fighter is not already in a battle.'
-          : '';
-        setError(msg + hint);
+        const s = typeof msg === 'string' ? msg : '';
+        let userMsg = msg;
+        if (s.includes('Not authorized')) userMsg = 'Fighter not authorized. Approve the Battle contract for this Fighter (you may need to sign an approval first).';
+        else if (s.includes('already in battle') || s.includes('in battle')) userMsg = 'This Fighter is already in a battle. Finish or claim it first.';
+        else if (s.includes('energy') || s.includes('Energy')) userMsg = 'Not enough energy. Fighter needs at least 20 energy.';
+        else if (s.includes('balance') || s.includes('fee') || s.includes('FOOD')) userMsg = 'Insufficient FOOD (50 required) or allowance for the Battle contract.';
+        else if (s.includes('staked') || s.includes('Staked')) userMsg = 'Only staked Fighters can enter battle.';
+        else if (s.includes('missing revert data') || s.includes('CALL_EXCEPTION')) userMsg = 'Contract reverted. Check: Fighter staked, 20+ energy, 50+ FOOD, and not already in a battle.';
+        setError(userMsg);
       }
       setTxPending(false);
     }
@@ -1198,22 +1165,27 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
             </div>
             
             {/* Action Buttons */}
-            <div className="flex gap-4 justify-center">
-              <button
-                onClick={() => { setSelectedFighter(null); setView('select'); }}
-                className="bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded-lg font-semibold transition"
-              >
-                <ArrowLeft className="w-4 h-4 inline mr-2" />
-                Back
-              </button>
-              <button
-                onClick={enterBattle}
-                disabled={txPending}
-                className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-bold text-xl transition disabled:opacity-50"
-              >
-                <Swords className="w-5 h-5 inline mr-2" />
-                {txPending ? 'Entering...' : 'ENTER BATTLE'}
-              </button>
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex gap-4 justify-center">
+                <button
+                  onClick={() => { setSelectedFighter(null); setView('select'); }}
+                  className="bg-gray-700 hover:bg-gray-600 px-6 py-3 rounded-lg font-semibold transition"
+                >
+                  <ArrowLeft className="w-4 h-4 inline mr-2" />
+                  Back
+                </button>
+                <button
+                  onClick={enterBattle}
+                  disabled={txPending}
+                  className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-bold text-xl transition disabled:opacity-50"
+                >
+                  <Swords className="w-5 h-5 inline mr-2" />
+                  {txPending ? 'Entering...' : 'ENTER BATTLE'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 max-w-md">
+                Entering battle requires one wallet signature: the contract records your 50 FOOD entry fee and battle state on-chain so rewards and stats are secure.
+              </p>
             </div>
           </div>
         )}
