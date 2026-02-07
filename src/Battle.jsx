@@ -536,11 +536,52 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       // RANDOMIZE ARENA from active arenas
       const activeArenas = ARENAS.filter(a => a.active);
       const randomArena = activeArenas[Math.floor(Math.random() * activeArenas.length)];
-      
+      const arenaId = randomArena.id;
+      const enemyId = 1;
+
       addLog(`⏳ Entering battle... (50 FOOD entry fee, -20 energy)`);
-      
+
+      // Pre-check: avoid entering if already in a battle (clear UX and avoids revert)
+      try {
+        const state = await battleContract.getBattleState(selectedFighter.tokenId);
+        const inBattle = state?.inBattle ?? state?.[0];
+        if (inBattle) {
+          setError('This Fighter is already in a battle. Finish or claim the current battle first.');
+          setTxPending(false);
+          return;
+        }
+      } catch (e) {
+        // getBattleState might not exist or fail; continue and let staticCall catch
+      }
+
+      // Simulate first to get a clear revert reason if the call would fail
+      try {
+        await battleContract.enterArena.staticCall(selectedFighter.tokenId, arenaId, enemyId);
+      } catch (simErr) {
+        const msg = simErr?.reason ?? simErr?.message ?? String(simErr);
+        const data = simErr?.data;
+        let userMsg = msg;
+        if (typeof msg === 'string') {
+          if (msg.includes('Not authorized') || (data && String(data).includes('Not authorized')))
+            userMsg = 'Fighter not authorized for battle. Try approving the Battle contract for this Fighter.';
+          else if (msg.includes('already in battle') || msg.includes('in battle'))
+            userMsg = 'This Fighter is already in a battle. Finish or claim the current battle first.';
+          else if (msg.includes('energy') || msg.includes('Energy'))
+            userMsg = 'Not enough energy. Fighter needs at least 20 energy.';
+          else if (msg.includes('balance') || msg.includes('fee') || msg.includes('FOOD'))
+            userMsg = 'Insufficient FOOD for entry fee (50 FOOD required) or allowance for Battle contract.';
+          else if (msg.includes('staked') || msg.includes('Staked'))
+            userMsg = 'Only staked Fighters can enter battle.';
+          else if (msg.includes('arena') || msg.includes('Arena') || msg.includes('inactive'))
+            userMsg = 'Arena or enemy not available.';
+        }
+        setError(userMsg);
+        setTxPending(false);
+        return;
+      }
+
       // Enter arena with Enemy 1 (always start at enemy 1)
-      const tx = await battleContract.enterArena(selectedFighter.tokenId, randomArena.id, 1);
+      const tx = await battleContract.enterArena(selectedFighter.tokenId, arenaId, enemyId);
       await tx.wait();
       
       addLog(`✅ Entered ${randomArena.name}!`);
@@ -569,7 +610,12 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       if (err.code === 'ACTION_REJECTED') {
         setError('Transaction cancelled');
       } else {
-        setError(err.reason || err.message || 'Failed to enter battle');
+        const msg = err?.reason || err?.message || 'Failed to enter battle';
+        const isMissingRevert = typeof msg === 'string' && (msg.includes('missing revert data') || msg.includes('CALL_EXCEPTION'));
+        const hint = isMissingRevert
+          ? ' Contract reverted (no reason returned). Check: Fighter is staked, has 20+ energy, you have 50+ FOOD, and Fighter is not already in a battle.'
+          : '';
+        setError(msg + hint);
       }
       setTxPending(false);
     }
