@@ -13,13 +13,16 @@ import {
 // ==================== CONTRACT ABIs ====================
 
 // Fighter ABI - CORRECT struct order: rarity, clan, energy, refuelStartTime, wins, losses, pvpWins, pvpLosses, isStaked, inBattle
+// When a fighter is staked, the NFT is owned by the Fighter contract. Enter battle via Fighter contract so msg.sender at Battle is the Fighter (authorized).
 const FIGHTER_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
   "function ownerOf(uint256 tokenId) view returns (address)",
   "function fighters(uint256 tokenId) view returns (uint8 rarity, uint8 clan, uint64 energy, uint64 refuelStartTime, uint32 wins, uint32 losses, uint32 pvpWins, uint32 pvpLosses, bool isStaked, bool inBattle)",
   "function getApproved(uint256 tokenId) view returns (address)",
-  "function approve(address to, uint256 tokenId)"
+  "function approve(address to, uint256 tokenId)",
+  "function enterBattle(uint256 fighterId, uint8 arenaId, uint8 enemyId)",
+  "function enterArena(uint256 fighterId, uint8 arenaId, uint8 enemyId)"
 ];
 
 // Herald Contract ABI - to check rarity
@@ -530,16 +533,6 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const fighterContract = new ethers.Contract(FIGHTER_ADDRESS, FIGHTER_ABI, signer);
-      const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
-
-      // Battle contract must be approved to operate the Fighter (required for enterArena)
-      const currentApproval = await fighterContract.getApproved(selectedFighter.tokenId);
-      if (!currentApproval || currentApproval.toLowerCase() !== BATTLE_ADDRESS.toLowerCase()) {
-        addLog(`⏳ Approving Fighter for battle...`);
-        const approveTx = await fighterContract.approve(BATTLE_ADDRESS, selectedFighter.tokenId);
-        await approveTx.wait();
-        addLog(`✅ Battle contract approved`);
-      }
 
       // RANDOMIZE ARENA from active arenas
       const activeArenas = ARENAS.filter(a => a.active);
@@ -549,10 +542,23 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
 
       addLog(`⏳ Entering battle... (50 FOOD entry fee, -20 energy)`);
 
-      // Send the transaction so MetaMask opens for signing. We do not pre-call getBattleState
-      // or staticCall here because this Battle contract reverts on those when not in battle,
-      // which would block the user from ever reaching the sign step.
-      const tx = await battleContract.enterArena(selectedFighter.tokenId, arenaId, enemyId);
+      // Staked fighters are owned by the Fighter contract. Battle.enterArena checks "authorized to use fighter"
+      // (owner or approved). So we must call via the Fighter contract, which then calls Battle.enterArena;
+      // that way msg.sender at Battle is the Fighter contract (the owner of the token).
+      let tx;
+      try {
+        tx = await fighterContract.enterBattle(selectedFighter.tokenId, arenaId, enemyId);
+      } catch (e1) {
+        if (e1?.message?.includes('enterBattle') || e1?.code === 'CALL_EXCEPTION') {
+          try {
+            tx = await fighterContract.enterArena(selectedFighter.tokenId, arenaId, enemyId);
+          } catch (e2) {
+            throw e2?.reason ? new Error(e2.reason) : e2;
+          }
+        } else {
+          throw e1?.reason ? new Error(e1.reason) : e1;
+        }
+      }
       await tx.wait();
       
       addLog(`✅ Entered ${randomArena.name}!`);
@@ -617,7 +623,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
             if (s.includes('missing revert data') || s.includes('CALL_EXCEPTION')) userMsg = 'Contract reverted (reason not decoded). Check: Fighter staked, 20+ energy, 50+ FOOD, and not already in a battle.';
           }
         } else {
-          if (s.includes('Not authorized')) userMsg = 'Fighter not authorized. Approve the Battle contract for this Fighter (you may need to sign an approval first).';
+          if (s.includes('Not authorized') || s.includes('authorized to use fighter')) userMsg = 'Fighter not authorized. For staked fighters, battle entry goes through the Fighter contract—if this persists, the Fighter contract may not expose enterBattle/enterArena.';
           else if (s.includes('already in battle') || s.includes('in battle')) userMsg = 'This Fighter is already in a battle. Finish or claim it first.';
           else if (s.includes('energy') || s.includes('Energy')) userMsg = 'Not enough energy. Fighter needs at least 20 energy.';
           else if (s.includes('balance') || s.includes('fee') || s.includes('FOOD')) userMsg = 'Insufficient FOOD (50 required) or allowance for the Battle contract.';
