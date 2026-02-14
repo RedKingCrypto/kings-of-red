@@ -13,7 +13,7 @@ import {
 // ==================== CONTRACT ABIs ====================
 
 // Fighter ABI - CORRECT struct order: rarity, clan, energy, refuelStartTime, wins, losses, pvpWins, pvpLosses, isStaked, inBattle
-// Staked fighters are owned by the Fighter contract; Battle.enterArena requires the caller to be owner. So we unstake first, then call Battle.enterArena.
+// Staked fighters are owned by the Fighter contract; Battle.enterArena requires the caller to be owner. 
 const FIGHTER_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
@@ -521,125 +521,84 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
   // ==================== BATTLE ENTRY ====================
 
   const enterBattle = async () => {
-    if (!selectedFighter) {
-      setError('No Fighter selected');
-      return;
-    }
+  if (!selectedFighter) {
+    setError('No Fighter selected');
+    return;
+  }
 
-    setTxPending(true);
-    setError(null);
+  setTxPending(true);
+  setError(null);
 
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const fighterContract = new ethers.Contract(FIGHTER_ADDRESS, FIGHTER_ABI, signer);
-      const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const battleContract = new ethers.Contract(BATTLE_ADDRESS, BATTLE_ABI, signer);
 
-      const activeArenas = ARENAS.filter(a => a.active);
-      const randomArena = activeArenas[Math.floor(Math.random() * activeArenas.length)];
-      const arenaId = randomArena.id;
-      const enemyId = 1;
+    const activeArenas = ARENAS.filter(a => a.active);
+    const randomArena = activeArenas[Math.floor(Math.random() * activeArenas.length)];
+    const arenaId = randomArena.id;
+    const enemyId = 1;
 
-      // Staked fighters are owned by the Fighter contract; Battle.enterArena only accepts the NFT owner.
-      // The Fighter contract does not expose enterBattle/enterArena (per its 49 write functions). So we
-      // unstake first (NFT returns to user), then call Battle.enterArena.
-      if (selectedFighter.isStaked) {
-        addLog(`⏳ Unstaking Fighter #${selectedFighter.tokenId}...`);
-        let unstakeTx;
-        try {
-          unstakeTx = await fighterContract.unstakeFighter(selectedFighter.tokenId);
-        } catch (e1) {
-          try {
-            unstakeTx = await fighterContract.unstake(selectedFighter.tokenId);
-          } catch (e2) {
-            throw e2?.reason ? new Error(e2.reason) : e2;
-          }
-        }
-        await unstakeTx.wait();
-        addLog(`✅ Unstaked. Entering battle... (50 FOOD, -20 energy)`);
-        // Refresh selected fighter so isStaked is false for any follow-up logic
-        setSelectedFighter(prev => prev ? { ...prev, isStaked: false } : null);
-      } else {
-        addLog(`⏳ Entering battle... (50 FOOD entry fee, -20 energy)`);
+    // ============= NO UNSTAKING - FIGHTER STAYS STAKED! =============
+    // Battle V2.3 now properly authorizes staked fighters using stakedByClan
+    
+    addLog(`⏳ Entering battle... (50 FOOD entry fee, -20 energy)`);
+
+    const tx = await battleContract.enterArena(selectedFighter.tokenId, arenaId, enemyId, {
+      gasLimit: 800000
+    });
+    
+    addLog(`⏳ Waiting for confirmation...`);
+    await tx.wait();
+    
+    addLog(`✅ Entered ${randomArena.name}!`);
+    addLog(`⚔️ Prepare to face Zimrek, the Professional Assassin!`);
+    
+    // Set battle state
+    setCurrentArena(randomArena);
+    setCurrentEnemy(1);
+    setEnemiesDefeated([]);
+    setFighterHP(3);
+    setEnemyHP(3);
+    setRound(1);
+    setCurrentTurn('player');
+    
+    // Grant test boosts for first enemy (will be NFT-based later)
+    setActiveBoosts(ALL_BOOSTS.map(b => ({ ...b, usedThisBattle: false })));
+    
+    // Start battle music
+    startBattleMusic(randomArena.id, 1);
+    
+    setView('fighting');
+    setTxPending(false);
+    
+  } catch (err) {
+    console.error('Error entering battle:', err);
+    if (err.code === 'ACTION_REJECTED') {
+      setError('Transaction cancelled');
+    } else {
+      let userMsg = err?.reason || err?.message || 'Failed to enter battle';
+      
+      // Simplified error messages
+      if (userMsg.includes('Not your staked fighter')) {
+        userMsg = 'This fighter is not in your staked clan slot. Make sure the correct fighter is staked.';
+      } else if (userMsg.includes('Fighter must be staked')) {
+        userMsg = 'Fighter must be staked to enter battle. Please stake this fighter first.';
+      } else if (userMsg.includes('Herald')) {
+        userMsg = 'You need a Herald of the same clan staked to enter battle.';
+      } else if (userMsg.includes('energy')) {
+        userMsg = 'Fighter needs at least 20 energy to battle.';
+      } else if (userMsg.includes('FOOD') || userMsg.includes('balance')) {
+        userMsg = 'You need at least 50 FOOD to enter battle.';
+      } else if (userMsg.includes('Cannot enter battle')) {
+        userMsg = 'Cannot enter battle. Check: Fighter staked, 20+ energy, 50+ FOOD, Herald staked, not already in battle.';
       }
-
-      const tx = await battleContract.enterArena(selectedFighter.tokenId, arenaId, enemyId);
-      await tx.wait();
       
-      addLog(`✅ Entered ${randomArena.name}!`);
-      addLog(`⚔️ Prepare to face Zimrek, the Professional Assassin!`);
-      
-      // Set battle state
-      setCurrentArena(randomArena);
-      setCurrentEnemy(1);
-      setEnemiesDefeated([]);
-      setFighterHP(3);
-      setEnemyHP(3);
-      setRound(1);
-      setCurrentTurn('player');
-      
-      // Grant test boosts for first enemy (will be NFT-based later)
-      setActiveBoosts(ALL_BOOSTS.map(b => ({ ...b, usedThisBattle: false })));
-      
-      // Start battle music
-      startBattleMusic(randomArena.id, 1);
-      
-      setView('fighting');
-      setTxPending(false);
-      
-    } catch (err) {
-      console.error('Error entering battle:', err);
-      if (err.code === 'ACTION_REJECTED') {
-        setError('Transaction cancelled');
-      } else {
-        let userMsg = err?.reason || err?.message || 'Failed to enter battle';
-        const s = typeof userMsg === 'string' ? userMsg : '';
-        let data = err?.data ?? err?.error?.data ?? null;
-        // When estimateGas fails, RPC often returns data=null. Try a read-only call to fetch revert data.
-        if ((!data || data === '0x') && (s.includes('missing revert data') || s.includes('CALL_EXCEPTION')) && window.ethereum) {
-          try {
-            const provider = new ethers.BrowserProvider(window.ethereum);
-            const activeArenas = ARENAS.filter(a => a.active);
-            const randomArena = activeArenas[Math.floor(Math.random() * activeArenas.length)];
-            const iface = new ethers.Interface(BATTLE_ABI);
-            const calldata = iface.encodeFunctionData('enterArena', [selectedFighter.tokenId, randomArena.id, 1]);
-            await provider.call({ to: BATTLE_ADDRESS, data: calldata });
-          } catch (callErr) {
-            data = callErr?.data ?? callErr?.error?.data ?? null;
-            if (data && typeof data === 'string') console.log('Revert data from eth_call:', data);
-          }
-        }
-        if (data && typeof data === 'string' && data.length >= 10) {
-          try {
-            const iface = new ethers.Interface(BATTLE_ABI);
-            const decoded = iface.parseError(data);
-            if (decoded) {
-              const name = decoded.name || decoded.signature?.split('(')[0];
-              console.log('Battle revert reason:', name, decoded.args);
-              if (name === 'NotAuthorized') userMsg = 'Fighter not authorized for battle. The Battle contract must be approved for this Fighter (sign the approval tx if prompted).';
-              else if (name === 'NotStaked') userMsg = 'Only staked Fighters can enter battle. This Fighter is not staked.';
-              else if (name === 'AlreadyInBattle') userMsg = 'This Fighter is already in a battle. Finish or claim it first.';
-              else if (name === 'InsufficientBalance' || name === 'InsufficientAllowance') userMsg = 'Insufficient FOOD (50 required) or the game balance contract may need to allow the Battle contract to deduct your entry fee.';
-              else if (name === 'InsufficientEnergy') userMsg = 'Not enough energy. Fighter needs at least 20 energy.';
-              else if (name === 'InvalidArena' || name === 'InvalidEnemy') userMsg = 'Arena or enemy not available on-chain. Try again or check contract config.';
-              else userMsg = `Contract reverted: ${name}.`;
-            }
-          } catch (_) {
-            if (s.includes('missing revert data') || s.includes('CALL_EXCEPTION')) userMsg = 'Contract reverted (reason not decoded). Check: Fighter staked, 20+ energy, 50+ FOOD, and not already in a battle.';
-          }
-        } else {
-          if (s.includes('Not authorized') || s.includes('authorized to use fighter')) userMsg = 'Staked fighters are owned by the Fighter contract; we unstake first then enter battle. If you still see this, unstake failed or the Fighter contract rejected the call.';
-          else if (s.includes('already in battle') || s.includes('in battle')) userMsg = 'This Fighter is already in a battle. Finish or claim it first.';
-          else if (s.includes('energy') || s.includes('Energy')) userMsg = 'Not enough energy. Fighter needs at least 20 energy.';
-          else if (s.includes('balance') || s.includes('fee') || s.includes('FOOD')) userMsg = 'Insufficient FOOD (50 required) or allowance for the Battle contract.';
-          else if (s.includes('staked') || s.includes('Staked')) userMsg = 'Only staked Fighters can enter battle.';
-          else if (s.includes('missing revert data') || s.includes('CALL_EXCEPTION')) userMsg = 'Contract reverted. Check: Fighter staked, 20+ energy, 50+ FOOD, and not already in a battle.';
-        }
-        setError(userMsg);
-      }
-      setTxPending(false);
+      setError(userMsg);
     }
-  };
+    setTxPending(false);
+  }
+};
 
   // ==================== BATTLE LOG ====================
 
@@ -1233,7 +1192,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
                   className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-bold text-xl transition disabled:opacity-50"
                 >
                   <Swords className="w-5 h-5 inline mr-2" />
-                  {txPending ? (selectedFighter?.isStaked ? 'Unstaking & entering...' : 'Entering...') : (selectedFighter?.isStaked ? 'UNSTAKE & ENTER BATTLE' : 'ENTER BATTLE')}
+                  {txPending ? (selectedFighter?.isStaked ? 'entering...' : 'Entering...') : (selectedFighter?.isStaked ? 'ENTER BATTLE' : 'ENTER BATTLE')}
                 </button>
               </div>
               <p className="text-xs text-gray-500 max-w-md">
