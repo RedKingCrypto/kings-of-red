@@ -10,6 +10,14 @@ import {
   CLAN_NAMES
 } from './contractConfig';
 
+// Get fighter image URL based on rarity and clan
+const getFighterImageUrl = (rarity, clan) => {
+  const rarityName = RARITY_NAMES[rarity]?.toLowerCase() || 'bronze';
+  const clanName = CLAN_NAMES[clan]?.toLowerCase() || 'smizfume';
+  // Adjust this URL to match your actual image hosting
+  return `https://ipfs.io/ipfs/bafybeia2alwupvq4ffp6pexcc4ekxz5nmtj4fguk7goxaddd7dcp7w2vbm/${rarityName}_${clanName}.jpg`;
+};
+
 // ==================== CONTRACT ABIs ====================
 
 // Fighter ABI - CORRECT struct order: rarity, clan, energy, refuelStartTime, wins, losses, pvpWins, pvpLosses, isStaked, inBattle
@@ -563,8 +571,8 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
     setRound(1);
     setCurrentTurn('player');
     
-    // Grant test boosts for first enemy (will be NFT-based later)
-    setActiveBoosts(ALL_BOOSTS.map(b => ({ ...b, usedThisBattle: false })));
+    // FIX (c): No automatic boost grants - players must purchase boosts
+setActiveBoosts([]);  // ✅ EMPTY ARRAY
     
     // Start battle music
     startBattleMusic(randomArena.id, 1);
@@ -683,11 +691,11 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
   };
 
   const playBoostAnimation = (animation) => {
-    if (animation) {
-      setWeaponAnimation(animation);
-      setTimeout(() => setWeaponAnimation(null), 2000);
-    }
-  };
+  if (animation) {
+    setWeaponAnimation(animation);
+    setTimeout(() => setWeaponAnimation(null), 4000);  // ✅ 4 seconds
+  }
+};
 
   const markBoostUsed = (boostId) => {
     setActiveBoosts(boosts => boosts.map(b => 
@@ -735,7 +743,7 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
       }
       
       setIsAnimating(false);
-    }, 1500);
+    }, 4000);
   };
 
   const startEnemyTurn = () => {
@@ -1249,6 +1257,24 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
               </div>
             </div>
 
+            {/* FIX (b): Arena Video Display */}
+{currentArena && currentArena.video && (
+  <div className="mb-4 rounded-xl overflow-hidden">
+    <video 
+      autoPlay 
+      muted 
+      loop 
+      playsInline 
+      className="w-full h-64 object-cover"
+    >
+      <source src={currentArena.video} type="video/mp4" />
+      <div className="bg-gray-800 h-64 flex items-center justify-center">
+        <p className="text-gray-500">Video not available</p>
+      </div>
+    </video>
+  </div>
+)}
+
             {/* Battle Area */}
             <div className="bg-gray-900/50 rounded-lg p-4 mb-4">
               <div className="grid grid-cols-7 gap-3 items-center">
@@ -1275,12 +1301,12 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
                     )}
                   </div>
                   <div className="w-full h-32 bg-gray-900 rounded-lg overflow-hidden">
-                    <img 
-                      src="/images/pirate_fighter.png" 
-                      alt="Fighter" 
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+  <img 
+    src={getFighterImageUrl(selectedFighter.rarity, selectedFighter.clan)}  // ✅ DYNAMIC
+    alt={`${RARITY_NAMES[selectedFighter.rarity]} ${CLAN_NAMES[selectedFighter.clan]} Fighter`}
+    className="w-full h-full object-cover"
+  />
+</div>
                 </div>
 
                 {/* Center - Actions/Animation */}
