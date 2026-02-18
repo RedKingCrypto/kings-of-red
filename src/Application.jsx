@@ -13,6 +13,7 @@ import BattlePage from './Battle.jsx';
 import MintFighter from './components/MintFighter.jsx';
 import BattleBoosts from './components/BattleBoosts.jsx';
 
+
 // Import contract addresses
 import { 
   HERALD_ADDRESS,
@@ -258,6 +259,14 @@ export default function Application() {
                 </div>
               )}
             </div>
+
+            // Add this to your navigation links
+<button 
+  onClick={() => navigate('battle-boosts')} // or setCurrentPage('battle-boosts')
+  className="nav-link-class"
+>
+  Battle Boosts
+</button>
             
             <button
               onClick={() => navigateTo('exchange')}
@@ -326,6 +335,8 @@ export default function Application() {
         {currentPage === 'faq' && <FAQPage onNavigate={navigateTo} />}
         {currentPage === 'leaderboard' && <LeaderboardPage connected={connected} walletAddress={walletAddress} onNavigate={navigateTo} />}
         {currentPage === 'battle' && <BattlePage connected={connected} walletAddress={walletAddress} provider={provider} onNavigate={navigateTo} />}
+        {currentPage === 'battle-boosts' && <BattleBoosts connected={connected} walletAddress={walletAddress} provider={provider} onNavigate={navigateTo} />}
+  
       </div>
 
       <footer className="border-t border-red-800/50 bg-black/40 backdrop-blur mt-12">

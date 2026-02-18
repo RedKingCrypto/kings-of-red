@@ -271,6 +271,22 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
     return () => stopBattleMusic();
   }, []);
 
+  // ====================== for Battle Boosts
+  // Load owned boosts from localStorage
+useEffect(() => {
+  const stored = localStorage.getItem('battleBoosts');
+  if (stored) {
+    try {
+      const owned = JSON.parse(stored);
+      // Set available boosts for battle
+      setActiveBoosts(owned);
+    } catch (e) {
+      console.error('Error loading boosts:', e);
+      setActiveBoosts([]);
+    }
+  }
+}, []);
+
   // ==================== DATA LOADING ====================
 
   useEffect(() => {
@@ -572,7 +588,19 @@ export default function Battle({ connected, walletAddress, connectWallet, onNavi
     setCurrentTurn('player');
     
     // FIX (c): No automatic boost grants - players must purchase boosts
-setActiveBoosts([]);  // ✅ EMPTY ARRAY
+
+// NEW (loads from localStorage):
+const stored = localStorage.getItem('battleBoosts');
+if (stored) {
+  try {
+    const owned = JSON.parse(stored);
+    setActiveBoosts(owned.map(b => ({ ...b, usedThisBattle: false })));
+  } catch (e) {
+    setActiveBoosts([]);
+  }
+} else {
+  setActiveBoosts([]);
+}
     
     // Start battle music
     startBattleMusic(randomArena.id, 1);
