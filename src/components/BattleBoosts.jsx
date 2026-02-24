@@ -3,7 +3,7 @@ import { Zap, Target, Heart, Shield, Droplet, Snowflake, Gift, TrendingUp, Shopp
 import { ethers } from 'ethers';
 
 // Import from contractConfig (adjust path as needed)
-import { FOOD_ADDRESS, GOLD_ADDRESS } from './contractConfig';
+import { FOOD_ADDRESS, GOLD_ADDRESS } from '../contractConfig';
 
 const BattleBoosts = ({ provider, signer, address }) => {
   const [cart, setCart] = useState([]);
