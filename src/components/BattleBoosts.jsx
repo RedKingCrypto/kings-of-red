@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Zap, Target, Heart, Shield, Droplet, Snowflake, Gift, TrendingUp, ShoppingCart, CheckCircle, AlertCircle, Coins } from 'lucide-react';
 import { ethers } from 'ethers';
 
-// Import from contractConfig (adjust path as needed)
-import { FOOD_ADDRESS, GOLD_ADDRESS } from '../contractConfig';
+// Import from contractConfig - adjust path based on your folder structure
+import { FOOD_ADDRESS, GOLD_ADDRESS } from './contractConfig';
 
 const BattleBoosts = ({ provider, signer, address }) => {
   const [cart, setCart] = useState([]);
@@ -17,7 +17,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
   const BOOSTS = [
     {
       id: 1,
-      stringId: 'konfisof_minor', // ← Matches Battle.jsx
+      stringId: 'konfisof_minor',
       name: 'Battle Boost Minor',
       clan: 'Konfisof',
       icon: Target,
@@ -34,7 +34,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
     },
     {
       id: 2,
-      stringId: 'konfisof_major', // ← Matches Battle.jsx
+      stringId: 'konfisof_major',
       name: 'Battle Boost Major',
       clan: 'Konfisof',
       icon: TrendingUp,
@@ -51,7 +51,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
     },
     {
       id: 3,
-      stringId: 'bervation_prayer', // ← Matches Battle.jsx
+      stringId: 'bervation_prayer',
       name: 'Holy Prayer',
       clan: 'Bervation',
       icon: Heart,
@@ -68,7 +68,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
     },
     {
       id: 4,
-      stringId: 'witkastle_morale', // ← Matches Battle.jsx
+      stringId: 'witkastle_morale',
       name: 'Morale Boost',
       clan: 'Witkastle',
       icon: Shield,
@@ -85,7 +85,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
     },
     {
       id: 5,
-      stringId: 'smizfume_poison', // ← Matches Battle.jsx
+      stringId: 'smizfume_poison',
       name: 'Poison Potion',
       clan: 'Smizfume',
       icon: Droplet,
@@ -102,7 +102,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
     },
     {
       id: 6,
-      stringId: 'coalheart_freeze', // ← Matches Battle.jsx
+      stringId: 'coalheart_freeze',
       name: 'Freeze',
       clan: 'Coalheart',
       icon: Snowflake,
@@ -119,7 +119,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
     },
     {
       id: 7,
-      stringId: 'warmdice_treasure', // ← Matches Battle.jsx
+      stringId: 'warmdice_treasure',
       name: 'Treasure Chest',
       clan: 'Warmdice',
       icon: Gift,
@@ -136,7 +136,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
     },
     {
       id: 8,
-      stringId: 'bowkin_trap', // ← Matches Battle.jsx
+      stringId: 'bowkin_trap',
       name: 'Trap',
       clan: 'Bowkin',
       icon: Zap,
@@ -343,9 +343,226 @@ const BattleBoosts = ({ provider, signer, address }) => {
           </div>
         )}
 
-        {/* Boost Grid - REST OF COMPONENT SAME AS ORIGINAL */}
-        {/* ... (keep the rest of your JSX as-is) */}
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-900/30 border border-red-500 rounded-lg max-w-2xl mx-auto">
+            <div className="flex items-center justify-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <p className="text-red-400 text-center font-bold">{error}</p>
+            </div>
+          </div>
+        )}
 
+        {/* Boost Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+          {BOOSTS.map((boost) => {
+            const IconComponent = boost.icon;
+            const inCart = cart.find(item => item.id === boost.id);
+            
+            return (
+              <div
+                key={boost.id}
+                className={`rounded-lg p-6 border-2 transition-all ${
+                  inCart 
+                    ? `${boost.borderColor} ${boost.bgColor} scale-105` 
+                    : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                }`}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`p-3 rounded-lg bg-gradient-to-br ${boost.color}`}>
+                    <IconComponent className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-xs font-bold ${getRarityColor(boost.rarity)}`}>{boost.rarity}</p>
+                    <p className="text-lg font-bold text-yellow-400">{boost.price} {boost.currency}</p>
+                  </div>
+                </div>
+
+                {/* Name & Clan */}
+                <h3 className="text-xl font-bold mb-1">{boost.name}</h3>
+                <p className="text-sm text-gray-400 mb-3">{boost.clan} Clan</p>
+
+                {/* Effect Badge */}
+                <div className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-3 bg-gradient-to-r ${boost.color}`}>
+                  {boost.effect}
+                </div>
+
+                {/* Description */}
+                <p className="text-sm text-gray-300 mb-4 min-h-[60px]">
+                  {boost.description}
+                </p>
+
+                {/* Details */}
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400">Duration:</span>
+                    <span className="text-gray-200">{boost.duration}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400">Type:</span>
+                    <span className="text-gray-200">{boost.type}</span>
+                  </div>
+                </div>
+
+                {/* Add to Cart Button */}
+                <button
+                  onClick={() => inCart ? removeFromCart(boost.id) : addToCart(boost)}
+                  className={`w-full py-2 rounded-lg font-bold transition-all ${
+                    inCart
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-gradient-to-r from-yellow-500 to-red-600 hover:from-yellow-600 hover:to-red-700'
+                  }`}
+                >
+                  {inCart ? 'Remove' : 'Add to Cart'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Shopping Cart */}
+        {cart.length > 0 && (
+          <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t-2 border-purple-500 p-6 shadow-2xl z-50">
+            <div className="container mx-auto">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-4">
+                  <ShoppingCart className="w-8 h-8 text-yellow-400" />
+                  <div>
+                    <p className="font-bold text-lg">
+                      {cart.length} Boost{cart.length > 1 ? 's' : ''} in Cart
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      {cart.map(b => b.name).join(', ')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-6">
+                  <div className="text-right">
+                    <p className="text-sm text-gray-400">Total Cost</p>
+                    {(() => {
+                      const totals = getTotalCost();
+                      return (
+                        <div className="flex gap-3 text-lg font-bold">
+                          {totals.FOOD > 0 && <span className="text-yellow-400">{totals.FOOD} FOOD</span>}
+                          {totals.GOLD > 0 && <span className="text-yellow-500">{totals.GOLD} GOLD</span>}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <button
+                    onClick={() => setCart([])}
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold transition"
+                  >
+                    Clear
+                  </button>
+
+                  <button
+                    onClick={handlePurchase}
+                    disabled={purchasing || !signer || !canAfford()}
+                    className={`px-8 py-3 rounded-lg font-bold text-lg transition-all ${
+                      purchasing || !signer || !canAfford()
+                        ? 'bg-gray-600 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-yellow-500 to-red-600 hover:from-yellow-600 hover:to-red-700 transform hover:scale-105'
+                    }`}
+                  >
+                    {purchasing ? 'Processing...' : !signer ? 'Connect Wallet' : !canAfford() ? 'Insufficient Balance' : 'Purchase'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Payment Info */}
+        <div className="mt-12 bg-gray-800/50 rounded-lg p-8">
+          <h2 className="text-2xl font-bold mb-6">Payment & Distribution</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-4 bg-red-900/20 border border-red-500 rounded-lg">
+              <h4 className="font-bold text-red-400 mb-2">🔥 30% Burned</h4>
+              <p className="text-sm text-gray-300">Permanently removed from circulation, increasing scarcity</p>
+            </div>
+
+            <div className="p-4 bg-yellow-900/20 border border-yellow-500 rounded-lg">
+              <h4 className="font-bold text-yellow-400 mb-2">🎁 35% Rewards Pool</h4>
+              <p className="text-sm text-gray-300">Reserved for airdrops and community rewards</p>
+            </div>
+
+            <div className="p-4 bg-blue-900/20 border border-blue-500 rounded-lg">
+              <h4 className="font-bold text-blue-400 mb-2">💼 35% Treasury</h4>
+              <p className="text-sm text-gray-300">Development, marketing, and operations</p>
+            </div>
+          </div>
+        </div>
+
+        {/* How It Works */}
+        <div className="mt-8 bg-gray-800/50 rounded-lg p-8">
+          <h2 className="text-2xl font-bold mb-6">How Battle Boosts Work</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="text-lg font-bold mb-3 text-yellow-400">🎯 Using Boosts</h3>
+              <ul className="space-y-2 text-gray-300">
+                <li>• Purchase boosts with FOOD or GOLD tokens</li>
+                <li>• Purchased boosts remain in your inventory</li>
+                <li>• Choose which boosts to bring into each battle</li>
+                <li>• Maximum ONE boost per clan per battle (7 clans total)</li>
+                <li>• Strategically activate boosts during battle when most effective</li>
+                <li>• Unused boosts are saved for future battles</li>
+              </ul>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold mb-3 text-yellow-400">⭐ Rarity Tiers</h3>
+              <ul className="space-y-2 text-gray-300">
+                <li className="text-gray-400">• <span className="font-bold">Common:</span> 35 FOOD or 20 FOOD</li>
+                <li className="text-purple-400">• <span className="font-bold">Rare:</span> 15-20 GOLD</li>
+                <li className="text-yellow-400">• <span className="font-bold">Ultra Rare:</span> 35 GOLD</li>
+                <li>• Prices may change based on game balance</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Boost Strategies */}
+        <div className="mt-8 bg-gray-800/50 rounded-lg p-8">
+          <h2 className="text-2xl font-bold mb-6">Recommended Strategies</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-4 bg-green-900/20 border border-green-500 rounded-lg">
+              <h4 className="font-bold text-green-400 mb-2">🎯 Accuracy Build</h4>
+              <p className="text-sm text-gray-300 mb-3">Maximize hit chance for consistent damage</p>
+              <ul className="text-xs text-gray-400 space-y-1">
+                <li>• Battle Boost Major (+40%)</li>
+                <li>• Morale Boost (+10%/-10%)</li>
+                <li>• Best for Bronze Fighters</li>
+              </ul>
+            </div>
+
+            <div className="p-4 bg-blue-900/20 border border-blue-500 rounded-lg">
+              <h4 className="font-bold text-blue-400 mb-2">🛡️ Survival Build</h4>
+              <p className="text-sm text-gray-300 mb-3">Outlast enemies with defensive boosts</p>
+              <ul className="text-xs text-gray-400 space-y-1">
+                <li>• Holy Prayer (HP restore)</li>
+                <li>• Freeze (skip enemy turn)</li>
+                <li>• Best for tough enemies</li>
+              </ul>
+            </div>
+
+            <div className="p-4 bg-purple-900/20 border border-purple-500 rounded-lg">
+              <h4 className="font-bold text-purple-400 mb-2">⚡ Speed Build</h4>
+              <p className="text-sm text-gray-300 mb-3">Quick victories with offensive boosts</p>
+              <ul className="text-xs text-gray-400 space-y-1">
+                <li>• Trap (instant damage)</li>
+                <li>• Poison Potion (weaken enemy)</li>
+                <li>• Best for Gold Fighters</li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
