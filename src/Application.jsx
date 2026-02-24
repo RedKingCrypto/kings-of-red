@@ -261,12 +261,7 @@ export default function Application() {
             </div>
 
             
-<button 
-  onClick={() => navigate('battle-boosts')} // or setCurrentPage('battle-boosts')
-  className="nav-link-class"
->
-  Battle Boosts
-</button>
+
             
             <button
               onClick={() => navigateTo('exchange')}
