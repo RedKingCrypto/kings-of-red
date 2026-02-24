@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, Target, Heart, Shield, Droplet, Snowflake, Gift, TrendingUp, ShoppingCart, CheckCircle, AlertCircle, Coins } from 'lucide-react';
+import { Zap, Target, Heart, Shield, Droplet, Snowflake, Gift, TrendingUp, ShoppingCart, CheckCircle, AlertCircle, Coins, Loader } from 'lucide-react';
 import { ethers } from 'ethers';
 
 // Import from contractConfig - adjust path based on your folder structure
-import { FOOD_ADDRESS, GOLD_ADDRESS } from '../contractConfig';
+import { GAMEBALANCE_ADDRESS } from '../contractConfig';
 
 const BattleBoosts = ({ provider, signer, address }) => {
   const [cart, setCart] = useState([]);
@@ -12,6 +12,13 @@ const BattleBoosts = ({ provider, signer, address }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [userBalances, setUserBalances] = useState({ food: 0, gold: 0 });
+  const [loadingBalances, setLoadingBalances] = useState(false);
+
+  // GameBalance ABI
+  const GAMEBALANCE_ABI = [
+    "function getBalance(address user, uint8 tokenId) view returns (uint256)",
+    "function spendTokens(uint8 tokenId, uint256 amount)"
+  ];
 
   // CORRECTED: All 8 Battle Boosts with matching Battle.jsx IDs
   const BOOSTS = [
@@ -26,6 +33,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-green-900/20',
       price: 35,
       currency: 'FOOD',
+      tokenId: 1, // FOOD token ID
       rarity: 'Common',
       effect: '+15% Fighter Hit Chance',
       description: 'Increase your Fighter\'s accuracy by 15% for the entire battle.',
@@ -43,6 +51,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-green-900/20',
       price: 35,
       currency: 'GOLD',
+      tokenId: 2, // GOLD token ID
       rarity: 'Ultra Rare',
       effect: '+40% Fighter Hit Chance',
       description: 'Massively increase your Fighter\'s accuracy by 40% for the entire battle.',
@@ -60,6 +69,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-blue-900/20',
       price: 35,
       currency: 'FOOD',
+      tokenId: 1,
       rarity: 'Common',
       effect: 'Restore 1 HP',
       description: 'Call upon divine power to restore 1 heart point during battle when needed.',
@@ -77,6 +87,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-indigo-900/20',
       price: 35,
       currency: 'FOOD',
+      tokenId: 1,
       rarity: 'Common',
       effect: '+10% Hit, -10% Enemy Hit',
       description: 'Rally your Fighter while intimidating the enemy. Double benefit!',
@@ -94,6 +105,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-purple-900/20',
       price: 35,
       currency: 'FOOD',
+      tokenId: 1,
       rarity: 'Common',
       effect: 'Enemy -20% Hit (2 attacks)',
       description: 'Poison the enemy, reducing their accuracy by 20% for their next 2 attacks.',
@@ -111,6 +123,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-red-900/20',
       price: 15,
       currency: 'GOLD',
+      tokenId: 2,
       rarity: 'Rare',
       effect: 'Enemy Skips 1 Turn',
       description: 'Freeze the enemy solid, causing them to lose their next attack completely.',
@@ -128,6 +141,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-yellow-900/20',
       price: 20,
       currency: 'FOOD',
+      tokenId: 1,
       rarity: 'Common',
       effect: 'Random Token Reward',
       description: 'Open a treasure chest for random rewards: FOOD (60%), GOLD (30%), or WOOD (10%).',
@@ -145,6 +159,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-teal-900/20',
       price: 20,
       currency: 'GOLD',
+      tokenId: 2,
       rarity: 'Rare',
       effect: 'Enemy Loses 1 HP',
       description: 'Set a deadly trap that damages the enemy before battle even starts!',
@@ -171,7 +186,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
     setOwnedBoosts(boosts);
   };
 
-  // Load user balances - CORRECTED ethers v6 syntax
+  // Load IN-GAME balances from GameBalance contract
   useEffect(() => {
     if (provider && address) {
       loadBalances();
@@ -179,24 +194,32 @@ const BattleBoosts = ({ provider, signer, address }) => {
   }, [provider, address]);
 
   const loadBalances = async () => {
+    if (!provider || !address) return;
+    
+    setLoadingBalances(true);
     try {
-      const TOKEN_ABI = ["function balanceOf(address) view returns (uint256)"];
+      const gameBalanceContract = new ethers.Contract(GAMEBALANCE_ADDRESS, GAMEBALANCE_ABI, provider);
       
-      const foodContract = new ethers.Contract(FOOD_ADDRESS, TOKEN_ABI, provider);
-      const goldContract = new ethers.Contract(GOLD_ADDRESS, TOKEN_ABI, provider);
-      
+      // Get in-game balances for FOOD (tokenId 1) and GOLD (tokenId 2)
       const [foodBal, goldBal] = await Promise.all([
-        foodContract.balanceOf(address),
-        goldContract.balanceOf(address)
+        gameBalanceContract.getBalance(address, 1), // FOOD
+        gameBalanceContract.getBalance(address, 2)  // GOLD
       ]);
       
-      // CORRECTED: ethers v6 syntax (removed .utils)
+      console.log('In-game balances loaded:', {
+        food: ethers.formatEther(foodBal),
+        gold: ethers.formatEther(goldBal)
+      });
+      
       setUserBalances({
         food: parseFloat(ethers.formatEther(foodBal)),
         gold: parseFloat(ethers.formatEther(goldBal))
       });
     } catch (err) {
-      console.error('Error loading balances:', err);
+      console.error('Error loading in-game balances:', err);
+      setError('Failed to load balances. Please refresh.');
+    } finally {
+      setLoadingBalances(false);
     }
   };
 
@@ -223,7 +246,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
     return userBalances.food >= totals.FOOD && userBalances.gold >= totals.GOLD;
   };
 
-  // SIMPLIFIED: Local purchase (no contract call for now)
+  // Purchase boosts - DEDUCT from in-game balance via GameBalance contract
   const handlePurchase = async () => {
     if (!signer) {
       setError('Please connect your wallet');
@@ -237,7 +260,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
 
     if (!canAfford()) {
       const totals = getTotalCost();
-      setError(`Insufficient balance! Need ${totals.FOOD} FOOD and ${totals.GOLD} GOLD`);
+      setError(`Insufficient in-game balance! Need ${totals.FOOD} FOOD and ${totals.GOLD} GOLD`);
       return;
     }
 
@@ -246,12 +269,38 @@ const BattleBoosts = ({ provider, signer, address }) => {
     setSuccess('');
 
     try {
-      // For now: Add boosts to owned inventory (localStorage)
-      // Later: Replace with actual contract call
+      const gameBalanceContract = new ethers.Contract(GAMEBALANCE_ADDRESS, GAMEBALANCE_ABI, signer);
       
+      // Group purchases by token type
+      const totals = getTotalCost();
+      
+      console.log('Purchasing boosts:', {
+        foodCost: totals.FOOD,
+        goldCost: totals.GOLD,
+        boosts: cart.map(b => b.name)
+      });
+      
+      // Spend FOOD if needed
+      if (totals.FOOD > 0) {
+        console.log(`Spending ${totals.FOOD} FOOD...`);
+        const foodAmount = ethers.parseEther(totals.FOOD.toString());
+        const tx = await gameBalanceContract.spendTokens(1, foodAmount); // tokenId 1 = FOOD
+        await tx.wait();
+        console.log('✅ FOOD spent');
+      }
+      
+      // Spend GOLD if needed
+      if (totals.GOLD > 0) {
+        console.log(`Spending ${totals.GOLD} GOLD...`);
+        const goldAmount = ethers.parseEther(totals.GOLD.toString());
+        const tx = await gameBalanceContract.spendTokens(2, goldAmount); // tokenId 2 = GOLD
+        await tx.wait();
+        console.log('✅ GOLD spent');
+      }
+      
+      // Add boosts to inventory
       const newBoosts = [...ownedBoosts];
       cart.forEach(boost => {
-        // Add boost with stringId for Battle.jsx compatibility
         newBoosts.push({
           id: boost.stringId,
           name: boost.name,
@@ -259,7 +308,8 @@ const BattleBoosts = ({ provider, signer, address }) => {
           clan: boost.clan,
           effect: boost.effect,
           type: boost.type === 'Manual' ? 'active' : 'passive',
-          animation: `/animations/${boost.stringId}.gif`
+          animation: `/animations/${boost.stringId}.gif`,
+          usedThisBattle: false
         });
       });
 
@@ -267,11 +317,23 @@ const BattleBoosts = ({ provider, signer, address }) => {
       setSuccess(`✅ Purchased ${cart.length} boost${cart.length > 1 ? 's' : ''}!`);
       setCart([]);
       
-      // Note: In production, would also deduct FOOD/GOLD here
+      // Reload balances to show updated in-game balance
+      await loadBalances();
       
     } catch (err) {
       console.error('Purchase error:', err);
-      setError(err.message || 'Purchase failed');
+      
+      // Parse error message
+      let errorMsg = 'Purchase failed';
+      if (err.message?.includes('insufficient balance')) {
+        errorMsg = 'Insufficient in-game balance!';
+      } else if (err.message?.includes('user rejected')) {
+        errorMsg = 'Transaction cancelled';
+      } else if (err.reason) {
+        errorMsg = err.reason;
+      }
+      
+      setError(errorMsg);
     } finally {
       setPurchasing(false);
     }
@@ -310,19 +372,32 @@ const BattleBoosts = ({ provider, signer, address }) => {
             Power up your Fighters with strategic boosts! Use one boost per clan (max 7 per battle).
           </p>
           
-          {/* User Balances */}
+          {/* IN-GAME Balances */}
           {address && (
             <div className="inline-flex gap-4 bg-gray-800/50 border border-gray-700 rounded-lg px-6 py-3">
               <div className="flex items-center gap-2">
                 <Coins className="w-5 h-5 text-yellow-400" />
-                <span className="font-bold">{userBalances.food.toFixed(0)} FOOD</span>
+                {loadingBalances ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  <span className="font-bold">{userBalances.food.toFixed(0)} FOOD</span>
+                )}
               </div>
               <div className="w-px bg-gray-600"></div>
               <div className="flex items-center gap-2">
                 <Coins className="w-5 h-5 text-yellow-500" />
-                <span className="font-bold">{userBalances.gold.toFixed(0)} GOLD</span>
+                {loadingBalances ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  <span className="font-bold">{userBalances.gold.toFixed(0)} GOLD</span>
+                )}
               </div>
             </div>
+          )}
+          
+          {/* Label for clarity */}
+          {address && (
+            <p className="text-xs text-gray-500 mt-2">In-game balances (from GameBalance contract)</p>
           )}
 
           {/* Owned Boosts Count */}
@@ -440,7 +515,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
 
                 <div className="flex items-center gap-6">
                   <div className="text-right">
-                    <p className="text-sm text-gray-400">Total Cost</p>
+                    <p className="text-sm text-gray-400">Total Cost (In-game)</p>
                     {(() => {
                       const totals = getTotalCost();
                       return (
@@ -462,12 +537,13 @@ const BattleBoosts = ({ provider, signer, address }) => {
                   <button
                     onClick={handlePurchase}
                     disabled={purchasing || !signer || !canAfford()}
-                    className={`px-8 py-3 rounded-lg font-bold text-lg transition-all ${
+                    className={`px-8 py-3 rounded-lg font-bold text-lg transition-all flex items-center gap-2 ${
                       purchasing || !signer || !canAfford()
                         ? 'bg-gray-600 cursor-not-allowed'
                         : 'bg-gradient-to-r from-yellow-500 to-red-600 hover:from-yellow-600 hover:to-red-700 transform hover:scale-105'
                     }`}
                   >
+                    {purchasing && <Loader className="w-5 h-5 animate-spin" />}
                     {purchasing ? 'Processing...' : !signer ? 'Connect Wallet' : !canAfford() ? 'Insufficient Balance' : 'Purchase'}
                   </button>
                 </div>
@@ -478,52 +554,24 @@ const BattleBoosts = ({ provider, signer, address }) => {
 
         {/* Payment Info */}
         <div className="mt-12 bg-gray-800/50 rounded-lg p-8">
-          <h2 className="text-2xl font-bold mb-6">Payment & Distribution</h2>
+          <h2 className="text-2xl font-bold mb-6">How It Works</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-4 bg-red-900/20 border border-red-500 rounded-lg">
-              <h4 className="font-bold text-red-400 mb-2">🔥 30% Burned</h4>
-              <p className="text-sm text-gray-300">Permanently removed from circulation, increasing scarcity</p>
-            </div>
-
-            <div className="p-4 bg-yellow-900/20 border border-yellow-500 rounded-lg">
-              <h4 className="font-bold text-yellow-400 mb-2">🎁 35% Rewards Pool</h4>
-              <p className="text-sm text-gray-300">Reserved for airdrops and community rewards</p>
-            </div>
-
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="p-4 bg-blue-900/20 border border-blue-500 rounded-lg">
-              <h4 className="font-bold text-blue-400 mb-2">💼 35% Treasury</h4>
-              <p className="text-sm text-gray-300">Development, marketing, and operations</p>
+              <h4 className="font-bold text-blue-400 mb-2">💳 Payment</h4>
+              <p className="text-sm text-gray-300">Purchase boosts using your <span className="font-bold text-yellow-400">in-game FOOD & GOLD</span> balances from the GameBalance contract. No wallet tokens needed!</p>
+            </div>
+
+            <div className="p-4 bg-green-900/20 border border-green-500 rounded-lg">
+              <h4 className="font-bold text-green-400 mb-2">📦 Inventory</h4>
+              <p className="text-sm text-gray-300">Purchased boosts are added to your inventory and available in all future battles. Use them strategically!</p>
             </div>
           </div>
-        </div>
 
-        {/* How It Works */}
-        <div className="mt-8 bg-gray-800/50 rounded-lg p-8">
-          <h2 className="text-2xl font-bold mb-6">How Battle Boosts Work</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-lg font-bold mb-3 text-yellow-400">🎯 Using Boosts</h3>
-              <ul className="space-y-2 text-gray-300">
-                <li>• Purchase boosts with FOOD or GOLD tokens</li>
-                <li>• Purchased boosts remain in your inventory</li>
-                <li>• Choose which boosts to bring into each battle</li>
-                <li>• Maximum ONE boost per clan per battle (7 clans total)</li>
-                <li>• Strategically activate boosts during battle when most effective</li>
-                <li>• Unused boosts are saved for future battles</li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-bold mb-3 text-yellow-400">⭐ Rarity Tiers</h3>
-              <ul className="space-y-2 text-gray-300">
-                <li className="text-gray-400">• <span className="font-bold">Common:</span> 35 FOOD or 20 FOOD</li>
-                <li className="text-purple-400">• <span className="font-bold">Rare:</span> 15-20 GOLD</li>
-                <li className="text-yellow-400">• <span className="font-bold">Ultra Rare:</span> 35 GOLD</li>
-                <li>• Prices may change based on game balance</li>
-              </ul>
-            </div>
+          <div className="bg-yellow-900/20 border border-yellow-500 rounded-lg p-4">
+            <p className="text-sm text-yellow-300">
+              <strong>💡 Tip:</strong> Visit the Exchange to convert wallet tokens to in-game balances, or stake Heralds to earn FOOD daily!
+            </p>
           </div>
         </div>
 
