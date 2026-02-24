@@ -260,7 +260,7 @@ export default function Application() {
               )}
             </div>
 
-            // Add this to your navigation links
+            
 <button 
   onClick={() => navigate('battle-boosts')} // or setCurrentPage('battle-boosts')
   className="nav-link-class"
