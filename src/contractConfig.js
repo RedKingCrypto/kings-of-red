@@ -18,6 +18,19 @@ export const FIGHTER_ADDRESS = '0x303C26E8819be824f6bAEdAeEb3a2DeF3B624552';
 // BATTLE CONTRACT (UUPS Proxy - V2.2)
 export const BATTLE_ADDRESS = '0x8207b7aadbF253B2A087606cf01A3ED3330B3b91';
 
+// BattleBoost Contract
+export const BATTLEBOOST_ADDRESS = '0x33C9aCa8dFBF7Bc30B3a6Bd04f54472Fad3d0DB5';
+
+export const BATTLEBOOST_ABI = [
+  "function purchaseBoost(uint8 boostId, uint256 quantity)",
+  "function purchaseBoosts(uint8[] calldata boostIds, uint256[] calldata quantities)",
+  "function getUserBoostBalance(address user, uint8 boostId) view returns (uint256)",
+  "function getUserAllBoosts(address user) view returns (uint256[])",
+  "function getBoost(uint8 boostId) view returns (tuple(uint8 id, string name, uint8 tokenId, uint256 price, bool active))",
+  "function totalBoosts() view returns (uint8)",
+  "function getVersion() view returns (string)"
+];
+
 // GAMEBALANCE CONTRACT (UUPS Proxy - V4)
 export const GAMEBALANCE_ADDRESS = '0x3332c61Ced87a85C09ef2Cb55aE07Bd169dB0aA6';
 

@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Zap, Target, Heart, Shield, Droplet, Snowflake, Gift, TrendingUp, ShoppingCart, CheckCircle, AlertCircle, Coins, Loader } from 'lucide-react';
 import { ethers } from 'ethers';
 
-// Import from contractConfig - adjust path based on your folder structure
-import { GAMEBALANCE_ADDRESS } from '../contractConfig';
+// Import from contractConfig
+import { GAMEBALANCE_ADDRESS, BATTLEBOOST_ADDRESS, BATTLEBOOST_ABI } from './contractConfig';
 
 const BattleBoosts = ({ provider, signer, address }) => {
   const [cart, setCart] = useState([]);
@@ -16,11 +16,9 @@ const BattleBoosts = ({ provider, signer, address }) => {
 
   // GameBalance ABI
   const GAMEBALANCE_ABI = [
-    "function getBalance(address user, uint8 tokenId) view returns (uint256)",
-    "function spendTokens(uint8 tokenId, uint256 amount)"
+    "function getBalance(address user, uint8 tokenId) view returns (uint256)"
   ];
 
-  // CORRECTED: All 8 Battle Boosts with matching Battle.jsx IDs
   const BOOSTS = [
     {
       id: 1,
@@ -33,7 +31,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-green-900/20',
       price: 35,
       currency: 'FOOD',
-      tokenId: 1, // FOOD token ID
       rarity: 'Common',
       effect: '+15% Fighter Hit Chance',
       description: 'Increase your Fighter\'s accuracy by 15% for the entire battle.',
@@ -51,7 +48,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-green-900/20',
       price: 35,
       currency: 'GOLD',
-      tokenId: 2, // GOLD token ID
       rarity: 'Ultra Rare',
       effect: '+40% Fighter Hit Chance',
       description: 'Massively increase your Fighter\'s accuracy by 40% for the entire battle.',
@@ -69,7 +65,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-blue-900/20',
       price: 35,
       currency: 'FOOD',
-      tokenId: 1,
       rarity: 'Common',
       effect: 'Restore 1 HP',
       description: 'Call upon divine power to restore 1 heart point during battle when needed.',
@@ -87,7 +82,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-indigo-900/20',
       price: 35,
       currency: 'FOOD',
-      tokenId: 1,
       rarity: 'Common',
       effect: '+10% Hit, -10% Enemy Hit',
       description: 'Rally your Fighter while intimidating the enemy. Double benefit!',
@@ -105,7 +99,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-purple-900/20',
       price: 35,
       currency: 'FOOD',
-      tokenId: 1,
       rarity: 'Common',
       effect: 'Enemy -20% Hit (2 attacks)',
       description: 'Poison the enemy, reducing their accuracy by 20% for their next 2 attacks.',
@@ -123,7 +116,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-red-900/20',
       price: 15,
       currency: 'GOLD',
-      tokenId: 2,
       rarity: 'Rare',
       effect: 'Enemy Skips 1 Turn',
       description: 'Freeze the enemy solid, causing them to lose their next attack completely.',
@@ -141,7 +133,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-yellow-900/20',
       price: 20,
       currency: 'FOOD',
-      tokenId: 1,
       rarity: 'Common',
       effect: 'Random Token Reward',
       description: 'Open a treasure chest for random rewards: FOOD (60%), GOLD (30%), or WOOD (10%).',
@@ -159,7 +150,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
       bgColor: 'bg-teal-900/20',
       price: 20,
       currency: 'GOLD',
-      tokenId: 2,
       rarity: 'Rare',
       effect: 'Enemy Loses 1 HP',
       description: 'Set a deadly trap that damages the enemy before battle even starts!',
@@ -168,7 +158,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
     }
   ];
 
-  // Load owned boosts from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('battleBoosts');
     if (stored) {
@@ -180,13 +169,11 @@ const BattleBoosts = ({ provider, signer, address }) => {
     }
   }, []);
 
-  // Save owned boosts to localStorage
   const saveBoosts = (boosts) => {
     localStorage.setItem('battleBoosts', JSON.stringify(boosts));
     setOwnedBoosts(boosts);
   };
 
-  // Load IN-GAME balances from GameBalance contract
   useEffect(() => {
     if (provider && address) {
       loadBalances();
@@ -200,16 +187,10 @@ const BattleBoosts = ({ provider, signer, address }) => {
     try {
       const gameBalanceContract = new ethers.Contract(GAMEBALANCE_ADDRESS, GAMEBALANCE_ABI, provider);
       
-      // Get in-game balances for FOOD (tokenId 1) and GOLD (tokenId 2)
       const [foodBal, goldBal] = await Promise.all([
-        gameBalanceContract.getBalance(address, 1), // FOOD
-        gameBalanceContract.getBalance(address, 2)  // GOLD
+        gameBalanceContract.getBalance(address, 1),
+        gameBalanceContract.getBalance(address, 2)
       ]);
-      
-      console.log('In-game balances loaded:', {
-        food: ethers.formatEther(foodBal),
-        gold: ethers.formatEther(goldBal)
-      });
       
       setUserBalances({
         food: parseFloat(ethers.formatEther(foodBal)),
@@ -217,7 +198,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
       });
     } catch (err) {
       console.error('Error loading in-game balances:', err);
-      setError('Failed to load balances. Please refresh.');
     } finally {
       setLoadingBalances(false);
     }
@@ -246,7 +226,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
     return userBalances.food >= totals.FOOD && userBalances.gold >= totals.GOLD;
   };
 
-  // Purchase boosts - DEDUCT from in-game balance via GameBalance contract
+  // Purchase boosts via BattleBoost contract
   const handlePurchase = async () => {
     if (!signer) {
       setError('Please connect your wallet');
@@ -258,8 +238,8 @@ const BattleBoosts = ({ provider, signer, address }) => {
       return;
     }
 
-    if (!canAfford()) {
-      const totals = getTotalCost();
+    const totals = getTotalCost();
+    if (userBalances.food < totals.FOOD || userBalances.gold < totals.GOLD) {
       setError(`Insufficient in-game balance! Need ${totals.FOOD} FOOD and ${totals.GOLD} GOLD`);
       return;
     }
@@ -269,36 +249,22 @@ const BattleBoosts = ({ provider, signer, address }) => {
     setSuccess('');
 
     try {
-      const gameBalanceContract = new ethers.Contract(GAMEBALANCE_ADDRESS, GAMEBALANCE_ABI, signer);
+      const battleBoostContract = new ethers.Contract(BATTLEBOOST_ADDRESS, BATTLEBOOST_ABI, signer);
       
-      // Group purchases by token type
-      const totals = getTotalCost();
+      // Prepare arrays for batch purchase
+      const boostIds = cart.map(b => b.id); // Numeric IDs 1-8
+      const quantities = cart.map(() => 1);
       
-      console.log('Purchasing boosts:', {
-        foodCost: totals.FOOD,
-        goldCost: totals.GOLD,
-        boosts: cart.map(b => b.name)
-      });
+      console.log('Purchasing boosts via contract:', { boostIds, quantities });
       
-      // Spend FOOD if needed
-      if (totals.FOOD > 0) {
-        console.log(`Spending ${totals.FOOD} FOOD...`);
-        const foodAmount = ethers.parseEther(totals.FOOD.toString());
-        const tx = await gameBalanceContract.spendTokens(1, foodAmount); // tokenId 1 = FOOD
-        await tx.wait();
-        console.log('✅ FOOD spent');
-      }
+      // Call BattleBoost contract
+      const tx = await battleBoostContract.purchaseBoosts(boostIds, quantities);
+      console.log('Transaction sent:', tx.hash);
       
-      // Spend GOLD if needed
-      if (totals.GOLD > 0) {
-        console.log(`Spending ${totals.GOLD} GOLD...`);
-        const goldAmount = ethers.parseEther(totals.GOLD.toString());
-        const tx = await gameBalanceContract.spendTokens(2, goldAmount); // tokenId 2 = GOLD
-        await tx.wait();
-        console.log('✅ GOLD spent');
-      }
+      await tx.wait();
+      console.log('✅ Transaction confirmed!');
       
-      // Add boosts to inventory
+      // Add to localStorage for frontend
       const newBoosts = [...ownedBoosts];
       cart.forEach(boost => {
         newBoosts.push({
@@ -317,20 +283,23 @@ const BattleBoosts = ({ provider, signer, address }) => {
       setSuccess(`✅ Purchased ${cart.length} boost${cart.length > 1 ? 's' : ''}!`);
       setCart([]);
       
-      // Reload balances to show updated in-game balance
+      // Reload balances
       await loadBalances();
       
     } catch (err) {
       console.error('Purchase error:', err);
       
-      // Parse error message
       let errorMsg = 'Purchase failed';
       if (err.message?.includes('insufficient balance')) {
         errorMsg = 'Insufficient in-game balance!';
       } else if (err.message?.includes('user rejected')) {
         errorMsg = 'Transaction cancelled';
+      } else if (err.message?.includes('not authorized') || err.message?.includes('AccessControl')) {
+        errorMsg = 'Contract not authorized. Please contact admin to grant SPEND_TOKENS role.';
       } else if (err.reason) {
         errorMsg = err.reason;
+      } else if (err.message) {
+        errorMsg = err.message.slice(0, 100);
       }
       
       setError(errorMsg);
@@ -363,7 +332,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900 to-gray-900 text-white">
       <div className="container mx-auto px-4 py-12">
         
-        {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-yellow-400 via-red-500 to-purple-600 bg-clip-text text-transparent">
             Battle Boosts Shop
@@ -372,7 +340,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
             Power up your Fighters with strategic boosts! Use one boost per clan (max 7 per battle).
           </p>
           
-          {/* IN-GAME Balances */}
           {address && (
             <div className="inline-flex gap-4 bg-gray-800/50 border border-gray-700 rounded-lg px-6 py-3">
               <div className="flex items-center gap-2">
@@ -395,12 +362,10 @@ const BattleBoosts = ({ provider, signer, address }) => {
             </div>
           )}
           
-          {/* Label for clarity */}
           {address && (
-            <p className="text-xs text-gray-500 mt-2">In-game balances (from GameBalance contract)</p>
+            <p className="text-xs text-gray-500 mt-2">In-game balances (GameBalance contract)</p>
           )}
 
-          {/* Owned Boosts Count */}
           {ownedBoosts.length > 0 && (
             <div className="mt-4 inline-block bg-green-900/30 border border-green-500 rounded-lg px-4 py-2">
               <p className="text-sm">
@@ -411,14 +376,12 @@ const BattleBoosts = ({ provider, signer, address }) => {
           )}
         </div>
 
-        {/* Success Message */}
         {success && (
           <div className="mb-6 p-4 bg-green-900/30 border border-green-500 rounded-lg max-w-2xl mx-auto">
             <p className="text-green-400 text-center font-bold">{success}</p>
           </div>
         )}
 
-        {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-900/30 border border-red-500 rounded-lg max-w-2xl mx-auto">
             <div className="flex items-center justify-center gap-2">
@@ -428,7 +391,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
           </div>
         )}
 
-        {/* Boost Grid */}
+        {/* Boost Grid - Same as before */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
           {BOOSTS.map((boost) => {
             const IconComponent = boost.icon;
@@ -443,7 +406,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
                     : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
                 }`}
               >
-                {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className={`p-3 rounded-lg bg-gradient-to-br ${boost.color}`}>
                     <IconComponent className="w-8 h-8 text-white" />
@@ -454,21 +416,17 @@ const BattleBoosts = ({ provider, signer, address }) => {
                   </div>
                 </div>
 
-                {/* Name & Clan */}
                 <h3 className="text-xl font-bold mb-1">{boost.name}</h3>
                 <p className="text-sm text-gray-400 mb-3">{boost.clan} Clan</p>
 
-                {/* Effect Badge */}
                 <div className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-3 bg-gradient-to-r ${boost.color}`}>
                   {boost.effect}
                 </div>
 
-                {/* Description */}
                 <p className="text-sm text-gray-300 mb-4 min-h-[60px]">
                   {boost.description}
                 </p>
 
-                {/* Details */}
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-400">Duration:</span>
@@ -480,7 +438,6 @@ const BattleBoosts = ({ provider, signer, address }) => {
                   </div>
                 </div>
 
-                {/* Add to Cart Button */}
                 <button
                   onClick={() => inCart ? removeFromCart(boost.id) : addToCart(boost)}
                   className={`w-full py-2 rounded-lg font-bold transition-all ${
@@ -496,7 +453,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
           })}
         </div>
 
-        {/* Shopping Cart */}
+        {/* Shopping Cart - Same as before but with updated button */}
         {cart.length > 0 && (
           <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t-2 border-purple-500 p-6 shadow-2xl z-50">
             <div className="container mx-auto">
@@ -515,7 +472,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
 
                 <div className="flex items-center gap-6">
                   <div className="text-right">
-                    <p className="text-sm text-gray-400">Total Cost (In-game)</p>
+                    <p className="text-sm text-gray-400">Total Cost</p>
                     {(() => {
                       const totals = getTotalCost();
                       return (
@@ -536,15 +493,15 @@ const BattleBoosts = ({ provider, signer, address }) => {
 
                   <button
                     onClick={handlePurchase}
-                    disabled={purchasing || !signer || !canAfford()}
+                    disabled={purchasing || !address || !canAfford()}
                     className={`px-8 py-3 rounded-lg font-bold text-lg transition-all flex items-center gap-2 ${
-                      purchasing || !signer || !canAfford()
+                      purchasing || !address || !canAfford()
                         ? 'bg-gray-600 cursor-not-allowed'
                         : 'bg-gradient-to-r from-yellow-500 to-red-600 hover:from-yellow-600 hover:to-red-700 transform hover:scale-105'
                     }`}
                   >
                     {purchasing && <Loader className="w-5 h-5 animate-spin" />}
-                    {purchasing ? 'Processing...' : !signer ? 'Connect Wallet' : !canAfford() ? 'Insufficient Balance' : 'Purchase'}
+                    {purchasing ? 'Processing...' : !address ? 'Connect Wallet' : !canAfford() ? 'Insufficient Balance' : 'Purchase'}
                   </button>
                 </div>
               </div>
@@ -552,19 +509,19 @@ const BattleBoosts = ({ provider, signer, address }) => {
           </div>
         )}
 
-        {/* Payment Info */}
+        {/* Info sections - same as before */}
         <div className="mt-12 bg-gray-800/50 rounded-lg p-8">
           <h2 className="text-2xl font-bold mb-6">How It Works</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="p-4 bg-blue-900/20 border border-blue-500 rounded-lg">
               <h4 className="font-bold text-blue-400 mb-2">💳 Payment</h4>
-              <p className="text-sm text-gray-300">Purchase boosts using your <span className="font-bold text-yellow-400">in-game FOOD & GOLD</span> balances from the GameBalance contract. No wallet tokens needed!</p>
+              <p className="text-sm text-gray-300">Purchase boosts using your in-game FOOD & GOLD balances. Balances are deducted automatically via the BattleBoost contract.</p>
             </div>
 
             <div className="p-4 bg-green-900/20 border border-green-500 rounded-lg">
               <h4 className="font-bold text-green-400 mb-2">📦 Inventory</h4>
-              <p className="text-sm text-gray-300">Purchased boosts are added to your inventory and available in all future battles. Use them strategically!</p>
+              <p className="text-sm text-gray-300">Purchased boosts are tracked on-chain and available in all future battles. Use them strategically!</p>
             </div>
           </div>
 
@@ -575,7 +532,7 @@ const BattleBoosts = ({ provider, signer, address }) => {
           </div>
         </div>
 
-        {/* Boost Strategies */}
+        {/* Strategies section - same as before */}
         <div className="mt-8 bg-gray-800/50 rounded-lg p-8">
           <h2 className="text-2xl font-bold mb-6">Recommended Strategies</h2>
           
