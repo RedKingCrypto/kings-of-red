@@ -39,10 +39,11 @@ const HERALD_ABI_COMPLETE = [
   "event HeraldMinted(uint256 indexed tokenId, address indexed minter, uint8 rarity, uint8 clan)"
 ];
 
+// FIX 1: claimRewards now correctly takes tokenId parameter to match the actual contract
 const HERALD_STAKING_ABI_COMPLETE = [
   "function stakeHerald(uint256 tokenId)",
   "function unstakeHerald(uint256 tokenId)",
-  "function claimRewards()",
+  "function claimRewards(uint256 tokenId)",  // ✅ FIXED: was claimRewards() with no args
   "function getUserStakedHeralds(address user) view returns (uint256[])",
   "function getStakedHeralds(address user) view returns (uint256[])",
   "function stakedHeralds(address user) view returns (uint256[])",
@@ -381,6 +382,8 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
     }
   };
 
+  // FIX 1: Pass herald.tokenId to claimRewards() so the contract knows WHICH herald
+  // to process — previously called with no args which matched the wrong function signature
   const handleClaimClan = async (clanId) => {
     const herald = stakedByClans[clanId];
     if (!herald?.canClaim) return;
@@ -392,10 +395,11 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
       const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI_COMPLETE, signer);
       
       showMessageFunc('info', 'Claiming rewards...');
-      const tx = await stakingContract.claimRewards();
+      // ✅ FIXED: Pass herald.tokenId so contract deducts GOLD and credits FOOD correctly
+      const tx = await stakingContract.claimRewards(herald.tokenId);
       await tx.wait();
       
-      showMessageFunc('success', `Claimed ${PRODUCTION_RATES[herald.rarity]} FOOD!`);
+      showMessageFunc('success', `Claimed ${PRODUCTION_RATES[herald.rarity]} FOOD! (7 GOLD deducted)`);
       await loadStakingData(false);
     } catch (error) {
       const errorMsg = error.message?.toLowerCase().includes('gold')
@@ -471,7 +475,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
         </div>
       ) : (
         <>
-          {/* Clan Grid - SAME AS BEFORE */}
+          {/* Clan Grid */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {CLAN_NAMES.map((clanName, clanId) => {
               const herald = stakedByClans[clanId];
@@ -543,7 +547,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
             })}
           </div>
 
-          {/* Owned Heralds List - SAME AS BEFORE */}
+          {/* Owned Heralds List */}
           {ownedHeralds.length > 0 && (
             <div className="mt-8 p-4 bg-green-900/20 border border-green-800/50 rounded-lg">
               <h3 className="font-bold text-green-300 mb-2">Your Unstaked Heralds ({ownedHeralds.length})</h3>
@@ -557,7 +561,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
             </div>
           )}
 
-          {/* Info Box - SAME AS BEFORE */}
+          {/* Info Box */}
           <div className="mt-8 p-4 bg-yellow-900/20 border border-yellow-800/50 rounded-lg">
             <div className="flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
@@ -576,7 +580,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
         </>
       )}
 
-      {/* Stake Modal - SAME AS BEFORE */}
+      {/* Stake Modal */}
       {showStakeModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 border border-gray-700 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
