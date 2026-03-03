@@ -39,11 +39,10 @@ const HERALD_ABI_COMPLETE = [
   "event HeraldMinted(uint256 indexed tokenId, address indexed minter, uint8 rarity, uint8 clan)"
 ];
 
-// FIX 1: claimRewards now correctly takes tokenId parameter to match the actual contract
 const HERALD_STAKING_ABI_COMPLETE = [
   "function stakeHerald(uint256 tokenId)",
   "function unstakeHerald(uint256 tokenId)",
-  "function claimRewards(uint256 tokenId)",  // ✅ FIXED: was claimRewards() with no args
+  "function claimRewards()",
   "function getUserStakedHeralds(address user) view returns (uint256[])",
   "function getStakedHeralds(address user) view returns (uint256[])",
   "function stakedHeralds(address user) view returns (uint256[])",
@@ -382,8 +381,6 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
     }
   };
 
-  // FIX 1: Pass herald.tokenId to claimRewards() so the contract knows WHICH herald
-  // to process — previously called with no args which matched the wrong function signature
   const handleClaimClan = async (clanId) => {
     const herald = stakedByClans[clanId];
     if (!herald?.canClaim) return;
@@ -395,8 +392,7 @@ export default function StakingPage({ connected, walletAddress, onNavigate }) {
       const stakingContract = new ethers.Contract(HERALD_STAKING_ADDRESS, HERALD_STAKING_ABI_COMPLETE, signer);
       
       showMessageFunc('info', 'Claiming rewards...');
-      // ✅ FIXED: Pass herald.tokenId so contract deducts GOLD and credits FOOD correctly
-      const tx = await stakingContract.claimRewards(herald.tokenId);
+      const tx = await stakingContract.claimRewards();
       await tx.wait();
       
       showMessageFunc('success', `Claimed ${PRODUCTION_RATES[herald.rarity]} FOOD! (7 GOLD deducted)`);
