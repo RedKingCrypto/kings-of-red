@@ -199,13 +199,28 @@ export default function ExchangePage({ connected, walletAddress, onNavigate }) {
 
   const calcSwapOut = () => {
     if (!swapAmount || parseFloat(swapAmount) <= 0) return '0';
-    const a = parseFloat(swapAmount) * 0.98;
-    const m = { 'FOOD_GOLD': a/4, 'GOLD_FOOD': a*4, 'FOOD_WOOD': a/2, 'WOOD_FOOD': a*2, 'GOLD_WOOD': a/2, 'WOOD_GOLD': a*2 };
-    return (m[swapFrom + '_' + swapTo] || 0).toFixed(2);
+    const a = parseFloat(swapAmount) * 0.98; // after 2% fee
+    // 1 GOLD = 4 FOOD | 1 GOLD = 2 WOOD | 2 FOOD = 1 WOOD
+    const ratios = {
+      'FOOD_GOLD': a / 5,    // 4 FOOD = 1 GOLD
+      'GOLD_FOOD': a * 5,    // 1 GOLD = 4 FOOD
+      'FOOD_WOOD': a / 2.5,  // 2 FOOD = 1 WOOD
+      'WOOD_FOOD': a * 2.5,  // 1 WOOD = 2 FOOD
+      'GOLD_WOOD': a * 2,    // 1 GOLD = 2 WOOD
+      'WOOD_GOLD': a / 2     // 2 WOOD = 1 GOLD
+    };
+    return (ratios[swapFrom + '_' + swapTo] || 0).toFixed(2);
   };
 
   const swapRatio = () => {
-    const m = { 'FOOD_GOLD':'4 FOOD = 1 GOLD','GOLD_FOOD':'1 GOLD = 4 FOOD','FOOD_WOOD':'2 FOOD = 1 WOOD','WOOD_FOOD':'1 WOOD = 2 FOOD','GOLD_WOOD':'2 GOLD = 1 WOOD','WOOD_GOLD':'1 WOOD = 2 GOLD' };
+    const m = {
+      'FOOD_GOLD': '4 FOOD = 1 GOLD',
+      'GOLD_FOOD': '1 GOLD = 4 FOOD',
+      'FOOD_WOOD': '2 FOOD = 1 WOOD',
+      'WOOD_FOOD': '1 WOOD = 2 FOOD',
+      'GOLD_WOOD': '1 GOLD = 2 WOOD',
+      'WOOD_GOLD': '2 WOOD = 1 GOLD'
+    };
     return m[swapFrom + '_' + swapTo] || 'Select tokens';
   };
 
@@ -403,7 +418,7 @@ export default function ExchangePage({ connected, walletAddress, onNavigate }) {
             <ul className="list-disc ml-4 space-y-1 text-blue-400/80">
               <li>Deposit: Free, no limits</li>
               <li>Withdraw: 7% tax (40% burned, 40% treasury, 20% rewards pool), 24h cooldown</li>
-              <li>Swap Ratios: 4 FOOD = 1 GOLD, 2 FOOD = 1 WOOD, 2 GOLD = 1 WOOD</li>
+              <li>Swap Ratios: 4 FOOD = 1 GOLD, 2 FOOD = 1 WOOD, 1 GOLD = 2 WOOD</li>
               <li>Swap Fee: 2% (50% burned, 50% treasury)</li>
               <li>All transactions use in-game balance</li>
             </ul>
